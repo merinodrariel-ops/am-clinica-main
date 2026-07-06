@@ -921,7 +921,7 @@ export default function PhotoStudioModal({
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
     const [magicWandActive, setMagicWandActive] = useState(false);
-    const [magicWandTolerance, setMagicWandTolerance] = useState(8);
+    const [magicWandTolerance, setMagicWandTolerance] = useState(50);
     const [exportFileName, setExportFileName] = useState('');
     const [exportDestination, setExportDestination] = useState<'patient' | 'social'>('social');
     const [healMode, setHealMode] = useState(false);
@@ -3665,7 +3665,8 @@ export default function PhotoStudioModal({
         pushHistory();
         
         const octx = oc.getContext('2d')!;
-        const visited = scanlineFloodFillErase(octx, Math.round(x), Math.round(y), magicWandTolerance);
+        const scaledTolerance = 10 * Math.pow(magicWandTolerance / 100, 2);
+        const visited = scanlineFloodFillErase(octx, Math.round(x), Math.round(y), scaledTolerance);
         if (!visited) return;
         
         // Draw the current state with a temporary selection mask (bright red) on the visible canvas
@@ -4865,8 +4866,9 @@ export default function PhotoStudioModal({
         }
     }
 
-    async function handleSaveToDrive(mode: 'replace' | 'copy') {
+    async function handleSaveToDrive(mode: 'replace' | 'copy', destinationOverride?: 'patient' | 'social') {
         if (!activeFile) return;
+        const dest = destinationOverride ?? exportDestination;
         setSaving(mode);
         try {
             const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
@@ -4876,7 +4878,7 @@ export default function PhotoStudioModal({
             const customBase = exportFileName.trim() || activeFile.name.replace(/\.[^.]+$/, '');
             const filename = `${customBase}.${ext}`;
 
-            if (exportDestination === 'social') {
+            if (dest === 'social') {
                 const formData = new FormData();
                 formData.append('file', blob, filename);
                 const result = await uploadPhotoForSocialAction(folderId, filename, formData);
@@ -4926,7 +4928,7 @@ export default function PhotoStudioModal({
             setSaveDialogOpen(false);
 
             // For copies, wait a moment for Drive consistency before refreshing the list
-            if (exportDestination === 'social' || mode === 'copy') {
+            if (dest === 'social' || mode === 'copy') {
                 const toastId = toast.loading('Sincronizando con Google Drive...');
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 toast.dismiss(toastId);
@@ -5017,6 +5019,25 @@ export default function PhotoStudioModal({
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Global Undo & Redo buttons */}
+                        <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-0.5 mr-1 gap-0.5">
+                            <button
+                                onClick={handleUndo}
+                                disabled={history.length === 0}
+                                title="Deshacer (Ctrl+Z)"
+                                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                            >
+                                <Undo2 size={15} />
+                            </button>
+                            <button
+                                onClick={handleRedo}
+                                disabled={redoStack.length === 0}
+                                title="Rehacer (Ctrl+Y)"
+                                className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                            >
+                                <Redo2 size={15} />
+                            </button>
+                        </div>
                         {/* Canvas toggle */}
                         {canvasActive ? (
                             <div className="flex items-center gap-2">
@@ -6449,13 +6470,32 @@ export default function PhotoStudioModal({
                                 {/* 2. Actions */}
                                 <div className="flex flex-col gap-3">
                                     <button
-                                        onClick={() => handleSaveToDrive('copy')}
+                                        onClick={() => handleSaveToDrive('replace', 'patient')}
+                                        disabled={!!saving}
+                                        className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
+                                    >
+                                        {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                        Reemplazar foto original
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleSaveToDrive('copy', 'social')}
                                         disabled={!!saving}
                                         className="w-full py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-600/10 active:scale-[0.98]"
                                     >
-                                        {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                        Guardar copia en Selección
+                                        {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
+                                        Guardar copia en Selección (Redes)
                                     </button>
+
+                                    <button
+                                        onClick={() => handleSaveToDrive('copy', 'patient')}
+                                        disabled={!!saving}
+                                        className="w-full py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/15 border border-white/10 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                                    >
+                                        {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                        Guardar copia nueva en el Drive
+                                    </button>
+
                                     <button
                                         onClick={() => setSaveDialogOpen(false)}
                                         disabled={!!saving}
@@ -7335,16 +7375,6 @@ function ToolsPanel({
                             <p className="text-xs text-white/45 uppercase tracking-wider font-semibold">Recorte Manual</p>
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => onStartManualEraser(brushMode === 'erase' ? 'restore' : 'erase')}
-                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                                        brushMode !== null
-                                            ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-md'
-                                            : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
-                                    }`}
-                                >
-                                    <Eraser size={14} /> Pincel
-                                </button>
-                                <button
                                     onClick={() => onStartManualEraser('magic')}
                                     className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                                         magicWandActive
@@ -7353,6 +7383,16 @@ function ToolsPanel({
                                     }`}
                                 >
                                     <Sparkles size={14} /> Varita Mágica
+                                </button>
+                                <button
+                                    onClick={() => onStartManualEraser(brushMode === 'erase' ? 'restore' : 'erase')}
+                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                        brushMode !== null
+                                            ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-md'
+                                            : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
+                                    }`}
+                                >
+                                    <Eraser size={14} /> Pincel
                                 </button>
                             </div>
                         </div>
@@ -7397,7 +7437,7 @@ function ToolsPanel({
                                 <div className="flex items-center gap-2">
                                     <span className="text-white/50 text-xs w-16">Tolerancia</span>
                                     <input
-                                        type="range" min={1} max={25} step={1}
+                                        type="range" min={1} max={100} step={1}
                                         value={magicWandTolerance}
                                         onChange={e => onSetMagicWandTolerance(Number(e.target.value))}
                                         className="flex-1 accent-purple-500"
