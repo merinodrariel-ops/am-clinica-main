@@ -269,6 +269,32 @@ function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] 
     return [...files].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
 }
 
+// The main photo grid merges "Fotos" + "Selección" (Redes) into a single sortable grid.
+// Order: cover first, then the selection photos, then the rest. Manual drag order is
+// respected; "Selección" photos that don't have a saved position yet bubble up right
+// after the cover, so newly selected photos always appear first.
+function getOrderedGridPhotos(files: DriveFile[], savedOrder: string[]): DriveFile[] {
+    const gridFiles = files.filter(f => {
+        const c = classifyFile(f);
+        return c === 'foto' || c === 'redes';
+    });
+    const ordered = applySavedOrder(gridFiles, savedOrder);
+    const savedSet = new Set(savedOrder);
+    const newSelection = ordered.filter(f => classifyFile(f) === 'redes' && !savedSet.has(f.id));
+    if (newSelection.length === 0) return ordered;
+
+    const newSelSet = new Set(newSelection.map(f => f.id));
+    const withoutNew = ordered.filter(f => !newSelSet.has(f.id));
+    const cover = withoutNew.slice(0, 1);
+    const rest = withoutNew.slice(1);
+    return [...cover, ...newSelection, ...rest];
+}
+
+function isGridPhoto(file: DriveFile): boolean {
+    const c = classifyFile(file);
+    return c === 'foto' || c === 'redes';
+}
+
 const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
 const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente']);
 
@@ -348,7 +374,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         if (!over || active.id === over.id) return;
 
         const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
-        const photos = applySavedOrder(files.filter(f => classifyFile(f) === 'foto'), fotosOrder[motherFolderId] || []);
+        const photos = getOrderedGridPhotos(files, fotosOrder[motherFolderId] || []);
         const oldIdx = photos.findIndex(f => f.id === String(active.id));
         const newIdx = photos.findIndex(f => f.id === String(over.id));
         if (oldIdx === -1 || newIdx === -1) return;
@@ -358,7 +384,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const coverFileId = reordered[0]?.id || undefined;
 
         // Update files in state
-        const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
+        const otherFiles = files.filter(f => !isGridPhoto(f));
         setFiles([...reordered, ...otherFiles]);
 
         setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
@@ -373,14 +399,14 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     }
 
     function handleSetPortada(file: DriveFile) {
-        const photos = files.filter(f => classifyFile(f) === 'foto');
+        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
+        const photos = getOrderedGridPhotos(files, fotosOrder[motherFolderId] || []);
         const idx = photos.findIndex(f => f.id === file.id);
         if (idx < 0) return;
         const reordered = [photos[idx], ...photos.slice(0, idx), ...photos.slice(idx + 1)];
-        const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
+        const otherFiles = files.filter(f => !isGridPhoto(f));
         setFiles([...reordered, ...otherFiles]);
         const ids = reordered.map(f => f.id);
-        const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
         setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
         void saveFotosOrderAction(patientId, motherFolderId, ids, file.id).then(result => {
             if (result.error) {
@@ -618,11 +644,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         classifiedGroups[cat].files.push(file);
     }
 
-    // Apply sorting to Fotos
+    // Merge "Fotos" + "Selección" into a single grid ordered cover → selección → rest.
     const savedOrder = fotosOrder[motherFolderId] || [];
-    if (savedOrder.length > 0) {
-        classifiedGroups.foto.files = applySavedOrder(classifiedGroups.foto.files, savedOrder);
-    }
+    classifiedGroups.foto.files = getOrderedGridPhotos(files, savedOrder);
+    classifiedGroups.redes.files = [];
     const dentalBitePairs = buildDentalBitePairs(classifiedGroups['3d'].files);
 
     // Sort 'exocad' files: ordered by modifiedTime descending (newest first)
