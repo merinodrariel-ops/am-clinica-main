@@ -79,6 +79,56 @@ export interface PatientDriveFoldersResult {
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
+function isSelectionFolderName(folderName: string): boolean {
+    return folderName.startsWith('[Selección]') ||
+        folderName.includes('Selección') ||
+        folderName.includes('Seleccion') ||
+        folderName === 'Redes';
+}
+
+async function moveFileToSelectionFolder(
+    drive: ReturnType<typeof getDriveClient>,
+    fileId: string,
+    patientFolderId: string
+): Promise<{ error?: string }> {
+    const parentFolder = await drive.files.get({
+        fileId: patientFolderId,
+        fields: 'name',
+        supportsAllDrives: true,
+    });
+    const parentName = parentFolder.data.name || '';
+    const targetFolderName = isSelectionFolderName(parentName)
+        ? parentName
+        : `[Selección] ${parentName}`;
+    const { folderId: targetFolderId, error: folderError } = isSelectionFolderName(parentName)
+        ? { folderId: patientFolderId, error: undefined }
+        : await createDriveFolder(drive, patientFolderId, targetFolderName);
+
+    if (!targetFolderId) {
+        return { error: folderError ?? 'No se pudo crear la carpeta de selección' };
+    }
+
+    const file = await drive.files.get({
+        fileId,
+        fields: 'id, parents',
+        supportsAllDrives: true,
+    });
+    const parents = file.data.parents || [];
+    if (parents.includes(targetFolderId)) return {};
+    if (parents.length === 0) return { error: 'No se pudieron resolver los padres actuales del archivo' };
+
+    await drive.files.update({
+        fileId,
+        supportsAllDrives: true,
+        enforceSingleParent: true,
+        addParents: targetFolderId,
+        removeParents: parents.join(','),
+        fields: 'id',
+    });
+
+    return {};
+}
+
 function getFolderDisplayName(folderName: string): string {
     // New convention: "[PRESENTACION] APELLIDO, Nombre" → "PRESENTACION"
     const bracketMatch = folderName.match(/^\[(.+?)\]/);
@@ -363,10 +413,7 @@ export async function uploadEditedPhotoAction(
             supportsAllDrives: true,
         });
         const parentName = parentFolder.data.name || '';
-        const isSelectionFolder = parentName.startsWith('[Selección]') ||
-                                  parentName.includes('Selección') ||
-                                  parentName.includes('Seleccion') ||
-                                  parentName === 'Redes';
+        const isSelectionFolder = isSelectionFolderName(parentName);
 
         let targetFolderId = folderId;
         if (!isSelectionFolder) {
@@ -422,10 +469,7 @@ export async function uploadPhotoForSocialAction(
             supportsAllDrives: true,
         });
         const parentName = parentFolder.data.name || '';
-        const isSelectionFolder = parentName.startsWith('[Selección]') ||
-                                  parentName.includes('Selección') ||
-                                  parentName.includes('Seleccion') ||
-                                  parentName === 'Redes';
+        const isSelectionFolder = isSelectionFolderName(parentName);
 
         let targetFolderId = patientFolderId;
         if (!isSelectionFolder) {
@@ -458,8 +502,9 @@ export async function uploadPhotoForSocialAction(
  */
 export async function replaceEditedPhotoAction(
     fileId: string,
-    formData: FormData
-): Promise<{ error?: string }> {
+    formData: FormData,
+    selectionParentFolderId?: string
+): Promise<{ error?: string; selectionError?: string }> {
     try {
         const roleCheck = await requireDriveManageRole('reemplazar archivos en Drive');
         if (roleCheck.error) return roleCheck;
@@ -476,6 +521,12 @@ export async function replaceEditedPhotoAction(
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await updateFileContentInDrive(fileId, buffer, file.type || 'image/jpeg');
         if (!result.success) return { error: result.error };
+        if (selectionParentFolderId) {
+            if (!DRIVE_ID_RE.test(selectionParentFolderId)) return { selectionError: 'Carpeta de selección inválida' };
+            const drive = getDriveClient();
+            const selectionResult = await moveFileToSelectionFolder(drive, fileId, selectionParentFolderId);
+            if (selectionResult.error) return { selectionError: selectionResult.error };
+        }
         return {};
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };

@@ -4949,14 +4949,18 @@ export default function PhotoStudioModal({
                 // Update existing file content in-place (preserves file ID, no duplicate)
                 const formData = new FormData();
                 formData.append('file', blob, filename);
-                const result = await replaceEditedPhotoAction(activeFile.id, formData);
+                const result = await replaceEditedPhotoAction(activeFile.id, formData, folderId);
                 if (result.error) {
                     toast.error(`Error al reemplazar: ${result.error}`);
                     return;
                 }
-                toast.success('Foto reemplazada en Drive');
+                if (result.selectionError) {
+                    toast.warning(`Foto reemplazada, pero no se pudo pasar a Selección: ${result.selectionError}`);
+                } else {
+                    toast.success('Foto reemplazada y enviada a Selección');
+                }
                 markAsEdited(activeFile.id);
-                setActiveFile(prev => prev ? { ...prev, mimeType: isPng ? 'image/png' : 'image/jpeg' } : null);
+                setActiveFile(prev => prev ? { ...prev, mimeType: isPng ? 'image/png' : 'image/jpeg', parentName: prev.parentName?.includes('Selección') ? prev.parentName : `[Selección] ${prev.parentName || ''}` } : null);
                 // Reset edit state and reload fresh from Drive (cache-busted)
                 setImageUrl(`/api/drive/file/${activeFile.id}?t=${Date.now()}`);
                 setRotation(0);
@@ -4985,8 +4989,8 @@ export default function PhotoStudioModal({
 
             setSaveDialogOpen(false);
 
-            // For copies, wait a moment for Drive consistency before refreshing the list
-            if (dest === 'social' || mode === 'copy') {
+            // For selection saves/moves, wait a moment for Drive consistency before refreshing the list
+            if (dest === 'social' || mode === 'copy' || mode === 'replace') {
                 const toastId = toast.loading('Sincronizando con Google Drive...');
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 toast.dismiss(toastId);
@@ -6533,7 +6537,7 @@ export default function PhotoStudioModal({
                                         className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
                                     >
                                         {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                        Reemplazar foto original
+                                        Reemplazar original y pasar a Selección
                                     </button>
 
                                     <button
