@@ -853,6 +853,7 @@ async function matchEmployees(
 export async function getAllPersonalBasic(): Promise<
     { id: string; nombre: string; apellido: string | null }[]
 > {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     const admin = getAdminClient();
     const { data } = await admin
         .from('personal')
@@ -867,6 +868,7 @@ export async function saveProsoftMapping(
     rawName: string,
     personalId: string
 ): Promise<{ success: boolean; error?: string }> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     const admin = getAdminClient();
     const { error } = await admin
         .from('prosoft_name_map')
@@ -880,6 +882,7 @@ export async function saveProsoftMapping(
 export async function deleteProsoftMapping(
     rawName: string
 ): Promise<{ success: boolean }> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     const admin = getAdminClient();
     await admin.from('prosoft_name_map').delete().eq('raw_name', rawName);
     return { success: true };
@@ -888,6 +891,7 @@ export async function deleteProsoftMapping(
 export async function getProsoftMappings(): Promise<
     { raw_name: string; personal_id: string; nombre: string; apellido: string | null }[]
 > {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     const admin = getAdminClient();
     const { data } = await admin
         .from('prosoft_name_map')
@@ -911,6 +915,7 @@ export async function previewProsoftImport(
     sheetUrl: string,
     mesOverride?: string // optional manual override: 'YYYY-MM'
 ): Promise<ProsoftPreview> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     const csvUrls = getCsvUrlsFromSheetUrl(sheetUrl);
     if (csvUrls.length === 0) {
         throw new Error(
@@ -927,6 +932,7 @@ export async function previewProsoftImportSafe(
     sheetUrl: string,
     mesOverride?: string
 ): Promise<ActionResult<ProsoftPreview>> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     try {
         const data = await previewProsoftImport(sheetUrl, mesOverride);
         return { success: true, data };
@@ -946,6 +952,7 @@ export async function importProsoftData(
     mesOverride?: string,
     onlyMatched = true
 ): Promise<ImportResult> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     const preview = normalizePreviewRows(await previewProsoftImport(sheetUrl, mesOverride));
     const admin = getAdminClient();
 
@@ -1052,6 +1059,7 @@ export async function importProsoftDataSafe(
     mesOverride?: string,
     onlyMatched = true
 ): Promise<ActionResult<ImportResult>> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     try {
         const data = await importProsoftData(sheetUrl, mesOverride, onlyMatched);
         return { success: true, data };
@@ -1065,11 +1073,13 @@ export async function importProsoftDataSafe(
 }
 
 import * as xlsx from 'xlsx';
+import { assertRole, MANAGE_ROLES } from '@/lib/server-role-guard';
 
 export async function processProsoftRows(
     csvRows: string[][],
     mesOverride?: string
 ): Promise<ProsoftPreview> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     const detectedPeriod = extractPeriodFromCsv(csvRows);
     const mes = detectedPeriod?.mes || mesOverride;
 
@@ -1137,6 +1147,7 @@ export async function previewProsoftFileSafe(
     formData: FormData,
     mesOverride?: string
 ): Promise<ActionResult<ProsoftPreview>> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     try {
         const file = formData.get('file') as File;
         if (!file) throw new Error('No se envió ningún archivo');
@@ -1167,6 +1178,7 @@ export async function importProsoftPreviewSafe(
     onlyMatched = true,
     personalIdFilter?: string
 ): Promise<ActionResult<ImportResult>> {
+    await assertRole(MANAGE_ROLES, 'importar datos de Prosoft');
     try {
         const normalizedPreview = normalizePreviewRows(preview);
         const admin = getAdminClient();
