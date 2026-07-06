@@ -33,6 +33,10 @@ export const RATIOS: { label: string; value: CanvasRatio; desc: string; w: numbe
 const EXPORT_BASE = 1080;
 const HANDLE_SIZE = 8;
 
+function isFinitePositive(value: number): boolean {
+    return Number.isFinite(value) && value > 0;
+}
+
 // ── Module-level helpers (exported for reuse in PhotoStudioModal) ─────────────
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
@@ -73,6 +77,17 @@ export function makeLayer(
 }
 
 export function getLayerCorners(layer: CanvasLayer, cw: number, ch: number): [number, number][] {
+    if (
+        !isFinitePositive(cw) ||
+        !isFinitePositive(ch) ||
+        !Number.isFinite(layer.x) ||
+        !Number.isFinite(layer.y) ||
+        !isFinitePositive(layer.w) ||
+        !isFinitePositive(layer.h) ||
+        !Number.isFinite(layer.rotation)
+    ) {
+        return [];
+    }
     const cx = layer.x * cw, cy = layer.y * ch;
     const hw = (layer.w * cw) / 2, hh = (layer.h * ch) / 2;
     const rad = layer.rotation * Math.PI / 180;
@@ -93,6 +108,19 @@ export function hitTestCorner(layer: CanvasLayer, nx: number, ny: number, cw: nu
 }
 
 export function hitTestLayerBody(layer: CanvasLayer, nx: number, ny: number, cw: number, ch: number): boolean {
+    if (
+        !Number.isFinite(nx) ||
+        !Number.isFinite(ny) ||
+        !isFinitePositive(cw) ||
+        !isFinitePositive(ch) ||
+        !Number.isFinite(layer.x) ||
+        !Number.isFinite(layer.y) ||
+        !isFinitePositive(layer.w) ||
+        !isFinitePositive(layer.h) ||
+        !Number.isFinite(layer.rotation)
+    ) {
+        return false;
+    }
     const lx = layer.x * cw, ly = layer.y * ch;
     const px = nx * cw - lx, py = ny * ch - ly;
     const rad = -layer.rotation * Math.PI / 180;
@@ -188,6 +216,12 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
             const py = layer.y * displaySize.h;
             const pw = layer.w * displaySize.w;
             const ph = layer.h * displaySize.h;
+            if (
+                !Number.isFinite(px) ||
+                !Number.isFinite(py) ||
+                !isFinitePositive(pw) ||
+                !isFinitePositive(ph)
+            ) continue;
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
@@ -202,6 +236,7 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
             const sel = layers.find(l => l.id === selectedId);
             if (sel) {
                 const corners = getLayerCorners(sel, displaySize.w, displaySize.h);
+                if (corners.length !== 4) return;
                 ctx.save();
                 ctx.strokeStyle = '#C9A96E';
                 ctx.lineWidth = 1.5 * (displaySize.w / renderW); // compensate scale
@@ -252,6 +287,12 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
         for (const layer of layers) {
             const px = layer.x * expW, py = layer.y * expH;
             const pw = layer.w * expW, ph = layer.h * expH;
+            if (
+                !Number.isFinite(px) ||
+                !Number.isFinite(py) ||
+                !isFinitePositive(pw) ||
+                !isFinitePositive(ph)
+            ) continue;
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
@@ -326,6 +367,7 @@ export default function CanvasCompositor({ files, canSave, onSaveToDrive }: Prop
     // ── Pointer interaction ───────────────────────────────────────────────────
     function getNorm(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
         const rect = e.currentTarget.getBoundingClientRect();
+        if (!isFinitePositive(rect.width) || !isFinitePositive(rect.height)) return [0.5, 0.5];
         return [
             (e.clientX - rect.left) / rect.width,
             (e.clientY - rect.top) / rect.height,

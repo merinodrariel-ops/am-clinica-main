@@ -3035,7 +3035,14 @@ export default function PhotoStudioModal({
         for (const layer of canvasLayers) {
             const px = layer.x * renderW, py = layer.y * renderH;
             const pw = layer.w * renderW, ph = layer.h * renderH;
-            if (!Number.isFinite(pw) || !Number.isFinite(ph) || pw <= 0 || ph <= 0) continue;
+            if (
+                !Number.isFinite(px) ||
+                !Number.isFinite(py) ||
+                !Number.isFinite(pw) ||
+                !Number.isFinite(ph) ||
+                pw <= 0 ||
+                ph <= 0
+            ) continue;
             const previewCanvas = canvasHealPreviewRef.current?.layerId === layer.id
                 ? canvasHealPreviewRef.current.canvas
                 : null;
@@ -3056,6 +3063,7 @@ export default function PhotoStudioModal({
             const sel = canvasLayers.find(l => l.id === canvasSelectedId);
             if (sel) {
                 const corners = getLayerCorners(sel, renderW, renderH);
+                if (corners.length !== 4) return;
                 ctx.save();
                 ctx.strokeStyle = '#C9A96E';
                 ctx.lineWidth = 3;
@@ -3080,6 +3088,9 @@ export default function PhotoStudioModal({
     // ── Canvas layer interaction ──────────────────────────────────────────────
     function getCanvasLayerNorm(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
         const rect = e.currentTarget.getBoundingClientRect();
+        if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) {
+            return [0.5, 0.5];
+        }
         return [(e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height];
     }
 
@@ -3176,6 +3187,9 @@ export default function PhotoStudioModal({
         const [nx, ny] = getCanvasLayerNorm(e);
         const { layerId, mode, startX, startY, origLayer } = canvasLayerDragRef.current;
         const dx = nx - startX, dy = ny - startY;
+        const canvasW = e.currentTarget.clientWidth;
+        const canvasH = e.currentTarget.clientHeight;
+        const shiftKey = e.shiftKey;
         setCanvasLayers(prev => prev.map(l => {
             if (l.id !== layerId) return l;
             if (mode === 'move') return {
@@ -3188,12 +3202,13 @@ export default function PhotoStudioModal({
                             - Math.atan2(startY - origLayer.y, startX - origLayer.x);
                 let deg = origLayer.rotation + angle * 180 / Math.PI;
                 // Shift held -> snap to 45° for better precision (0, 45, 90, etc.)
-                if (e.shiftKey) {
+                if (shiftKey) {
                     deg = Math.round(deg / 45) * 45;
                 }
                 return { ...l, rotation: normalizeRotation(deg) };
             }
-            const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
+            const W = Number.isFinite(canvasW) && canvasW > 0 ? canvasW : 1;
+            const H = Number.isFinite(canvasH) && canvasH > 0 ? canvasH : 1;
             const distSqStart = Math.pow((startX - origLayer.x) * W, 2) + Math.pow((startY - origLayer.y) * H, 2);
             const distSqNow = Math.pow((nx - origLayer.x) * W, 2) + Math.pow((ny - origLayer.y) * H, 2);
             if (distSqStart < 1) return l;
@@ -3568,11 +3583,21 @@ export default function PhotoStudioModal({
             ctx.fillRect(0, 0, expW, expH);
         }
         for (const layer of canvasLayers) {
-            ctx.save();
-            ctx.translate(layer.x * expW, layer.y * expH);
-            ctx.rotate(layer.rotation * Math.PI / 180);
+            const px = layer.x * expW;
+            const py = layer.y * expH;
             const pw = layer.w * expW;
             const ph = layer.h * expH;
+            if (
+                !Number.isFinite(px) ||
+                !Number.isFinite(py) ||
+                !Number.isFinite(pw) ||
+                !Number.isFinite(ph) ||
+                pw <= 0 ||
+                ph <= 0
+            ) continue;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(layer.rotation * Math.PI / 180);
             // Safety check for export
             if (
                 layer.img instanceof HTMLImageElement &&
