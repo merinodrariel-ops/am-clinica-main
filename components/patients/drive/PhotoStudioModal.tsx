@@ -5002,6 +5002,10 @@ export default function PhotoStudioModal({
 
     async function handleSaveToDrive(mode: 'replace' | 'copy', dest: 'patient' | 'social') {
         if (!activeFile) return;
+        if (canvasActive && mode === 'replace') {
+            toast.error('Un lienzo nuevo se guarda como copia en Selección; no reemplaza fotos originales');
+            return;
+        }
         setSaving(mode);
         try {
             const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
@@ -5325,15 +5329,17 @@ export default function PhotoStudioModal({
                                         toast.error('Confirmá o cancelá el recorte antes de guardar');
                                         return;
                                     }
-                                    const baseName = activeFile?.name.replace(/\.[^.]+$/, '') ?? 'foto';
+                                    const baseName = canvasActive
+                                        ? (activeCanvas?.name || `lienzo_${canvasRatio.replace(':', 'x')}`)
+                                        : (activeFile?.name.replace(/\.[^.]+$/, '') ?? 'foto');
                                     const cleanPatientName = patientName.replace(/\s+/g, '_');
-                                    setExportFileName(`${cleanPatientName}_${baseName}_editada`);
+                                    setExportFileName(`${cleanPatientName}_${baseName}_${canvasActive ? 'lienzo' : 'editada'}`);
                                     setSaveDialogOpen(true);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#b8924e] transition-colors"
                             >
                                 <Save size={14} />
-                                <span className="hidden sm:inline">Guardar foto</span>
+                                <span className="hidden sm:inline">{canvasActive ? 'Guardar lienzo' : 'Guardar foto'}</span>
                             </button>
                         )}
                         {!smileMode && (
@@ -6601,7 +6607,9 @@ export default function PhotoStudioModal({
                                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
                                 className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl"
                             >
-                                <h3 className="text-white font-semibold text-lg mb-2">Guardar cambios</h3>
+                                <h3 className="text-white font-semibold text-lg mb-2">
+                                    {canvasActive ? 'Guardar lienzo' : 'Guardar cambios'}
+                                </h3>
                                 
                                 {/* 1. Filename field */}
                                 <div className="space-y-1.5 mb-5">
@@ -6631,20 +6639,24 @@ export default function PhotoStudioModal({
                                 <div className="bg-purple-950/20 border border-purple-500/20 rounded-xl p-3.5 text-[11px] text-purple-300/95 leading-relaxed flex gap-2.5 mb-6">
                                     <Globe2 size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
                                     <span>
-                                        Las fotos editadas se guardan automáticamente en la subcarpeta <strong>Selección</strong>, optimizadas y sin metadatos (GPS, EXIF, datos de cámara) para proteger la privacidad al publicarse.
+                                        {canvasActive
+                                            ? 'Los lienzos nuevos se guardan como archivo nuevo en la subcarpeta Selección. No reemplazan ninguna foto original.'
+                                            : <>Las fotos editadas se guardan automáticamente en la subcarpeta <strong>Selección</strong>, optimizadas y sin metadatos (GPS, EXIF, datos de cámara) para proteger la privacidad al publicarse.</>}
                                     </span>
                                 </div>
 
                                 {/* 2. Actions */}
                                 <div className="flex flex-col gap-3">
-                                    <button
-                                        onClick={() => handleSaveToDrive('replace', 'patient')}
-                                        disabled={!!saving}
-                                        className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
-                                    >
-                                        {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                        Reemplazar original y pasar a Selección
-                                    </button>
+                                    {!canvasActive && (
+                                        <button
+                                            onClick={() => handleSaveToDrive('replace', 'patient')}
+                                            disabled={!!saving}
+                                            className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10 active:scale-[0.98]"
+                                        >
+                                            {saving === 'replace' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                            Reemplazar original y pasar a Selección
+                                        </button>
+                                    )}
 
                                     <button
                                         onClick={() => handleSaveToDrive('copy', 'social')}
@@ -6652,7 +6664,7 @@ export default function PhotoStudioModal({
                                         className="w-full py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-600/10 active:scale-[0.98]"
                                     >
                                         {saving === 'copy' ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
-                                        Guardar copia en Selección (Redes)
+                                        {canvasActive ? 'Guardar lienzo en Selección' : 'Guardar copia en Selección (Redes)'}
                                     </button>
 
                                     <button
