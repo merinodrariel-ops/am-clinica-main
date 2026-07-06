@@ -470,6 +470,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             patientId={patient.id_paciente}
                             patientName={`${patient.apellido}, ${patient.nombre}`}
                             motherFolderUrl={patient.link_historia_clinica}
+                            initialCoverFileId={patient.foto_perfil_url}
                         />
                     </PatientSection>
 
