@@ -86,8 +86,19 @@ function stripExtension(name: string): string {
     return name.replace(/\.[a-z0-9]{2,5}$/i, '');
 }
 
+function getExtension(name: string): string {
+    const match = name.match(/(\.[a-z0-9]{2,5})$/i);
+    return match?.[1] || '';
+}
+
 function sanitizeCloudinarySegment(value: string): string {
     return slugifyCaseTitle(stripExtension(value)).slice(0, 80) || 'foto';
+}
+
+export function buildDrivePhotoFileName(order: number, description: string, originalName: string): string {
+    const extension = getExtension(originalName);
+    const base = sanitizeCloudinarySegment(description || originalName);
+    return `${String(order).padStart(2, '0')}-${base}${extension}`;
 }
 
 function escapeForTs(value: string): string {
@@ -107,7 +118,7 @@ export function buildPublicCaseDraft(input: PublicCaseDraftInput): PublicCaseDra
         return {
             order: index + 1,
             driveFileId: photo.id,
-            fileName: photo.name,
+            fileName: buildDrivePhotoFileName(index + 1, caption, photo.name),
             caption,
             alt: `${caption} - caso clínico AM Estética Dental`,
             cloudinaryPendingPath: `casos/${slug}/${publicId}`,

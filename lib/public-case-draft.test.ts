@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPublicCaseDraft, slugifyCaseTitle, splitLongPhotoDescription } from './public-case-draft';
+import { buildDrivePhotoFileName, buildPublicCaseDraft, slugifyCaseTitle, splitLongPhotoDescription } from './public-case-draft';
 
 test('slugifyCaseTitle creates a stable SEO slug', () => {
     assert.equal(
@@ -31,6 +31,7 @@ test('buildPublicCaseDraft preserves photo order and per-photo descriptions', ()
     assert.equal(draft.slug, 'christensen-victoria-gingivectomia-laser-y-microdiseno');
     assert.equal(draft.photoCount, 2);
     assert.equal(draft.photos[0].order, 1);
+    assert.equal(draft.photos[0].fileName, '01-foto-intraoral-del-antes.jpg');
     assert.equal(draft.photos[0].caption, 'Foto intraoral del antes');
     assert.equal(draft.photos[1].order, 2);
     assert.equal(draft.photos[1].caption, 'Maxilar superior con láser contorneando la encía');
@@ -38,6 +39,13 @@ test('buildPublicCaseDraft preserves photo order and per-photo descriptions', ()
     assert.match(draft.photos[0].cloudinaryPendingPath, /^casos\/christensen-victoria/);
     assert.match(draft.caseTsSnippet, /fotos: \[/);
     assert.match(draft.caseTsSnippet, /Foto intraoral del antes/);
+});
+
+test('buildDrivePhotoFileName preserves extension and prefixes order', () => {
+    assert.equal(
+        buildDrivePhotoFileName(12, 'Antes y después final con gingivectomía', 'Diapositiva 62.PNG'),
+        '12-antes-y-despues-final-con-gingivectomia.PNG'
+    );
 });
 
 test('splitLongPhotoDescription maps a long clinical narration to photo slots', () => {

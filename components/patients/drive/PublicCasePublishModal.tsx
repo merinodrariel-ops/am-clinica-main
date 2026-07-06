@@ -3,10 +3,12 @@
 import { useMemo, useState } from 'react';
 import { Check, Clipboard, CloudUpload, FileText, Wand2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { renameDriveFileAction } from '@/app/actions/patient-files-drive';
 import Modal from '@/components/ui/Modal';
 import { Textarea } from '@/components/ui/Textarea';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import {
+    buildDrivePhotoFileName,
     buildPublicCaseDraft,
     splitLongPhotoDescription,
     type PublicCaseDraft,
@@ -24,11 +26,13 @@ function defaultCaseTitle(patientName: string) {
 }
 
 export default function PublicCasePublishModal({ files, patientName, onClose }: PublicCasePublishModalProps) {
+    const [currentFiles, setCurrentFiles] = useState(files);
     const [title, setTitle] = useState(defaultCaseTitle(patientName));
     const [caseDescription, setCaseDescription] = useState('');
     const [longDescription, setLongDescription] = useState('');
-    const [photoDescriptions, setPhotoDescriptions] = useState(() => files.map(() => ''));
+    const [photoDescriptions, setPhotoDescriptions] = useState(() => currentFiles.map(() => ''));
     const [draft, setDraft] = useState<PublicCaseDraft | null>(null);
+    const [renamingDriveFiles, setRenamingDriveFiles] = useState(false);
 
     const completedDescriptions = useMemo(
         () => photoDescriptions.filter(value => value.trim()).length,
@@ -41,7 +45,7 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
     }
 
     function applyLongDescription() {
-        const parsed = splitLongPhotoDescription(longDescription, files.length);
+        const parsed = splitLongPhotoDescription(longDescription, currentFiles.length);
         const parsedCount = parsed.filter(Boolean).length;
         if (parsedCount === 0) {
             toast.error('No encontré referencias tipo "foto 1", "foto 2" en el texto.');
@@ -54,12 +58,12 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
     }
 
     function prepareDraft() {
-        if (files.length === 0) return;
+        if (currentFiles.length === 0) return;
         const nextDraft = buildPublicCaseDraft({
             patientName,
             title,
             caseDescription,
-            photos: files.map((file, index) => ({
+            photos: currentFiles.map((file, index) => ({
                 id: file.id,
                 name: file.name,
                 description: photoDescriptions[index] || '',
@@ -68,6 +72,34 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
 
         setDraft(nextDraft);
         toast.success('Borrador del caso preparado');
+    }
+
+    async function renameDriveFilesFromDescriptions() {
+        if (renamingDriveFiles) return;
+        const missingCount = currentFiles.filter((_, index) => !photoDescriptions[index]?.trim()).length;
+        if (missingCount > 0) {
+            toast.error(`Faltan ${missingCount} descripción${missingCount !== 1 ? 'es' : ''} antes de renombrar.`);
+            return;
+        }
+
+        setRenamingDriveFiles(true);
+        const renamed: DriveFile[] = [];
+        for (let index = 0; index < currentFiles.length; index += 1) {
+            const file = currentFiles[index];
+            const newName = buildDrivePhotoFileName(index + 1, photoDescriptions[index], file.name);
+            const result = await renameDriveFileAction(file.id, newName);
+            if (result.error || !result.success) {
+                toast.error(`No se pudo renombrar "${file.name}": ${result.error || 'error desconocido'}`);
+                setRenamingDriveFiles(false);
+                return;
+            }
+            renamed.push({ ...file, name: newName });
+        }
+
+        setCurrentFiles(renamed);
+        setDraft(null);
+        setRenamingDriveFiles(false);
+        toast.success(`${renamed.length} foto${renamed.length !== 1 ? 's renombradas' : ' renombrada'} en Drive`);
     }
 
     async function copyDraft() {
@@ -153,6 +185,14 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
                                 <CloudUpload size={16} />
                                 Publicar ahora
                             </button>
+                            <button
+                                type="button"
+                                onClick={renameDriveFilesFromDescriptions}
+                                disabled={renamingDriveFiles}
+                                className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                {renamingDriveFiles ? 'Renombrando...' : 'Renombrar en Drive'}
+                            </button>
                         </div>
                     </section>
 
@@ -160,10 +200,10 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
                         <div className="flex items-center justify-between gap-3">
                             <div>
                                 <p className="text-sm font-semibold text-white">
-                                    {files.length} foto{files.length !== 1 ? 's' : ''} seleccionada{files.length !== 1 ? 's' : ''}
+                                    {currentFiles.length} foto{currentFiles.length !== 1 ? 's' : ''} seleccionada{currentFiles.length !== 1 ? 's' : ''}
                                 </p>
                                 <p className="text-xs text-slate-400">
-                                    {completedDescriptions}/{files.length} con descripción
+                                    {completedDescriptions}/{currentFiles.length} con descripción
                                 </p>
                             </div>
                             <button
@@ -176,7 +216,7 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
                         </div>
 
                         <div className="max-h-[58vh] space-y-3 overflow-y-auto pr-1">
-                            {files.map((file, index) => (
+                            {currentFiles.map((file, index) => (
                                 <div
                                     key={file.id}
                                     className="grid grid-cols-[72px_minmax(0,1fr)] gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
