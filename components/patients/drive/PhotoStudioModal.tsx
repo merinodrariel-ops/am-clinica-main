@@ -301,6 +301,14 @@ function persistFileStatesToLocalStorage(patientId: string, states: Map<string, 
     }
 }
 
+// Keep a cursor-positioned context menu fully inside the viewport (no off-screen clipping).
+function clampMenuToViewport(x: number, y: number, width: number, height: number, padding = 12) {
+    if (typeof window === 'undefined') return { x, y };
+    const left = Math.max(padding, Math.min(x, window.innerWidth - width - padding));
+    const top = Math.max(padding, Math.min(y, window.innerHeight - height - padding));
+    return { x: left, y: top };
+}
+
 function AirDropIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
     return (
         <svg
@@ -3268,7 +3276,8 @@ export default function PhotoStudioModal({
         for (let i = canvasLayers.length - 1; i >= 0; i--) {
             if (hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) {
                 setCanvasSelectedId(canvasLayers[i].id);
-                setCanvasContextMenu({ x: e.clientX, y: e.clientY, layerId: canvasLayers[i].id });
+                const { x, y } = clampMenuToViewport(e.clientX, e.clientY, 180, 240);
+                setCanvasContextMenu({ x, y, layerId: canvasLayers[i].id });
                 return;
             }
         }
@@ -4299,7 +4308,8 @@ export default function PhotoStudioModal({
         }
 
         if (hit || multiSelectedIds.length >= 1 || selectedShapeId) {
-            setContextMenu({ x: e.clientX, y: e.clientY });
+            const { x, y } = clampMenuToViewport(e.clientX, e.clientY, 180, 170);
+            setContextMenu({ x, y });
         }
     }
 
