@@ -1529,6 +1529,7 @@ export default function PhotoStudioModal({
     // Presentation mode state
     const [presentationMode, setPresentationMode] = useState(false);
     const [presentationIdx, setPresentationIdx] = useState(0);
+    const [cleanEditSignature, setCleanEditSignature] = useState<string | null>(null);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -1543,7 +1544,31 @@ export default function PhotoStudioModal({
         setPresentationMode(true);
     }, [activeFile?.id, imageFiles]);
 
-    const isDirty =
+    const currentEditSignature = useMemo(() => JSON.stringify({
+        fileId: activeFile?.id ?? null,
+        imageUrl,
+        rotation,
+        brightness,
+        bgDone,
+        bgColor,
+        hasTransparentBg,
+        drawShapes,
+        currentPoints,
+        textAnnotations,
+    }), [
+        activeFile?.id,
+        imageUrl,
+        rotation,
+        brightness,
+        bgDone,
+        bgColor,
+        hasTransparentBg,
+        drawShapes,
+        currentPoints,
+        textAnnotations,
+    ]);
+
+    const legacyDirty =
         rotation !== 0 ||
         brightness !== 100 ||
         bgDone ||
@@ -1551,6 +1576,9 @@ export default function PhotoStudioModal({
         drawShapes.length > 0 ||
         currentPoints.length > 0 ||
         textAnnotations.length > 0;
+    const isDirty = cleanEditSignature !== null
+        ? currentEditSignature !== cleanEditSignature
+        : legacyDirty;
 
     // Reset edits without changing the active file
     const resetEdits = useCallback(() => {
@@ -1595,6 +1623,7 @@ export default function PhotoStudioModal({
         setTextToolActive(false);
         setSelectedTextId(null);
         textMetricsRef.current.clear();
+        setCleanEditSignature(null);
     }, []);
 
     // When initial file prop changes (shouldn't normally happen, but be safe)
@@ -4934,6 +4963,18 @@ export default function PhotoStudioModal({
                 setBrightness(100);
                 setBgDone(false);
                 setHasTransparentBg(false);
+                setCleanEditSignature(JSON.stringify({
+                    fileId: activeFile.id,
+                    imageUrl: savedPreviewUrl,
+                    rotation: 0,
+                    brightness: 100,
+                    bgDone: false,
+                    bgColor,
+                    hasTransparentBg: false,
+                    drawShapes,
+                    currentPoints,
+                    textAnnotations,
+                }));
                 preCropImageRef.current = savedPreviewUrl;
                 prevCroppedUrlRef.current = null;
                 offscreenCanvasRef.current = null;
@@ -4954,6 +4995,7 @@ export default function PhotoStudioModal({
                     markAsEdited(result.fileId);
                 }
                 toast.success('Copia guardada en Drive');
+                setCleanEditSignature(currentEditSignature);
             }
 
             setSaveDialogOpen(false);
