@@ -6176,23 +6176,21 @@ export default function PhotoStudioModal({
                             healMode={healMode}
                             onSetHealMode={(next) => {
                                 if (next) {
-                                    void getOpenCv().catch(() => {
-                                        toast.error('No se pudo cargar el corrector');
-                                        setHealMode(false);
-                                    });
-                                }
-                                setHealMode(next);
-                                if (next) {
-                                    setBrushMode(null);
-                                    setDrawMode('idle');
-                                    setMousePos(null);
-                                } else {
+                                    toast.message('Corrector temporalmente en revisión');
+                                    setHealMode(false);
                                     hideHealCursor();
                                     healLastPointRef.current = null;
                                     canvasHealPreviewRef.current = null;
                                     canvasHealSessionRef.current = null;
                                     setHealPreviewNonce(v => v + 1);
+                                    return;
                                 }
+                                setHealMode(next);
+                                hideHealCursor();
+                                healLastPointRef.current = null;
+                                canvasHealPreviewRef.current = null;
+                                canvasHealSessionRef.current = null;
+                                setHealPreviewNonce(v => v + 1);
                             }}
                             healSize={healSize}
                             onSetHealSize={setHealSize}
@@ -7281,46 +7279,6 @@ function ToolsPanel({
                 )}
             </div>
 
-            {/* Spot healing */}
-            <div className="space-y-2">
-                <p className="flex items-center gap-2 text-white/75 text-sm font-semibold">
-                    <Zap size={18} className="text-cyan-300" /> Corrector
-                </p>
-                <button
-                    onClick={() => onSetHealMode(!healMode)}
-                    disabled={canvasActive && !canvasSelectedId}
-                    className={`w-full py-3 rounded-xl text-base font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
-                        healMode
-                            ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-300/30'
-                            : 'bg-white/10 text-white/70 hover:bg-white/15'
-                    }`}
-                >
-                    <Zap size={20} /> {healMode ? 'Corrector activo' : 'Activar corrector'}
-                </button>
-                {canvasActive && !canvasSelectedId && (
-                    <p className="text-white/45 text-sm text-center py-2">
-                        Seleccioná una foto del lienzo para corregirla
-                    </p>
-                )}
-                {healMode && (
-                    <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
-                        <p className="text-white/45 text-xs uppercase tracking-wider">Tamaño</p>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="range" min={6} max={90} step={2}
-                                value={healSize}
-                                onChange={e => onSetHealSize(Number(e.target.value))}
-                                className="flex-1 accent-cyan-300"
-                            />
-                            <span className="text-white/50 text-sm w-8">{healSize}</span>
-                        </div>
-                        <p className="text-white/35 text-xs">
-                            Pintá sobre lunares, bordes o manchas para mimetizar con el entorno.
-                        </p>
-                    </div>
-                )}
-            </div>
-
             {/* Background removal */}
             <div className="space-y-2">
                 <p className="flex items-center gap-2 text-white/75 text-sm font-semibold">
@@ -7770,6 +7728,37 @@ function ToolsPanel({
                     <p className="text-white/35 text-xs">Arrastrá fotos al lienzo · clic derecho en capa para opciones</p>
                 </div>
             )}
+
+            {/* Spot healing */}
+            <div className="space-y-2 border-t border-white/10 pt-4">
+                <p className="flex items-center gap-2 text-white/45 text-sm font-semibold">
+                    <Zap size={18} className="text-white/35" /> Corrector
+                </p>
+                <button
+                    type="button"
+                    onClick={() => onSetHealMode(false)}
+                    disabled
+                    className="w-full py-3 rounded-xl text-base font-semibold transition-colors disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-white/5 text-white/45"
+                >
+                    <Zap size={20} /> {healMode ? 'Corrector en revisión' : 'En revisión'}
+                </button>
+                <div className="space-y-2 rounded-xl border border-white/5 bg-white/[0.03] p-3 opacity-60">
+                    <p className="text-white/35 text-xs uppercase tracking-wider">Tamaño</p>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="range" min={6} max={90} step={2}
+                            value={healSize}
+                            onChange={e => onSetHealSize(Number(e.target.value))}
+                            disabled
+                            className="flex-1 accent-white/40"
+                        />
+                        <span className="text-white/35 text-sm w-8">{healSize}</span>
+                    </div>
+                    <p className="text-white/35 text-xs">
+                        Desactivado temporalmente para evitar que la foto se bloquee.
+                    </p>
+                </div>
+            </div>
 
             {/* Spacer + Undo + Reset */}
             <div className="flex-1" />
