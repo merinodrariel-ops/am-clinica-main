@@ -3879,6 +3879,35 @@ export default function PhotoStudioModal({
         return -1;
     }
 
+    function finishDrawingPath(points: DrawPoint[]) {
+        if (points.length >= 2) {
+            const newId = `shape-${Date.now()}`;
+            setDrawShapes(shapes => [...shapes, { id: newId, points, closed: false, color: drawColor, strokeStyle }]);
+            setSelectedShapeId(newId);
+            setDrawMode('selected');
+        } else {
+            setSelectedShapeId(null);
+            setDrawMode('idle');
+        }
+        setCurrentPoints([]);
+        setMousePos(null);
+    }
+
+    function handleCanvasContainerClick(e: React.MouseEvent<HTMLDivElement>) {
+        if (drawMode !== 'drawing') return;
+        const canvas = drawCanvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const clickedInsidePhoto =
+            e.clientX >= rect.left &&
+            e.clientX <= rect.right &&
+            e.clientY >= rect.top &&
+            e.clientY <= rect.bottom;
+        if (clickedInsidePhoto) return;
+        e.preventDefault();
+        finishDrawingPath(currentPoints);
+    }
+
     function handleDrawClick(e: React.MouseEvent<HTMLCanvasElement>) {
         // Suppress click if we were dragging
         if (didDragRef.current) { didDragRef.current = false; return; }
@@ -3936,8 +3965,8 @@ export default function PhotoStudioModal({
                     setDrawShapes(shapes => [...shapes, { id: newId, points: currentPoints, closed: true, color: drawColor, strokeStyle }]);
                     setCurrentPoints([]);
                     setMousePos(null);
-                    setSelectedShapeId(null);
-                    setDrawMode('drawing');
+                    setSelectedShapeId(newId);
+                    setDrawMode('selected');
                     return;
                 }
             }
@@ -3984,17 +4013,7 @@ export default function PhotoStudioModal({
         if (drawMode === 'drawing') {
             e.stopPropagation();
             const pts = currentPoints.slice(0, -1); // remove phantom point from last click
-            if (pts.length >= 2) {
-                const newId = `shape-${Date.now()}`;
-                // Double-click = open path (no line back to first point)
-                // To close: click on the first point while drawing
-                setDrawShapes(shapes => [...shapes, { id: newId, points: pts, closed: false, color: drawColor, strokeStyle }]);
-                // Stay in drawing mode — user can keep drawing immediately
-                setSelectedShapeId(null);
-                setDrawMode('drawing');
-            }
-            setCurrentPoints([]);
-            setMousePos(null);
+            finishDrawingPath(pts);
             return;
         }
         const [nx, ny] = getDrawNormXY(e);
@@ -5515,6 +5534,7 @@ export default function PhotoStudioModal({
                         onTouchStart={canvasActive || cropActive ? undefined : handleTouchStart}
                         onTouchMove={canvasActive || cropActive ? undefined : handleTouchMove}
                         onTouchEnd={canvasActive ? undefined : handleTouchEnd}
+                        onClick={canvasActive || cropActive ? undefined : handleCanvasContainerClick}
                         onDoubleClick={canvasActive || cropActive ? undefined : () => { setZoom(1); setPanX(0); setPanY(0); }}
                         style={{ cursor: (!canvasActive && zoom > 1 && !manualBackgroundToolActive) ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                     >
@@ -7685,7 +7705,7 @@ function ToolsPanel({
 
                 {drawMode === 'drawing' && currentPointCount > 0 && (
                     <p className="text-white/35 text-xs">
-                        {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic para terminar abierto · clic en el primer punto para cerrar
+                        {currentPointCount} punto{currentPointCount !== 1 ? 's' : ''} — doble clic termina · clic fuera de la foto sale
                     </p>
                 )}
                 {(drawMode === 'selected' || drawMode === 'editing') && (
