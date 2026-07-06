@@ -46,6 +46,7 @@ interface DriveFileCardProps {
     isPortada?: boolean;
     onSetPortada?: (file: DriveFile) => void;
     patientFolder?: string;
+    isSeleccion?: boolean;
 }
 
 function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'exocad' | 'other' {
@@ -109,7 +110,7 @@ const SHARE_MENU_WIDTH = 176;
 const SHARE_MENU_ESTIMATED_HEIGHT = 140;
 const SHARE_MENU_EDGE_GAP = 8;
 
-export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign, isPortada, onSetPortada, patientFolder }: DriveFileCardProps) {
+export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign, isPortada, onSetPortada, patientFolder, isSeleccion }: DriveFileCardProps) {
     const [showShare, setShowShare] = useState(false);
     const [shareMenuPosition, setShareMenuPosition] = useState<{ top: number; left: number } | null>(null);
     const shareButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -206,6 +207,11 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
         >
             {/* Thumbnail or icon */}
             <div className="aspect-square rounded-lg overflow-hidden mb-2 flex items-center justify-center bg-gray-50 dark:bg-white/5 relative">
+                {isSeleccion && !isPortada && (
+                    <div className="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-purple-500 text-white text-[10px] font-bold leading-tight pointer-events-none select-none flex items-center gap-0.5">
+                        <Sparkles size={9} /> Selección
+                    </div>
+                )}
                 {(category === 'image' || category === 'pdf' || category === 'google-doc') && file.thumbnailLink ? (
                     <img
                         src={thumbnailSrc}

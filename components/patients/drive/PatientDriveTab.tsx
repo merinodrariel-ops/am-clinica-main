@@ -89,7 +89,7 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} isPortada={isPortada} onSetPortada={onSetPortada} patientFolder={patientFolder} />
+            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} isPortada={isPortada} onSetPortada={onSetPortada} patientFolder={patientFolder} isSeleccion={classifyFile(file) === 'redes'} />
         </div>
     );
 }
@@ -784,6 +784,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         photoTag={photoTags[file.id]}
                                                         onSmileDesign={canManageDrive ? (f => openSmileDesign(f, motherFolderId)) : undefined}
                                                         patientFolder={getFormattedFolderName(patientName)}
+                                                        isSeleccion={classifyFile(file) === 'redes'}
                                                     />
                                                     {key === '3d' && dentalBitePairs.has(file.id) && (
                                                         <button
