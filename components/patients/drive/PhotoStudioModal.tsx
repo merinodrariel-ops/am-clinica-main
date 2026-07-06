@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
-    RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2,
+    RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
     AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Folder, Eraser
@@ -933,6 +933,7 @@ export default function PhotoStudioModal({
     type CanvasLayerSnapshot = { kind: 'canvas-layer'; canvasId: string; layerId: string; layerSrc: string };
     type Snapshot = PhotoSnapshot | CanvasLayerSnapshot;
     const [history, setHistory] = useState<Snapshot[]>([]);
+    const [redoStack, setRedoStack] = useState<Snapshot[]>([]);
 
     // ── Persistence: Save/Restore individual file states (drawings, etc.) ────────
     useEffect(() => {
@@ -1666,18 +1667,26 @@ export default function PhotoStudioModal({
         };
     }, []);
 
-    // Keyboard shortcut: Cmd/Ctrl+Z → undo
+    // Keyboard shortcut: Cmd/Ctrl+Z → undo, Cmd/Ctrl+Y / Cmd/Ctrl+Shift+Z → redo
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-                e.preventDefault();
-                handleUndo();
+            if (e.metaKey || e.ctrlKey) {
+                if (e.shiftKey && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    handleRedo();
+                } else if (e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    handleUndo();
+                } else if (e.key.toLowerCase() === 'y') {
+                    e.preventDefault();
+                    handleRedo();
+                }
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [history]);
+    }, [history, redoStack]);
 
     // Keyboard shortcut: Cmd+C / Cmd+V for selected text annotations or draw shapes
     useEffect(() => {
@@ -1914,11 +1923,35 @@ export default function PhotoStudioModal({
     function pushHistory(snap?: Snapshot) {
         const entry: Snapshot = snap ?? { kind: 'photo', imageUrl, rotation, brightness, bgDone, bgColor, hasTransparentBg };
         setHistory(prev => [...prev.slice(-19), entry]);
+        setRedoStack([]); // Clear redo stack on new action
     }
 
     function handleUndo() {
         const snap = history[history.length - 1];
         if (!snap) return;
+
+        const selectedLayer = canvasActive && canvasSelectedId
+            ? canvasLayers.find(l => l.id === canvasSelectedId)
+            : null;
+
+        const currentEntry: Snapshot = selectedLayer
+            ? {
+                kind: 'canvas-layer',
+                canvasId: activeCanvasId || '',
+                layerId: selectedLayer.id,
+                layerSrc: selectedLayer.src,
+              }
+            : {
+                kind: 'photo',
+                imageUrl,
+                rotation,
+                brightness,
+                bgDone,
+                bgColor,
+                hasTransparentBg,
+              };
+
+        setRedoStack(prev => [...prev, currentEntry]);
         setHistory(prev => prev.slice(0, -1));
 
         if (snap.kind === 'canvas-layer') {
@@ -1989,6 +2022,102 @@ export default function PhotoStudioModal({
         canvasHealSessionRef.current = null;
         healLastPointRef.current = null;
         // preCropImageRef stays valid — user can still re-crop from full image after undo
+    }
+
+    function handleRedo() {
+        const snap = redoStack[redoStack.length - 1];
+        if (!snap) return;
+
+        const selectedLayer = canvasActive && canvasSelectedId
+            ? canvasLayers.find(l => l.id === canvasSelectedId)
+            : null;
+
+        const currentEntry: Snapshot = selectedLayer
+            ? {
+                kind: 'canvas-layer',
+                canvasId: activeCanvasId || '',
+                layerId: selectedLayer.id,
+                layerSrc: selectedLayer.src,
+              }
+            : {
+                kind: 'photo',
+                imageUrl,
+                rotation,
+                brightness,
+                bgDone,
+                bgColor,
+                hasTransparentBg,
+              };
+
+        setHistory(prev => [...prev, currentEntry]);
+        setRedoStack(prev => prev.slice(0, -1));
+
+        if (snap.kind === 'canvas-layer') {
+            void loadCanvasImage(snap.layerSrc).then(img => {
+                setCanvases(prev => prev.map(canvas => {
+                    if (canvas.id !== snap.canvasId) return canvas;
+                    return {
+                        ...canvas,
+                        layers: canvas.layers.map(layer =>
+                            layer.id === snap.layerId
+                                ? { ...layer, src: snap.layerSrc, img }
+                                : layer
+                        ),
+                    };
+                }));
+            }).catch(() => {
+                toast.error('No se pudo rehacer la corrección');
+            });
+            return;
+        }
+
+        objectUrlRef.current = snap.imageUrl.startsWith('blob:') ? snap.imageUrl : null;
+        setImageUrl(snap.imageUrl);
+        setRotation(snap.rotation);
+        setBrightness(snap.brightness);
+        setBgDone(snap.bgDone);
+        setBgColor(snap.bgColor);
+        setHasTransparentBg(snap.hasTransparentBg ?? false);
+        setCropActive(false);
+        setCompletedCrop(null);
+        setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+
+        if (brushMode !== null || magicWandActive) {
+            const img = new Image();
+            if (snap.imageUrl && !snap.imageUrl.startsWith('blob:') && !snap.imageUrl.startsWith('data:')) {
+                img.crossOrigin = 'anonymous';
+            }
+            img.onload = () => {
+                const oc = offscreenCanvasRef.current;
+                if (oc) {
+                    oc.width = img.naturalWidth;
+                    oc.height = img.naturalHeight;
+                    const octx = oc.getContext('2d')!;
+                    octx.clearRect(0, 0, oc.width, oc.height);
+                    octx.drawImage(img, 0, 0);
+
+                    const vc = brushCanvasRef.current;
+                    if (vc) {
+                        vc.width = oc.width;
+                        vc.height = oc.height;
+                        const vctx = vc.getContext('2d')!;
+                        vctx.clearRect(0, 0, vc.width, vc.height);
+                        vctx.drawImage(oc, 0, 0);
+                    }
+                }
+            };
+            img.src = snap.imageUrl;
+        } else {
+            setBrushMode(null);
+            setMagicWandActive(false);
+            offscreenCanvasRef.current = null;
+        }
+
+        setHealMode(false);
+        hideHealCursor();
+        canvasHealPreviewRef.current = null;
+        canvasHealSessionRef.current = null;
+        healLastPointRef.current = null;
     }
 
     async function handleRemoveBackground() {
@@ -2159,7 +2288,7 @@ export default function PhotoStudioModal({
                 
                 pushHistory();
                 setBgDone(true);
-                setBgColor('transparent');
+                setBgColor('black');
                 toast.success('Editor manual inicializado', { id: toastId });
             } catch (err) {
                 toast.error('Error al inicializar editor manual', { id: toastId });
@@ -2263,6 +2392,7 @@ export default function PhotoStudioModal({
         }
         
         ctx.putImageData(imgData, 0, 0);
+        return visited;
     }
 
     async function createEditableCanvasFromSource(src: string) {
@@ -3535,12 +3665,38 @@ export default function PhotoStudioModal({
         pushHistory();
         
         const octx = oc.getContext('2d')!;
-        scanlineFloodFillErase(octx, Math.round(x), Math.round(y), magicWandTolerance);
+        const visited = scanlineFloodFillErase(octx, Math.round(x), Math.round(y), magicWandTolerance);
+        if (!visited) return;
         
-        // Redraw on the visible canvas
-        const vctx = e.currentTarget.getContext('2d')!;
-        vctx.clearRect(0, 0, e.currentTarget.width, e.currentTarget.height);
+        // Draw the current state with a temporary selection mask (bright red) on the visible canvas
+        const canvasElement = e.currentTarget;
+        const vctx = canvasElement.getContext('2d')!;
+        vctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
         vctx.drawImage(oc, 0, 0);
+        
+        const tempImgData = vctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        const tempD = tempImgData.data;
+        for (let i = 0; i < visited.length; i++) {
+            if (visited[i] === 1) {
+                const p = i * 4;
+                tempD[p] = 239;
+                tempD[p + 1] = 68;
+                tempD[p + 2] = 68;
+                tempD[p + 3] = 160; // 0.6 opacity
+            }
+        }
+        vctx.putImageData(tempImgData, 0, 0);
+        
+        // Clear selection mask after 400ms to show the clean transparent output
+        setTimeout(() => {
+            if (offscreenCanvasRef.current === oc && canvasElement) {
+                const currentCtx = canvasElement.getContext('2d');
+                if (currentCtx) {
+                    currentCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                    currentCtx.drawImage(oc, 0, 0);
+                }
+            }
+        }, 400);
         
         oc.toBlob(blob => {
             if (!blob) return;
@@ -6007,8 +6163,10 @@ export default function PhotoStudioModal({
                                 setImageUrl(`/api/drive/file/${activeFile.id}?cors=1`);
                             }}
                             onUndo={handleUndo}
+                            onRedo={handleRedo}
                             onPushHistory={pushHistory}
                             historyCount={history.length}
+                            redoCount={redoStack.length}
                             showGrid={showGrid}
                             setShowGrid={setShowGrid}
                             isGridVisible={showGrid || rotation !== 0}
@@ -6801,8 +6959,10 @@ interface ToolsPanelProps {
     onSetHealSize: (v: number) => void;
     onReset: () => void;
     onUndo: () => void;
+    onRedo: () => void;
     onPushHistory: () => void;
     historyCount: number;
+    redoCount: number;
     showGrid: boolean;
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
     isGridVisible: boolean;
@@ -6869,8 +7029,10 @@ function ToolsPanel({
     onSetHealSize,
     onReset,
     onUndo,
+    onRedo,
     onPushHistory,
     historyCount,
+    redoCount,
     showGrid, setShowGrid,
     isGridVisible,
     onConfirmBg,
@@ -7130,15 +7292,42 @@ function ToolsPanel({
                     </>
                 ) : (
                     <div className="space-y-3 bg-white/5 p-4 rounded-xl border border-white/5">
+                        {/* Undo / Redo controls for Background Tools */}
+                        {(brushMode !== null || magicWandActive || bgDone) && (
+                            <div className="flex gap-2 pb-2.5 border-b border-white/5">
+                                <button
+                                    onClick={onUndo}
+                                    disabled={historyCount === 0}
+                                    title="Deshacer (Ctrl+Z)"
+                                    className="flex-1 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                                >
+                                    <Undo2 size={13} /> Deshacer
+                                </button>
+                                <button
+                                    onClick={onRedo}
+                                    disabled={redoCount === 0}
+                                    title="Rehacer (Ctrl+Y)"
+                                    className="flex-1 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                                >
+                                    <Redo2 size={13} /> Rehacer
+                                </button>
+                            </div>
+                        )}
+
                         {/* IA BG removal button - only if not done */}
                         {!bgDone && (
-                            <button
-                                onClick={onRemoveBg}
-                                disabled={canvasActive && !canvasSelectedId}
-                                className="w-full py-3 rounded-xl bg-violet-600/30 text-violet-200 text-sm font-semibold hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                <Wand2 size={18} /> Remover fondo por IA
-                            </button>
+                            <div className="space-y-1">
+                                <button
+                                    onClick={onRemoveBg}
+                                    disabled={canvasActive && !canvasSelectedId}
+                                    className="w-full py-3 rounded-xl bg-violet-600/30 text-violet-200 text-sm font-semibold hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    <Wand2 size={18} /> Remoción de fondo facial (IA)
+                                </button>
+                                <p className="text-[10px] text-white/35 text-center leading-normal">
+                                    Recomendado únicamente para retratos y fotos de rostro.
+                                </p>
+                            </div>
                         )}
 
                         {/* Manual Clipping Tools Selector */}
@@ -7146,7 +7335,7 @@ function ToolsPanel({
                             <p className="text-xs text-white/45 uppercase tracking-wider font-semibold">Recorte Manual</p>
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => onStartManualEraser(brushMode === 'restore' ? 'erase' : 'restore')}
+                                    onClick={() => onStartManualEraser(brushMode === 'erase' ? 'restore' : 'erase')}
                                     className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                                         brushMode !== null
                                             ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-md'
@@ -7173,20 +7362,20 @@ function ToolsPanel({
                             <div className="space-y-2 pt-2 border-t border-white/5">
                                 <div className="flex gap-2">
                                     <button
+                                        onClick={() => onSetBrushMode('erase')}
+                                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                            brushMode === 'erase' ? 'bg-[#C9A96E] text-black' : 'bg-white/10 text-white/70 hover:bg-white/15'
+                                        }`}
+                                    >
+                                        Borrar fondo
+                                    </button>
+                                    <button
                                         onClick={() => onSetBrushMode('restore')}
                                         className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                                             brushMode === 'restore' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'
                                         }`}
                                     >
-                                        Restaurar
-                                    </button>
-                                    <button
-                                        onClick={() => onSetBrushMode('erase')}
-                                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                                            brushMode === 'erase' ? 'bg-red-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'
-                                        }`}
-                                    >
-                                        Borrar más
+                                        Restaurar original
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-2 pt-1">
