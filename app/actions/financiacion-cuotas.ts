@@ -678,6 +678,26 @@ export async function crearPlanFinanciacionAction(
         if (!user) return { success: false, error: 'No autenticado' };
 
         const adminClient = createAdminClient();
+
+        // Regla de negocio (docs/financing-data-integrity.md): un paciente no puede
+        // tener dos planes de financiación activos. Un duplicado infla la deuda
+        // mensual y total del dashboard (caso Mugetti). Guard autoritativo server-side.
+        const { data: existingActive, error: existingError } = await adminClient
+            .from('planes_financiacion')
+            .select('id, tratamiento, saldo_restante_usd')
+            .eq('paciente_id', params.pacienteId)
+            .eq('estado', 'En curso')
+            .limit(1)
+            .maybeSingle();
+
+        if (existingError) return { success: false, error: existingError.message };
+        if (existingActive) {
+            return {
+                success: false,
+                error: `El paciente ya tiene un plan de financiación activo (${existingActive.tratamiento || 'sin tratamiento'}, saldo USD ${Number(existingActive.saldo_restante_usd || 0).toFixed(2)}). Cerrá o corregí ese plan antes de crear otro.`,
+            };
+        }
+
         const { data, error } = await adminClient
             .from('planes_financiacion')
             .insert({

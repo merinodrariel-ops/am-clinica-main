@@ -596,6 +596,25 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
 
             if (!user) throw new Error('No autenticado');
 
+            // Guard: bloquear un segundo plan activo ANTES de registrar el cobro,
+            // para no dejar un pago hecho con el plan rechazado después.
+            if (formData.es_inicio_financiacion) {
+                const { data: activeFinancingPlans, error: activeFinancingError } = await supabase
+                    .from('planes_financiacion')
+                    .select('id')
+                    .eq('paciente_id', formData.paciente_id)
+                    .eq('estado', 'En curso')
+                    .limit(1);
+
+                if (activeFinancingError) throw activeFinancingError;
+
+                if ((activeFinancingPlans || []).length > 0) {
+                    alert('Este paciente ya tiene una financiación activa. Cerrá o corregí el plan existente antes de registrar otro inicio de financiación.');
+                    setSaving(false);
+                    return;
+                }
+            }
+
             // 1. Preparation
             const bnaRateEffective = bnaRate;
             const conceptoFinal = formData.concepto_nombre || 'Sin concepto';
