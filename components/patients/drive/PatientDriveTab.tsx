@@ -429,12 +429,17 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
     }
 
-    async function handleShareFile(file: DriveFile) {
+    async function handleShareFile(file: DriveFile, target: 'native' | 'instagram' | 'tiktok' = 'native') {
         try {
             const res = await fetch(`/api/drive/file/${file.id}`);
             const blob = await res.blob();
             const shareFile = new File([blob], file.name, { type: blob.type });
             if (navigator.canShare?.({ files: [shareFile] })) {
+                if (target === 'instagram') {
+                    toast.info('Elegí Instagram en el menú del sistema. Si aparece, podés enviarla a historia.');
+                } else if (target === 'tiktok') {
+                    toast.info('Elegí TikTok en el menú del sistema. Si aparece, podés crear la publicación desde la app.');
+                }
                 await navigator.share({ files: [shareFile], title: file.name });
             } else {
                 const a = document.createElement('a');
@@ -442,7 +447,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 a.download = file.name;
                 a.click();
                 setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-                toast.info('Tu browser no soporta AirDrop — se descargó el archivo');
+                toast.info('Tu browser no soporta compartir archivos — se descargó el archivo');
             }
         } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError')

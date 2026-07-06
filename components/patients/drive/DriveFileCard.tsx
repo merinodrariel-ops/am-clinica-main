@@ -18,6 +18,8 @@ import {
     Tag,
     Star,
     Sparkles,
+    Instagram,
+    Music2,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { getCategoryDef, getTagLabel } from '@/lib/photo-tag-taxonomy';
@@ -37,7 +39,7 @@ interface DriveFileCardProps {
     file: DriveFile;
     onPreview: (file: DriveFile) => void;
     onDelete?: (file: DriveFile) => void;
-    onShare?: (file: DriveFile) => void;
+    onShare?: (file: DriveFile, target?: 'native' | 'instagram' | 'tiktok') => void;
     onShareWithPatient?: (file: DriveFile) => void;
     onShareEmail?: (file: DriveFile) => void;
     onTag?: (file: DriveFile) => void;
@@ -106,8 +108,8 @@ const COLOR_MAP = {
     other: 'text-gray-400 bg-gray-400/10',
 };
 
-const SHARE_MENU_WIDTH = 176;
-const SHARE_MENU_ESTIMATED_HEIGHT = 140;
+const SHARE_MENU_WIDTH = 196;
+const SHARE_MENU_ESTIMATED_HEIGHT = 260;
 const SHARE_MENU_EDGE_GAP = 8;
 
 export default function DriveFileCard({ file, onPreview, onDelete, onShare, onShareWithPatient, onShareEmail, onTag, photoTag, onSmileDesign, isPortada, onSetPortada, patientFolder, isSeleccion }: DriveFileCardProps) {
@@ -175,7 +177,7 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
     // google-docs are served by Google directly; the proxy can't download them
     const canDownload = category !== 'google-doc';
     const size = formatFileSize(file.size);
-    const hasShare = onShare || onShareWithPatient || onShareEmail;
+    const hasShare = onShare || onShareWithPatient || onShareEmail || canDownload;
 
     // Serve grid thumbnails through our cached proxy (small, reliable, 1-week edge cache)
     // instead of Google's raw thumbnailLink. `v=modifiedTime` busts the cache when a
@@ -263,20 +265,9 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                     </div>
                 )}
 
-                {canDownload && (
-                    <a
-                        href={`/api/drive/file/${file.id}`}
-                        download={file.name}
-                        onClick={e => e.stopPropagation()}
-                        className="absolute bottom-1.5 right-1.5 p-1.5 rounded-lg bg-black/60 text-white/80 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/80 hover:text-white z-10"
-                        title="Descargar"
-                    >
-                        <Download size={13} />
-                    </a>
-                )}
-                {/* Unified share button + dropdown — next to download (bottom-right) */}
+                {/* Unified share button + dropdown */}
                 {hasShare && (
-                    <div className="absolute bottom-1.5 right-8 z-20">
+                    <div className="absolute bottom-1.5 right-1.5 z-20">
                         <button
                             ref={shareButtonRef}
                             onClick={e => { e.stopPropagation(); setShowShare(s => !s); }}
@@ -296,7 +287,7 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                                 {/* Dropdown — portaled out of the card so it never gets clipped, clamped to the viewport */}
                                 <div
                                     ref={shareMenuRef}
-                                    className="fixed w-44 bg-gray-900/95 backdrop-blur-sm border border-white/15 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1"
+                                    className="fixed w-48 bg-gray-900/95 backdrop-blur-sm border border-white/15 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1"
                                     style={{
                                         top: shareMenuPosition?.top ?? SHARE_MENU_EDGE_GAP,
                                         left: shareMenuPosition?.left ?? SHARE_MENU_EDGE_GAP,
@@ -305,12 +296,30 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                                 >
                                     {onShare && (
                                         <button
-                                            onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file); }}
+                                            onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file, 'native'); }}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
                                         >
                                             <Share2 size={13} className="text-blue-400 flex-shrink-0" />
-                                            AirDrop
+                                            Compartir
                                         </button>
+                                    )}
+                                    {onShare && category === 'image' && (
+                                        <>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file, 'instagram'); }}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Instagram size={13} className="text-pink-400 flex-shrink-0" />
+                                                Instagram
+                                            </button>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file, 'tiktok'); }}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Music2 size={13} className="text-cyan-300 flex-shrink-0" />
+                                                TikTok
+                                            </button>
+                                        </>
                                     )}
                                     {onShareWithPatient && (
                                         <button
@@ -329,6 +338,20 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                                             <Mail size={13} className="text-red-400 flex-shrink-0" />
                                             Email
                                         </button>
+                                    )}
+                                    {canDownload && (
+                                        <>
+                                            <div className="my-1 border-t border-white/10" />
+                                            <a
+                                                href={`/api/drive/file/${file.id}`}
+                                                download={file.name}
+                                                onClick={e => { e.stopPropagation(); setShowShare(false); }}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Download size={13} className="text-white/55 flex-shrink-0" />
+                                                Descargar
+                                            </a>
+                                        </>
                                     )}
                                 </div>
                             </>,
