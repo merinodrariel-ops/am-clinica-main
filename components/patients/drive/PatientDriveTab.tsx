@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, type DragEvent, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useRef, type DragEvent, type CSSProperties, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
     FolderOpen,
     RefreshCw,
@@ -15,6 +16,15 @@ import {
     FileText,
     FileCode,
     Sparkles,
+    CloudUpload,
+    Download,
+    Eye,
+    Mail,
+    MessageCircle,
+    Share2,
+    Tag,
+    Trash2,
+    X,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -36,6 +46,7 @@ import DriveUploadButton from './DriveUploadButton';
 import ShareWithPatientModal from './ShareWithPatientModal';
 import PhotoTagPanel from './PhotoTagPanel';
 import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo-tags';
+import { getContextMenuSelection, updatePhotoGridSelection } from '@/lib/drive-photo-grid-selection';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -49,9 +60,12 @@ function SortableFileCard({
     onShareEmail,
     onTag,
     photoTag,
-    onSmileDesign,
-    onSetPortada,
     patientFolder,
+    selectionEnabled,
+    isSelected,
+    hideInlineActions,
+    onSelectionClick,
+    onContextMenuRequest,
 }: {
     file: DriveFile;
     isPortada: boolean;
@@ -62,9 +76,15 @@ function SortableFileCard({
     onShareEmail?: (f: DriveFile) => void;
     onTag?: (f: DriveFile) => void;
     photoTag?: PhotoTag | null;
-    onSmileDesign?: (f: DriveFile) => void;
-    onSetPortada?: (f: DriveFile) => void;
     patientFolder?: string;
+    selectionEnabled?: boolean;
+    isSelected?: boolean;
+    hideInlineActions?: boolean;
+    onSelectionClick?: (
+        file: DriveFile,
+        event: { additive: boolean; range: boolean; checkbox: boolean }
+    ) => void;
+    onContextMenuRequest?: (file: DriveFile, event: MouseEvent<HTMLDivElement>) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.id });
     const style: CSSProperties = {
@@ -89,7 +109,24 @@ function SortableFileCard({
             >
                 <GripVertical size={15} className="text-white" />
             </div>
-            <DriveFileCard file={file} onPreview={onPreview} onDelete={onDelete} onShare={onShare} onShareWithPatient={onShareWithPatient} onShareEmail={onShareEmail} onTag={onTag} photoTag={photoTag} onSmileDesign={onSmileDesign} isPortada={isPortada} onSetPortada={onSetPortada} patientFolder={patientFolder} isSeleccion={classifyFile(file) === 'redes'} />
+            <DriveFileCard
+                file={file}
+                onPreview={onPreview}
+                onDelete={onDelete}
+                onShare={onShare}
+                onShareWithPatient={onShareWithPatient}
+                onShareEmail={onShareEmail}
+                onTag={onTag}
+                photoTag={photoTag}
+                isPortada={isPortada}
+                patientFolder={patientFolder}
+                isSeleccion={classifyFile(file) === 'redes'}
+                selectionEnabled={selectionEnabled}
+                isSelected={isSelected}
+                hideInlineActions={hideInlineActions}
+                onSelectionClick={onSelectionClick}
+                onContextMenuRequest={onContextMenuRequest}
+            />
         </div>
     );
 }
@@ -293,6 +330,13 @@ function isGridPhoto(file: DriveFile): boolean {
 const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
 const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente']);
 
+type PhotoContextMenuState = {
+    x: number;
+    y: number;
+    clickedId: string;
+    targetIds: string[];
+} | null;
+
 interface PatientDriveTabProps {
     patientId: string;
     patientName: string;
@@ -318,11 +362,21 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [fotosOrder, setFotosOrder] = useState<Record<string, string[]>>({});
     const [extractingSlidesId, setExtractingSlidesId] = useState<string | null>(null);
     const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
+    const [sharePatientFiles, setSharePatientFiles] = useState<DriveFile[]>([]);
     const [tagFile, setTagFile] = useState<DriveFile | null>(null);
     const [photoTags, setPhotoTags] = useState<Record<string, PhotoTag>>({});
+    const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+    const [photoSelectionAnchorId, setPhotoSelectionAnchorId] = useState<string | null>(null);
+    const [photoContextMenu, setPhotoContextMenu] = useState<PhotoContextMenuState>(null);
 
     // dnd-kit sensors — require 8px move before drag activates (avoids accidental drags on click)
     const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+    const clearPhotoSelection = useCallback(() => {
+        setSelectedPhotoIds([]);
+        setPhotoSelectionAnchorId(null);
+        setPhotoContextMenu(null);
+    }, []);
 
     const fetchFolders = useCallback(async (url: string, options?: { silent?: boolean }) => {
         const folderId = extractFolderIdFromUrl(url);
@@ -342,6 +396,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
 
         setFiles(result.files || []);
+        clearPhotoSelection();
 
         // Load saved photo order
         const orderData = await getPatientFotosOrder(patientId);
@@ -354,7 +409,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const tagMap: Record<string, PhotoTag> = {};
         for (const t of tags) tagMap[t.file_id] = t;
         setPhotoTags(tagMap);
-    }, [patientId]);
+    }, [patientId, clearPhotoSelection]);
 
     useEffect(() => {
         if (currentFolderUrl && status === 'idle') {
@@ -393,23 +448,110 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         });
     }
 
-    function handleSetPortada(file: DriveFile) {
+    function getPhotoSelectionFiles(targetIds = selectedPhotoIds): DriveFile[] {
+        const targetSet = new Set(targetIds);
         const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
-        const photos = getOrderedGridPhotos(files, fotosOrder[motherFolderId] || []);
-        const idx = photos.findIndex(f => f.id === file.id);
-        if (idx < 0) return;
-        const reordered = [photos[idx], ...photos.slice(0, idx), ...photos.slice(idx + 1)];
-        const otherFiles = files.filter(f => !isGridPhoto(f));
-        setFiles([...reordered, ...otherFiles]);
-        const ids = reordered.map(f => f.id);
-        setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
-        void saveFotosOrderAction(patientId, motherFolderId, ids, file.id).then(result => {
-            if (result.error) {
-                toast.error(`No se pudo guardar la portada: ${result.error}`);
-            } else {
-                toast.success('Foto de portada actualizada');
-            }
+        return getOrderedGridPhotos(files, fotosOrder[motherFolderId] || []).filter(file => targetSet.has(file.id));
+    }
+
+    function handlePhotoSelection(
+        file: DriveFile,
+        orderedIds: string[],
+        event: { additive: boolean; range: boolean; checkbox: boolean }
+    ) {
+        const nextSelection = updatePhotoGridSelection({
+            orderedIds,
+            selectedIds: selectedPhotoIds,
+            anchorId: photoSelectionAnchorId,
+            clickedId: file.id,
+            additive: event.additive,
+            range: event.range,
+            checkbox: event.checkbox,
         });
+
+        setSelectedPhotoIds(nextSelection.selectedIds);
+        setPhotoSelectionAnchorId(nextSelection.anchorId);
+        setPhotoContextMenu(null);
+
+        if (nextSelection.shouldOpenPreview) {
+            openPreview(file, extractFolderIdFromUrl(currentFolderUrl) || '');
+        }
+    }
+
+    function openPhotoContextMenu(file: DriveFile, orderedIds: string[], event: MouseEvent<HTMLDivElement>) {
+        const nextSelection = getContextMenuSelection({
+            orderedIds,
+            selectedIds: selectedPhotoIds,
+            clickedId: file.id,
+        });
+        setSelectedPhotoIds(nextSelection.selectedIds);
+        setPhotoSelectionAnchorId(nextSelection.anchorId);
+        setPhotoContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            clickedId: file.id,
+            targetIds: nextSelection.selectedIds,
+        });
+    }
+
+    function closePhotoContextMenu() {
+        setPhotoContextMenu(null);
+    }
+
+    function handlePrepareCloudinaryUpload(targetIds = selectedPhotoIds) {
+        const targetFiles = getPhotoSelectionFiles(targetIds);
+        if (targetFiles.length === 0) return;
+        toast.info(`${targetFiles.length} foto${targetFiles.length > 1 ? 's seleccionadas' : ' seleccionada'} para subir a la web. Siguiente paso: editor de caso y carga a Cloudinary.`);
+        closePhotoContextMenu();
+    }
+
+    async function handleDownloadFiles(targetIds: string[]) {
+        const targetFiles = getPhotoSelectionFiles(targetIds);
+        if (targetFiles.length === 0) return;
+        closePhotoContextMenu();
+        try {
+            for (const file of targetFiles) {
+                const response = await fetch(`/api/drive/file/${file.id}`);
+                const blob = await response.blob();
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = file.name;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+            }
+            toast.success(`${targetFiles.length} archivo${targetFiles.length > 1 ? 's descargados' : ' descargado'}`);
+        } catch {
+            toast.error('No se pudieron descargar los archivos seleccionados');
+        }
+    }
+
+    async function handleDeleteFiles(targetIds: string[]) {
+        const targetFiles = getPhotoSelectionFiles(targetIds);
+        if (targetFiles.length === 0) return;
+
+        const label = targetFiles.length === 1
+            ? `"${targetFiles[0].name}"`
+            : `${targetFiles.length} fotos seleccionadas`;
+        if (!confirm(`¿Eliminar ${label}? Esta acción no se puede deshacer.`)) return;
+
+        closePhotoContextMenu();
+        const deletedIds: string[] = [];
+        for (const file of targetFiles) {
+            const result = await deleteDriveFileAction(file.id);
+            if (result.error) {
+                toast.error(`Error al eliminar "${file.name}": ${result.error}`);
+                continue;
+            }
+            deletedIds.push(file.id);
+        }
+
+        if (deletedIds.length > 0) {
+            const deleted = new Set(deletedIds);
+            setFiles(prev => prev.filter(file => !deleted.has(file.id)));
+            setSelectedPhotoIds(prev => prev.filter(id => !deleted.has(id)));
+            setPhotoSelectionAnchorId(prev => prev && deleted.has(prev) ? null : prev);
+            toast.success(`${deletedIds.length} archivo${deletedIds.length > 1 ? 's eliminados' : ' eliminado'}`);
+        }
     }
 
     async function handleDeleteFile(file: DriveFile) {
@@ -421,6 +563,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
         toast.success(`"${file.name}" eliminado`);
         setFiles(prev => prev.filter(fi => fi.id !== file.id));
+        setSelectedPhotoIds(prev => prev.filter(id => id !== file.id));
+        setPhotoSelectionAnchorId(prev => prev === file.id ? null : prev);
     }
 
     function handleShareEmail(file: DriveFile) {
@@ -429,30 +573,61 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
     }
 
-    async function handleShareFile(file: DriveFile, target: 'native' | 'instagram' | 'tiktok' = 'native') {
+    function handleShareEmailFiles(targetFiles: DriveFile[]) {
+        if (targetFiles.length === 0) return;
+        closePhotoContextMenu();
+        if (targetFiles.length === 1) {
+            handleShareEmail(targetFiles[0]);
+            return;
+        }
+
+        const subject = encodeURIComponent(`${targetFiles.length} fotos — AM Clínica`);
+        const body = encodeURIComponent([
+            'Te comparto estas fotos de AM Clínica:',
+            '',
+            ...targetFiles.map(file => `${file.name}\n${file.webViewLink}`),
+        ].join('\n\n'));
+        window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+    }
+
+    async function handleShareFiles(targetFiles: DriveFile[], target: 'native' | 'instagram' | 'tiktok' = 'native') {
+        if (targetFiles.length === 0) return;
+        closePhotoContextMenu();
         try {
-            const res = await fetch(`/api/drive/file/${file.id}`);
-            const blob = await res.blob();
-            const shareFile = new File([blob], file.name, { type: blob.type });
-            if (navigator.canShare?.({ files: [shareFile] })) {
+            const shareFiles = await Promise.all(targetFiles.map(async (file) => {
+                const res = await fetch(`/api/drive/file/${file.id}`);
+                const blob = await res.blob();
+                return new File([blob], file.name, { type: blob.type });
+            }));
+
+            if (navigator.canShare?.({ files: shareFiles })) {
                 if (target === 'instagram') {
                     toast.info('Elegí Instagram en el menú del sistema. Si aparece, podés enviarla a historia.');
                 } else if (target === 'tiktok') {
                     toast.info('Elegí TikTok en el menú del sistema. Si aparece, podés crear la publicación desde la app.');
                 }
-                await navigator.share({ files: [shareFile], title: file.name });
+                await navigator.share({
+                    files: shareFiles,
+                    title: shareFiles.length === 1 ? shareFiles[0].name : `${shareFiles.length} fotos`,
+                });
             } else {
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = file.name;
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-                toast.info('Tu browser no soporta compartir archivos — se descargó el archivo');
+                for (const file of shareFiles) {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(file);
+                    a.download = file.name;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                }
+                toast.info('Tu browser no soporta compartir archivos — se descargó la selección');
             }
         } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError')
                 toast.error('No se pudo compartir');
         }
+    }
+
+    async function handleShareFile(file: DriveFile, target: 'native' | 'instagram' | 'tiktok' = 'native') {
+        await handleShareFiles([file], target);
     }
 
     async function handleExtractSlides(fileId: string) {
@@ -648,6 +823,14 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const savedOrder = fotosOrder[motherFolderId] || [];
     classifiedGroups.foto.files = getOrderedGridPhotos(files, savedOrder);
     classifiedGroups.redes.files = [];
+    const photoIds = classifiedGroups.foto.files.map(file => file.id);
+    const selectedPhotoFiles = classifiedGroups.foto.files.filter(file => selectedPhotoIds.includes(file.id));
+    const contextMenuFiles = photoContextMenu ? getPhotoSelectionFiles(photoContextMenu.targetIds) : [];
+    const contextClickedFile = photoContextMenu
+        ? classifiedGroups.foto.files.find(file => file.id === photoContextMenu.clickedId) ?? null
+        : null;
+    const contextIsSingle = contextMenuFiles.length === 1;
+    const contextCanSmileDesign = contextIsSingle && contextClickedFile?.id === classifiedGroups.foto.files[0]?.id;
     const dentalBitePairs = buildDentalBitePairs(classifiedGroups['3d'].files);
 
     // Sort 'exocad' files: ordered by modifiedTime descending (newest first)
@@ -736,6 +919,27 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                 {group.files.length} archivo{group.files.length !== 1 ? 's' : ''}
                                             </span>
                                         </h3>
+                                        {key === 'foto' && selectedPhotoFiles.length > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="hidden sm:inline text-xs font-semibold text-[#C9A96E]">
+                                                    {selectedPhotoFiles.length} seleccionada{selectedPhotoFiles.length !== 1 ? 's' : ''}
+                                                </span>
+                                                <button
+                                                    onClick={() => handlePrepareCloudinaryUpload()}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-xs font-bold hover:bg-[#d9bb7d] transition-colors"
+                                                >
+                                                    <CloudUpload size={14} />
+                                                    Subir a web
+                                                </button>
+                                                <button
+                                                    onClick={clearPhotoSelection}
+                                                    className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-white/10 text-slate-400 hover:text-white hover:bg-white/15 transition-colors"
+                                                    title="Limpiar selección"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {key === 'foto' && canManageDrive ? (
@@ -761,9 +965,12 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             onShareEmail={canManageDrive ? handleShareEmail : undefined}
                                                             onTag={canManageDrive ? setTagFile : undefined}
                                                             photoTag={photoTags[file.id]}
-                                                            onSmileDesign={canManageDrive ? (f => openSmileDesign(f, motherFolderId)) : undefined}
-                                                            onSetPortada={canManageDrive ? handleSetPortada : undefined}
                                                             patientFolder={getFormattedFolderName(patientName)}
+                                                            selectionEnabled={canManageDrive}
+                                                            isSelected={selectedPhotoIds.includes(file.id)}
+                                                            hideInlineActions
+                                                            onSelectionClick={(selectedFile, event) => handlePhotoSelection(selectedFile, photoIds, event)}
+                                                            onContextMenuRequest={(selectedFile, event) => openPhotoContextMenu(selectedFile, photoIds, event)}
                                                         />
                                                     ))}
                                                 </div>
@@ -782,7 +989,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         onShareEmail={canManageDrive ? handleShareEmail : undefined}
                                                         onTag={canManageDrive ? setTagFile : undefined}
                                                         photoTag={photoTags[file.id]}
-                                                        onSmileDesign={canManageDrive ? (f => openSmileDesign(f, motherFolderId)) : undefined}
                                                         patientFolder={getFormattedFolderName(patientName)}
                                                         isSeleccion={classifyFile(file) === 'redes'}
                                                     />
@@ -844,6 +1050,115 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     </div>
                 )}
 
+                {photoContextMenu && contextMenuFiles.length > 0 && typeof document !== 'undefined' && createPortal(
+                    <>
+                        <div
+                            className="fixed inset-0 z-[9998]"
+                            onClick={closePhotoContextMenu}
+                            onContextMenu={(event) => {
+                                event.preventDefault();
+                                closePhotoContextMenu();
+                            }}
+                        />
+                        <div
+                            className="fixed z-[9999] w-56 overflow-hidden rounded-xl border border-white/15 bg-gray-950/95 py-1 shadow-2xl backdrop-blur-sm"
+                            style={{
+                                left: Math.max(8, Math.min(photoContextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : photoContextMenu.x) - 232)),
+                                top: Math.max(8, Math.min(photoContextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : photoContextMenu.y) - 340)),
+                            }}
+                            onClick={(event) => event.stopPropagation()}
+                            onContextMenu={(event) => event.preventDefault()}
+                        >
+                            <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white/35">
+                                {contextMenuFiles.length} foto{contextMenuFiles.length !== 1 ? 's' : ''}
+                            </div>
+                            {contextIsSingle && contextClickedFile && (
+                                <button
+                                    onClick={() => {
+                                        closePhotoContextMenu();
+                                        openPreview(contextClickedFile, motherFolderId);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                                >
+                                    <Eye size={13} className="text-blue-300" />
+                                    Abrir
+                                </button>
+                            )}
+                            <button
+                                onClick={() => handlePrepareCloudinaryUpload(photoContextMenu.targetIds)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                            >
+                                <CloudUpload size={13} className="text-[#C9A96E]" />
+                                Subir a web
+                            </button>
+                            <button
+                                onClick={() => handleShareFiles(contextMenuFiles)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                            >
+                                <Share2 size={13} className="text-blue-400" />
+                                Compartir
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSharePatientFiles(contextMenuFiles);
+                                    closePhotoContextMenu();
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                            >
+                                <MessageCircle size={13} className="text-green-400" />
+                                WhatsApp
+                            </button>
+                            <button
+                                onClick={() => handleShareEmailFiles(contextMenuFiles)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                            >
+                                <Mail size={13} className="text-red-400" />
+                                Email
+                            </button>
+                            {contextIsSingle && contextClickedFile && (
+                                <button
+                                    onClick={() => {
+                                        closePhotoContextMenu();
+                                        setTagFile(contextClickedFile);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                                >
+                                    <Tag size={13} className="text-emerald-400" />
+                                    Clasificar
+                                </button>
+                            )}
+                            {contextCanSmileDesign && contextClickedFile && (
+                                <button
+                                    onClick={() => {
+                                        closePhotoContextMenu();
+                                        openSmileDesign(contextClickedFile, motherFolderId);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                                >
+                                    <Sparkles size={13} className="text-purple-300" />
+                                    Smile Design
+                                </button>
+                            )}
+                            <div className="my-1 border-t border-white/10" />
+                            <button
+                                onClick={() => handleDownloadFiles(photoContextMenu.targetIds)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+                            >
+                                <Download size={13} className="text-white/60" />
+                                Descargar
+                            </button>
+                            <button
+                                onClick={() => handleDeleteFiles(photoContextMenu.targetIds)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-colors"
+                            >
+                                <Trash2 size={13} className="text-red-400" />
+                                Eliminar
+                            </button>
+                        </div>
+                    </>,
+                    document.body
+                )}
+
                 {/* Share with patient */}
                 {canManageDrive && sharePatientFile && (
                     <ShareWithPatientModal
@@ -856,6 +1171,19 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         patientId={patientId}
                         patientName={patientName}
                         onClose={() => setSharePatientFile(null)}
+                    />
+                )}
+                {canManageDrive && sharePatientFiles.length > 0 && (
+                    <ShareWithPatientModal
+                        files={sharePatientFiles.map(file => ({
+                            id: file.id,
+                            name: file.name,
+                            driveFileId: file.id,
+                        }))}
+                        folderId={motherFolderId || undefined}
+                        patientId={patientId}
+                        patientName={patientName}
+                        onClose={() => setSharePatientFiles([])}
                     />
                 )}
 
