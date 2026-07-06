@@ -193,7 +193,7 @@ interface PhotoStudioModalProps {
     patientName: string;
     canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
-    onSaved: () => void;           // called after successful save → triggers folder refresh
+    onSaved: (options?: { silent?: boolean }) => void; // called after successful save → triggers folder refresh
     autoStartSmile?: boolean;
 }
 
@@ -4960,15 +4960,28 @@ export default function PhotoStudioModal({
                     toast.success('Foto reemplazada y enviada a Selección');
                 }
                 markAsEdited(activeFile.id);
-                setActiveFile(prev => prev ? { ...prev, mimeType: isPng ? 'image/png' : 'image/jpeg', parentName: prev.parentName?.includes('Selección') ? prev.parentName : `[Selección] ${prev.parentName || ''}` } : null);
-                // Reset edit state and reload fresh from Drive (cache-busted)
-                setImageUrl(`/api/drive/file/${activeFile.id}?t=${Date.now()}`);
+                const savedPreviewUrl = URL.createObjectURL(blob);
+                createdBlobUrlsRef.current.push(savedPreviewUrl);
+                objectUrlRef.current = savedPreviewUrl;
+                const selectionParentName = activeFile.parentName?.includes('Selección')
+                    ? activeFile.parentName
+                    : `[Selección] ${activeFile.parentName || patientName}`;
+                setActiveFile(prev => prev ? {
+                    ...prev,
+                    mimeType: isPng ? 'image/png' : 'image/jpeg',
+                    parentName: selectionParentName,
+                    modifiedTime: new Date().toISOString(),
+                } : null);
+                // Keep edited pixels on screen immediately; Drive/CDN can lag after in-place replace.
+                setImageUrl(savedPreviewUrl);
                 setRotation(0);
                 setBrightness(100);
                 setBgDone(false);
                 setHasTransparentBg(false);
-                preCropImageRef.current = null;
+                preCropImageRef.current = savedPreviewUrl;
                 prevCroppedUrlRef.current = null;
+                offscreenCanvasRef.current = null;
+                originalImgForRestoreRef.current = null;
                 setHistory([]);
             } else {
                 // Save as a new copy
@@ -4996,7 +5009,7 @@ export default function PhotoStudioModal({
                 toast.dismiss(toastId);
             }
 
-            onSaved(); // refresca la carpeta, pero nos quedamos en el estudio
+            onSaved({ silent: mode === 'replace' }); // refresca la carpeta, pero nos quedamos en el estudio
         } catch (err) {
             const message = err instanceof Error ? err.message : '';
             toast.error(message ? `Error al guardar: ${message}` : 'Error inesperado al guardar');

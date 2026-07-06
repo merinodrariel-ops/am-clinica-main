@@ -6,6 +6,8 @@ export async function GET(
     { params }: { params: Promise<{ fileId: string }> }
 ) {
     const { fileId } = await params;
+    const searchParams = new URL(request.url).searchParams;
+    const forceFresh = searchParams.has('t') || searchParams.get('fresh') === '1';
 
     if (!fileId) {
         return NextResponse.json({ error: 'File ID required' }, { status: 400 });
@@ -35,7 +37,9 @@ export async function GET(
         // first hit per region the file is served without touching the Drive API again.
         // Display URLs are versioned with `?v=modifiedTime`, so an in-place "replace
         // original" (same fileId, new bytes) yields a fresh URL and never serves stale.
-        headers.set('Cache-Control', 'public, max-age=600, s-maxage=604800, stale-while-revalidate=86400');
+        headers.set('Cache-Control', forceFresh
+            ? 'no-store, max-age=0'
+            : 'public, max-age=600, s-maxage=604800, stale-while-revalidate=86400');
         // Allow canvas drawImage() without tainting (needed for PhotoStudio export)
         headers.set('Access-Control-Allow-Origin', '*');
 

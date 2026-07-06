@@ -324,7 +324,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     // dnd-kit sensors — require 8px move before drag activates (avoids accidental drags on click)
     const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-    const fetchFolders = useCallback(async (url: string) => {
+    const fetchFolders = useCallback(async (url: string, options?: { silent?: boolean }) => {
         const folderId = extractFolderIdFromUrl(url);
         if (!folderId) {
             setErrorMsg('No se pudo extraer el ID de la carpeta de Drive');
@@ -332,7 +332,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             return;
         }
 
-        setStatus('loading');
+        if (!options?.silent) setStatus('loading');
         const result = await getPatientAllFilesAction(folderId);
 
         if (result.error) {
@@ -498,10 +498,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         setPreviewFolderId(folderId);
     };
 
-    const handleRefresh = () => {
+    const handleRefresh = (options?: { silent?: boolean }) => {
         if (currentFolderUrl) {
-            setStatus('idle');
-            fetchFolders(currentFolderUrl);
+            if (!options?.silent) setStatus('idle');
+            fetchFolders(currentFolderUrl, options);
         }
     };
 
@@ -527,8 +527,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         setCreating(false);
     };
 
-    const handleUploadedToFolder = () => {
-        handleRefresh();
+    const handleUploadedToFolder = (options?: { silent?: boolean }) => {
+        handleRefresh(options);
     };
 
     const isFileDrag = (event: DragEvent<HTMLElement>) =>
@@ -615,7 +615,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 <AlertCircle size={28} className="text-red-400 mb-3" />
                 <p className="text-sm text-gray-500 dark:text-white/40 max-w-md mb-4">{errorMsg}</p>
                 <button
-                    onClick={handleRefresh}
+                    onClick={() => handleRefresh()}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-sm text-gray-700 dark:text-white/70 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
                 >
                     <RefreshCw size={14} />
@@ -707,7 +707,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                             Carpeta Local
                         </button>
                         <button
-                            onClick={handleRefresh}
+                            onClick={() => handleRefresh()}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-white/40 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                         >
                             <RefreshCw size={14} />
@@ -870,8 +870,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     allFolderFiles={files.filter(f => ['foto', 'redes'].includes(classifyFile(f)))}
                     autoStartSmile={previewAutoSmile}
                     onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
-                    onSaved={() => {
-                        handleUploadedToFolder();
+                    onSaved={(options) => {
+                        handleUploadedToFolder(options);
                     }}
                 />
             </div>

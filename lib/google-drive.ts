@@ -886,6 +886,7 @@ export async function updateFileContentInDrive(
         await drive.files.update({
             fileId,
             supportsAllDrives: true,
+            requestBody: { mimeType },
             media: { mimeType, body: stream },
             fields: 'id',
         });
