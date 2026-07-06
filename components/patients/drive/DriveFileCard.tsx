@@ -333,8 +333,9 @@ export default function DriveFileCard({ file, onPreview, onDelete, onShare, onSh
                 {onDelete && (
                     <button
                         onClick={e => { e.stopPropagation(); onDelete(file); }}
-                        className="absolute bottom-1.5 left-1.5 p-1.5 rounded-lg bg-black/60 text-white/60 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-red-600 hover:text-white z-10"
+                        className="absolute bottom-1.5 left-1.5 p-1.5 rounded-lg bg-black/75 text-white/85 opacity-100 transition-all hover:bg-red-600 hover:text-white z-10"
                         title="Eliminar"
+                        aria-label={`Eliminar ${file.name}`}
                     >
                         <Trash2 size={13} />
                     </button>
