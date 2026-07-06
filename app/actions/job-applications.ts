@@ -92,33 +92,28 @@ function getRequiredText(formData: FormData, key: string, maxLength = 3000) {
 
 function validateTextPayload(payload: {
     fullName: string;
-    area: string;
+    areas: string[];
     otherArea: string;
     experience: string;
-    areaResponsibilities: string;
     instagramUrl: string;
     email: string;
     location: string;
-    teamworkAnswer: string;
-    learningInterest: string;
-    longTermGoals: string;
-    teamContribution: string;
     whyChooseYou: string;
     consent: string;
 }) {
     if (!payload.fullName || payload.fullName.length < 3) return 'Completá tu nombre y apellido.';
-    if (!payload.area || !JOB_APPLICATION_AREAS.includes(payload.area as typeof JOB_APPLICATION_AREAS[number])) return 'Seleccioná un área.';
-    if (payload.area === 'Otros' && !payload.otherArea) return 'Indicá el área de postulación.';
+    if (!payload.areas || payload.areas.length === 0) return 'Seleccioná al menos un área.';
+    for (const area of payload.areas) {
+        if (!JOB_APPLICATION_AREAS.includes(area as typeof JOB_APPLICATION_AREAS[number])) {
+            return 'Selección de área inválida.';
+        }
+    }
+    if (payload.areas.includes('Otros') && !payload.otherArea) return 'Indicá el área de postulación.';
     if (!payload.experience) return 'Completá tu experiencia previa.';
-    if (!payload.areaResponsibilities) return 'Completá las funciones del área.';
     if (!payload.instagramUrl || !isLikelyUrl(payload.instagramUrl)) return 'Completá tu Instagram.';
     if (!payload.email || !isValidEmail(payload.email)) return 'Completá un email válido.';
     if (!payload.location) return 'Completá dónde vivís.';
-    if (!payload.teamworkAnswer) return 'Completá cómo trabajás en equipo.';
-    if (!payload.learningInterest) return 'Respondé si querés seguir aprendiendo.';
-    if (!payload.longTermGoals) return 'Completá tus metas a largo plazo.';
-    if (!payload.teamContribution) return 'Completá qué aportarías al equipo.';
-    if (!payload.whyChooseYou) return 'Completá por qué deberíamos elegirte.';
+    if (!payload.whyChooseYou) return 'Completá por qué te gustaría sumarte.';
     if (payload.consent !== 'on') return 'Aceptá el uso de tus datos para el proceso de selección.';
     return '';
 }
@@ -135,19 +130,16 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
         return { error: 'Esperá unos segundos y volvé a enviar el formulario.' };
     }
 
+    const areas = formData.getAll('areas').map(a => sanitizeText(a, 180)).filter(Boolean);
+
     const payload = {
         fullName: sanitizeText(formData.get('full_name'), 180),
-        area: sanitizeText(formData.get('area'), 180),
+        areas,
         otherArea: sanitizeText(formData.get('other_area'), 180),
         experience: getRequiredText(formData, 'experience'),
-        areaResponsibilities: getRequiredText(formData, 'area_responsibilities'),
         instagramUrl: sanitizeText(formData.get('instagram_url'), 240),
         email: normalizeEmail(formData.get('email')),
         location: sanitizeText(formData.get('location'), 240),
-        teamworkAnswer: getRequiredText(formData, 'teamwork_answer'),
-        learningInterest: getRequiredText(formData, 'learning_interest'),
-        longTermGoals: getRequiredText(formData, 'long_term_goals'),
-        teamContribution: getRequiredText(formData, 'team_contribution'),
         whyChooseYou: getRequiredText(formData, 'why_choose_you'),
         consent: String(formData.get('consent') || ''),
     };
@@ -194,13 +186,15 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
         return { error: genericSubmitError() };
     }
 
-    const duplicate = findRecentDuplicateJobApplication(
-        (recentCandidates || []) as Array<{ id: string; created_at: string; email: string; full_name: string; area: string }>,
-        {
-            email: payload.email,
-            fullName: payload.fullName,
-            area: payload.area,
-        },
+    const duplicate = payload.areas.some((area) =>
+        findRecentDuplicateJobApplication(
+            (recentCandidates || []) as Array<{ id: string; created_at: string; email: string; full_name: string; area: string }>,
+            {
+                email: payload.email,
+                fullName: payload.fullName,
+                area: area,
+            },
+        )
     );
 
     if (duplicate) {
@@ -223,30 +217,32 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
         return { error: genericSubmitError() };
     }
 
+    const inserts = payload.areas.map((area) => ({
+        id: crypto.randomUUID(),
+        full_name: payload.fullName,
+        area: area,
+        other_area: area === 'Otros' ? payload.otherArea : null,
+        experience: payload.experience,
+        area_responsibilities: '',
+        instagram_url: payload.instagramUrl,
+        email: payload.email,
+        location: payload.location,
+        teamwork_answer: '',
+        learning_interest: '',
+        long_term_goals: '',
+        team_contribution: '',
+        why_choose_you: payload.whyChooseYou,
+        cv_storage_path: storagePath,
+        cv_original_filename: sanitizeJobApplicationFileName(cv.name),
+        cv_mime_type: cv.type,
+        cv_size_bytes: cv.size,
+        ip_hash: ipHash,
+        user_agent_hash: userAgentHash,
+    }));
+
     const { error: insertError } = await admin
         .from('job_applications')
-        .insert({
-            id: applicationId,
-            full_name: payload.fullName,
-            area: payload.area,
-            other_area: payload.area === 'Otros' ? payload.otherArea : null,
-            experience: payload.experience,
-            area_responsibilities: payload.areaResponsibilities,
-            instagram_url: payload.instagramUrl,
-            email: payload.email,
-            location: payload.location,
-            teamwork_answer: payload.teamworkAnswer,
-            learning_interest: payload.learningInterest,
-            long_term_goals: payload.longTermGoals,
-            team_contribution: payload.teamContribution,
-            why_choose_you: payload.whyChooseYou,
-            cv_storage_path: storagePath,
-            cv_original_filename: sanitizeJobApplicationFileName(cv.name),
-            cv_mime_type: cv.type,
-            cv_size_bytes: cv.size,
-            ip_hash: ipHash,
-            user_agent_hash: userAgentHash,
-        });
+        .insert(inserts);
 
     if (insertError) {
         console.error('[submitJobApplication] insert failed:', insertError.message);
