@@ -56,3 +56,10 @@ windows-portable-pack/exocad-config.json
 # Local scratch & temporary files
 /scratch/
 /horarios/
+
+# Patient data backups & PII exports (NEVER commit — Ley 25.326)
+/data/backups/
+/outputs/*.json
+*backup_pacientes*
+backup-pacientes*
+*.bak
