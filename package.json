@@ -8,6 +8,8 @@
     "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test lib/*.test.ts",
+    "test:finanzas": "tsx --test lib/financial-engine.test.ts lib/payroll-rules.test.ts lib/dashboard.test.ts",
     "test:admission-mobile": "playwright test tests/admission-mobile.spec.ts",
     "drive:simulate": "node scripts/drive-watcher.js",
     "drive:organize": "node scripts/drive-watcher.js --organize",
