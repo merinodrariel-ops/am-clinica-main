@@ -276,17 +276,15 @@ interface PatientDriveTabProps {
     patientId: string;
     patientName: string;
     motherFolderUrl: string | null | undefined;
-    initialCoverFileId?: string | null;
 }
 
-export default function PatientDriveTab({ patientId, patientName, motherFolderUrl, initialCoverFileId }: PatientDriveTabProps) {
+export default function PatientDriveTab({ patientId, patientName, motherFolderUrl }: PatientDriveTabProps) {
     const { categoria: role, profile } = useAuth();
     const canUpload = UPLOAD_ROLES.has(role || '');
     const canManageDrive = DRIVE_MANAGE_ROLES.has(role || '');
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
     const [files, setFiles] = useState<DriveFile[]>([]);
-    const [coverFileId, setCoverFileId] = useState<string | null>(initialCoverFileId ?? null);
     const [errorMsg, setErrorMsg] = useState('');
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
     const [previewPaired3DFile, setPreviewPaired3DFile] = useState<DriveFile | null>(null);
@@ -356,7 +354,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
         const reordered = arrayMove(photos, oldIdx, newIdx);
         const ids = reordered.map(f => f.id);
-        const newCoverFileId = reordered[0]?.id || null;
+        const coverFileId = reordered[0]?.id || undefined;
 
         // Update files in state
         const otherFiles = files.filter(f => classifyFile(f) !== 'foto');
@@ -364,9 +362,8 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
 
         const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
         setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
-        setCoverFileId(newCoverFileId);
 
-        void saveFotosOrderAction(patientId, motherFolderId, ids, newCoverFileId).then(result => {
+        void saveFotosOrderAction(patientId, motherFolderId, ids, coverFileId).then(result => {
             if (result.error) {
                 toast.error(`No se pudo guardar la portada: ${result.error}`);
             }
@@ -383,7 +380,6 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const ids = reordered.map(f => f.id);
         const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
         setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
-        setCoverFileId(file.id);
         void saveFotosOrderAction(patientId, motherFolderId, ids, file.id).then(result => {
             if (result.error) {
                 toast.error(`No se pudo guardar la portada: ${result.error}`);
@@ -730,7 +726,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         <SortableFileCard
                                                             key={file.id}
                                                             file={file}
-                                                            isPortada={file.id === coverFileId}
+                                                            isPortada={idx === 0}
                                                             onPreview={f => openPreview(f, motherFolderId)}
                                                             onDelete={canManageDrive ? handleDeleteFile : undefined}
                                                             onShare={handleShareFile}

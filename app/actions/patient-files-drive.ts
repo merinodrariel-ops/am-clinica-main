@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
 import { createClient as createServerClient } from '@/utils/supabase/server';
 import {
     listFolderFiles,
@@ -36,9 +37,16 @@ export async function renameDriveFileAction(
     }
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabaseAdmin() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Supabase admin environment variables are missing');
+    }
+
+    return createClient(supabaseUrl, supabaseKey);
+}
 
 export interface DriveFile {
     id: string;
@@ -206,6 +214,7 @@ export async function createPatientDriveFolderAction(
     nombre: string
 ): Promise<{ motherFolderUrl?: string; error?: string }> {
     try {
+        const supabase = getSupabaseAdmin();
         const { data: patientRow } = await supabase
             .from('pacientes')
             .select('link_historia_clinica')
@@ -260,7 +269,7 @@ async function requireDriveManageRole(actionLabel: string): Promise<{ error?: st
 
 /** Returns the saved photo order for a patient: { [folderId]: [fileId, ...] } */
 export async function getPatientFotosOrder(patientId: string): Promise<Record<string, string[]>> {
-    const { data } = await supabase
+    const { data } = await getSupabaseAdmin()
         .from('pacientes')
         .select('fotos_order')
         .eq('id_paciente', patientId)
@@ -280,6 +289,7 @@ export async function saveFotosOrderAction(
         if (roleCheck.error) return roleCheck;
 
         // Read current value then merge — avoids overwriting other folders' orders
+        const supabase = getSupabaseAdmin();
         const { data: current } = await supabase
             .from('pacientes')
             .select('fotos_order')
@@ -305,6 +315,10 @@ export async function saveFotosOrderAction(
             .eq('id_paciente', patientId);
 
         if (error) return { error: error.message };
+
+        revalidatePath('/patients');
+        revalidatePath(`/patients/${patientId}`);
+
         return {};
     } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) };
@@ -525,12 +539,16 @@ export async function setPatientCoverPhotoAction(
             return { error: 'ID de archivo inválido' };
         }
 
-        const { error } = await supabase
+        const { error } = await getSupabaseAdmin()
             .from('pacientes')
             .update({ foto_perfil_url: fileId })
             .eq('id_paciente', patientId);
 
         if (error) return { error: error.message };
+
+        revalidatePath('/patients');
+        revalidatePath(`/patients/${patientId}`);
+
         return {};
     } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) };
