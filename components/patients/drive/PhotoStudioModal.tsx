@@ -4991,9 +4991,12 @@ export default function PhotoStudioModal({
         display: 'block',
     };
 
-    // Fast thumbnail shown as blurred placeholder while the full-res loads
+    // Fast thumbnail shown as blurred placeholder while the full-res loads.
+    // Uses our cached proxy (reliable + already warmed by the grid) instead of Google's
+    // raw thumbnailLink, which is slow/unreliable for private files. This makes the modal
+    // show the photo instantly while the full-resolution original streams in on top.
     const thumbPlaceholderUrl = activeFile?.thumbnailLink
-        ? activeFile.thumbnailLink.replace(/=s\d+(-[a-z])?$/i, '=s400')
+        ? `/api/drive/thumbnail/${encodeURIComponent(activeFile.id)}?s=400${activeFile.modifiedTime ? `&v=${encodeURIComponent(activeFile.modifiedTime)}` : ''}`
         : null;
 
     return (
