@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
-    Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2,
+    Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2, Share2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
     AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Folder, Eraser
 } from 'lucide-react';
@@ -5338,76 +5338,83 @@ export default function PhotoStudioModal({
                         )}
                         {!smileMode && (
                             <div ref={downloadMenuRef} className="relative">
-                            <button
-                                onClick={() => setDownloadMenuOpen(prev => !prev)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
-                            >
-                                <Download size={14} />
-                                <span className="hidden sm:inline">Descargar{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
-                            </button>
-                            {downloadMenuOpen && (
-                                <div className="absolute right-0 top-full mt-2 z-20 w-52 rounded-xl border border-white/15 bg-[#1A1A24] p-1.5 shadow-xl">
-                                    {currentTargetIds.length > 1 && (
+                                <button
+                                    onClick={() => setDownloadMenuOpen(prev => !prev)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
+                                    title="Compartir y descargar"
+                                >
+                                    <Share2 size={14} />
+                                    <span className="hidden sm:inline">Compartir{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
+                                </button>
+                                {downloadMenuOpen && (
+                                    <div className="absolute right-0 top-full mt-2 z-20 w-56 rounded-xl border border-white/15 bg-[#1A1A24] p-1.5 shadow-xl">
                                         <button
-                                            onClick={handleDownloadBatchOriginal}
-                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                            onClick={() => {
+                                                setDownloadMenuOpen(false);
+                                                handleShare();
+                                            }}
+                                            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
                                         >
-                                            Descargar lote original ({currentTargetIds.length})
+                                            <Globe2 size={14} className="text-blue-300" />
+                                            AirDrop
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={handleDownloadOriginal}
-                                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-                                    >
-                                        Descargar original
-                                    </button>
-                                    <button
-                                        onClick={handleDownloadWebp}
-                                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-                                    >
-                                        Descargar WebP comprimida
-                                    </button>
-                                    {currentTargetIds.length > 1 && (
                                         <button
-                                            onClick={handleDownloadBatchWebp}
-                                            className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                            onClick={() => {
+                                                setDownloadMenuOpen(false);
+                                                handleShareWithPatient();
+                                            }}
+                                            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
                                         >
-                                            Descargar lote WebP ({currentTargetIds.length})
+                                            <MessageCircle size={14} className="text-emerald-300" />
+                                            Paciente{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={() => {
-                                            setDownloadMenuOpen(false);
-                                            handleDownload();
-                                        }}
-                                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-                                    >
-                                        Descargar editada
-                                    </button>
-                                </div>
-                            )}
-                         </div>
-                         )}
-                         {!smileMode && (
-                         <button
-                             onClick={() => handleShareWithPatient()}
-                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/85 text-white text-sm font-semibold border border-emerald-400/20 hover:bg-emerald-600 transition-colors"
-                             title={currentTargetIds.length > 1 ? `Compartir ${currentTargetIds.length} fotos con el paciente` : 'Compartir con paciente'}
-                         >
-                             <MessageCircle size={14} />
-                             <span className="hidden sm:inline">Paciente{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
-                         </button>
-                         )}
-                         {!smileMode && (
-                         <button
-                             onClick={() => handleShare()}
-                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm border border-white/10 hover:bg-white/15 transition-colors"
-                             title="Compartir / AirDrop"
-                         >
-                             <Globe2 size={14} />
-                             <span className="hidden sm:inline">AirDrop{currentTargetIds.length > 1 ? ` (${currentTargetIds.length})` : ''}</span>
-                         </button>
-                         )}
+                                        <div className="my-1 border-t border-white/10" />
+                                        {currentTargetIds.length > 1 && (
+                                            <button
+                                                onClick={handleDownloadBatchOriginal}
+                                                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                            >
+                                                <Download size={14} className="text-white/55" />
+                                                Descargar lote original ({currentTargetIds.length})
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={handleDownloadOriginal}
+                                            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                        >
+                                            <Download size={14} className="text-white/55" />
+                                            Descargar original
+                                        </button>
+                                        <button
+                                            onClick={handleDownloadWebp}
+                                            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                        >
+                                            <Download size={14} className="text-white/55" />
+                                            Descargar WebP comprimida
+                                        </button>
+                                        {currentTargetIds.length > 1 && (
+                                            <button
+                                                onClick={handleDownloadBatchWebp}
+                                                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                            >
+                                                <Download size={14} className="text-white/55" />
+                                                Descargar lote WebP ({currentTargetIds.length})
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                setDownloadMenuOpen(false);
+                                                handleDownload();
+                                            }}
+                                            className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+                                        >
+                                            <Download size={14} className="text-white/55" />
+                                            Descargar editada
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
