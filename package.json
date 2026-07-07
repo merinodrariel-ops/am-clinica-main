@@ -12,6 +12,7 @@
     "drive:simulate": "node scripts/drive-watcher.js",
     "drive:organize": "node scripts/drive-watcher.js --organize",
     "drive:watch": "node scripts/drive-watcher.js --watch",
+    "agent:admin": "tsx scripts/am-admin-agent.ts",
     "mcp:am-clinica": "tsx mcp/am-clinica/server.ts",
     "test:mcp:am-clinica": "tsx --test mcp/am-clinica/core.test.ts"
   },
