@@ -30,6 +30,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
 import { readSidebarCollapsed, writeSidebarCollapsed } from '@/lib/sidebar-preferences';
+import { ASSISTANT_ALLOWED_CATEGORIES } from '@/lib/asistente-access';
 import SettingsModal from '@/components/settings/SettingsModal';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -53,7 +54,7 @@ const MENU_ITEMS = [
         label: 'Asistente',
         href: '/asistente',
         key: 'agenda',
-        roles: ['owner', 'admin', 'reception', 'dr', 'developer', 'recaptacion']
+        roles: [...ASSISTANT_ALLOWED_CATEGORIES]
     },
     {
         icon: Users,
