@@ -58,3 +58,20 @@ test('splitLongPhotoDescription maps a long clinical narration to photo slots', 
     assert.equal(descriptions[1], 'La foto 2 es sin gingivectomía láser.');
     assert.equal(descriptions[11], 'La foto doce es el antes y después final.');
 });
+
+test('splitLongPhotoDescription handles numbered lines after the first photo marker', () => {
+    const descriptions = splitLongPhotoDescription(
+        [
+            'Foto 1: foto intraoral del antes.',
+            '2. Sin gingivectomía láser y sin limpieza.',
+            '3) Maxilar superior con mitad de gingivectomía y mitad sin gingivectomía.',
+            '4: Labios en sonrisa del antes.',
+        ].join('\n'),
+        4
+    );
+
+    assert.equal(descriptions[0], 'Foto 1: foto intraoral del antes.');
+    assert.equal(descriptions[1], '2. Sin gingivectomía láser y sin limpieza.');
+    assert.equal(descriptions[2], '3) Maxilar superior con mitad de gingivectomía y mitad sin gingivectomía.');
+    assert.equal(descriptions[3], '4: Labios en sonrisa del antes.');
+});

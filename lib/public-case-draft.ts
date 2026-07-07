@@ -59,7 +59,19 @@ export function slugifyCaseTitle(value: string): string {
 
 export function splitLongPhotoDescription(text: string, photoCount: number): string[] {
     const descriptions = Array.from({ length: photoCount }, () => '');
-    const matches = [...text.matchAll(/\b(?:la\s+)?foto\s+(?:n(?:ro|º|\.)?\s*)?(\d+|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)\b/gi)];
+    const numberToken = '(\\d+|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)';
+    const explicitPhotoPattern = new RegExp(`\\b(?:la\\s+)?foto\\s*(?:n(?:ro|º|°|\\.)?\\s*)?${numberToken}\\b`, 'gi');
+    const listItemPattern = new RegExp(`(?:^|[\\n\\r])\\s*${numberToken}\\s*[.)\\-:]\\s+`, 'gi');
+    const matches = [
+        ...[...text.matchAll(explicitPhotoPattern)].map(match => ({
+            index: match.index ?? 0,
+            rawIndex: match[1],
+        })),
+        ...[...text.matchAll(listItemPattern)].map(match => ({
+            index: match.index ?? 0,
+            rawIndex: match[1],
+        })),
+    ].sort((a, b) => a.index - b.index);
 
     if (matches.length === 0) {
         return descriptions;
@@ -67,7 +79,7 @@ export function splitLongPhotoDescription(text: string, photoCount: number): str
 
     for (let i = 0; i < matches.length; i += 1) {
         const current = matches[i];
-        const rawIndex = current[1].toLowerCase();
+        const rawIndex = current.rawIndex.toLowerCase();
         const parsedIndex = /^\d+$/.test(rawIndex)
             ? Number(rawIndex)
             : SPANISH_NUMBER_WORDS[rawIndex];
