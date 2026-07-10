@@ -25,6 +25,9 @@ import {
     Tag,
     Trash2,
     X,
+    Check,
+    Square,
+    Box,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -48,6 +51,7 @@ import PhotoTagPanel from './PhotoTagPanel';
 import PublicCasePublishModal from './PublicCasePublishModal';
 import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo-tags';
 import { getContextMenuSelection, updatePhotoGridSelection } from '@/lib/drive-photo-grid-selection';
+import { toggle3DSelection, canOpenPair, resolveSelectionPair } from '@/lib/drive-3d-selection';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -354,6 +358,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [errorMsg, setErrorMsg] = useState('');
     const [previewFile, setPreviewFile] = useState<DriveFile | null>(null);
     const [previewPaired3DFile, setPreviewPaired3DFile] = useState<DriveFile | null>(null);
+    const [selected3DIds, setSelected3DIds] = useState<string[]>([]);
     const [previewFolderId, setPreviewFolderId] = useState<string>('');
     const [previewAutoSmile, setPreviewAutoSmile] = useState(false);
     const [currentFolderUrl, setCurrentFolderUrl] = useState(motherFolderUrl);
@@ -675,6 +680,19 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         setPreviewFolderId(folderId);
     };
 
+    // Manual 3D comparison: open the two selected models together in one viewer.
+    // If one is a lower arch, use the upper as the base so the bite aligns naturally.
+    const openTwo3D = (a: DriveFile, b: DriveFile, folderId: string) => {
+        const aIsLower = getDentalArch(a) === 'lower';
+        const bIsUpper = getDentalArch(b) === 'upper';
+        const [primary, secondary] = (aIsLower && bIsUpper) ? [b, a] : [a, b];
+        setPreviewAutoSmile(false);
+        setPreviewFile(primary);
+        setPreviewPaired3DFile(secondary);
+        setPreviewFolderId(folderId);
+        setSelected3DIds([]);
+    };
+
     const handleRefresh = (options?: { silent?: boolean }) => {
         if (currentFolderUrl) {
             if (!options?.silent) setStatus('idle');
@@ -982,18 +1000,34 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                                             {group.files.map(file => (
                                                 <div key={file.id} className="flex flex-col gap-1.5">
-                                                    <DriveFileCard
-                                                        file={file}
-                                                        onPreview={f => openPreview(f, motherFolderId)}
-                                                        onDelete={canManageDrive ? handleDeleteFile : undefined}
-                                                        onShare={handleShareFile}
-                                                        onShareWithPatient={canManageDrive ? setSharePatientFile : undefined}
-                                                        onShareEmail={canManageDrive ? handleShareEmail : undefined}
-                                                        onTag={canManageDrive ? setTagFile : undefined}
-                                                        photoTag={photoTags[file.id]}
-                                                        patientFolder={getFormattedFolderName(patientName)}
-                                                        isSeleccion={classifyFile(file) === 'redes'}
-                                                    />
+                                                    <div className="relative">
+                                                        {key === '3d' && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setSelected3DIds(prev => toggle3DSelection(prev, file.id)); }}
+                                                                className={`absolute top-1.5 left-1.5 z-20 rounded-md p-1.5 shadow-sm transition-colors ${
+                                                                    selected3DIds.includes(file.id)
+                                                                        ? 'bg-[#C9A96E] text-black'
+                                                                        : 'bg-black/65 text-white/75 hover:bg-[#C9A96E] hover:text-black'
+                                                                }`}
+                                                                title={selected3DIds.includes(file.id) ? 'Quitar de la comparación' : 'Seleccionar para abrir junto a otro modelo 3D'}
+                                                                aria-label={selected3DIds.includes(file.id) ? `Quitar ${file.name} de la comparación` : `Seleccionar ${file.name} para comparar`}
+                                                            >
+                                                                {selected3DIds.includes(file.id) ? <Check size={14} /> : <Square size={14} />}
+                                                            </button>
+                                                        )}
+                                                        <DriveFileCard
+                                                            file={file}
+                                                            onPreview={f => openPreview(f, motherFolderId)}
+                                                            onDelete={canManageDrive ? handleDeleteFile : undefined}
+                                                            onShare={handleShareFile}
+                                                            onShareWithPatient={canManageDrive ? setSharePatientFile : undefined}
+                                                            onShareEmail={canManageDrive ? handleShareEmail : undefined}
+                                                            onTag={canManageDrive ? setTagFile : undefined}
+                                                            photoTag={photoTags[file.id]}
+                                                            patientFolder={getFormattedFolderName(patientName)}
+                                                            isSeleccion={classifyFile(file) === 'redes'}
+                                                        />
+                                                    </div>
                                                     {key === '3d' && dentalBitePairs.has(file.id) && (
                                                         <button
                                                             onClick={() => openBitePreview(file, dentalBitePairs.get(file.id)!, motherFolderId)}
@@ -1194,6 +1228,29 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         patientName={patientName}
                         onClose={() => setPublicCaseFiles([])}
                     />
+                )}
+
+                {/* Floating bar: open two selected 3D models together */}
+                {selected3DIds.length > 0 && (
+                    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#14141c] border border-white/15 shadow-2xl">
+                        <span className="text-white/70 text-xs whitespace-nowrap">
+                            {selected3DIds.length}/2 modelo{selected3DIds.length !== 1 ? 's' : ''} para comparar
+                        </span>
+                        <button
+                            onClick={() => {
+                                const pair = resolveSelectionPair(selected3DIds, files.filter(f => classifyFile(f) === '3d'));
+                                if (pair) openTwo3D(pair[0], pair[1], motherFolderId);
+                            }}
+                            disabled={!canOpenPair(selected3DIds)}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#C9A96E] text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#d4b87e] transition-colors whitespace-nowrap"
+                            title={canOpenPair(selected3DIds) ? 'Abrir los dos modelos en un mismo visor' : 'Seleccioná 2 modelos para abrirlos juntos'}
+                        >
+                            <Box size={13} /> Abrir juntos
+                        </button>
+                        <button onClick={() => setSelected3DIds([])} className="p-1 text-white/40 hover:text-white" title="Cancelar selección">
+                            <X size={15} />
+                        </button>
+                    </div>
                 )}
 
                 {/* Preview modal */}
