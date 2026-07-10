@@ -1204,7 +1204,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     patientId={patientId}
                     patientName={patientName}
                     canSave={canManageDrive}
-                    allFolderFiles={files.filter(f => ['foto', 'redes'].includes(classifyFile(f)))}
+                    allFolderFiles={files.filter(f => ['foto', 'redes', '3d'].includes(classifyFile(f)))}
                     autoStartSmile={previewAutoSmile}
                     onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
                     onSaved={(options) => {
