@@ -584,7 +584,7 @@ export async function ensurePatientContractFolder(
 
 /**
  * Resolves a patient's root folder and reuses an existing presentation subfolder if present.
- * It does not create presentation subfolders; new patients use the root folder directly.
+ * It does not create presentation subfolders or treat the patient root as one.
  */
 export async function ensurePatientPresentationFolder(
     apellido: string,
@@ -626,18 +626,19 @@ export async function ensurePatientPresentationFolder(
 
         // Check if an existing presentation subfolder exists
         const existingFolders = await listExactFoldersByName(drive, resolvedMotherFolderId, presentationFolderName);
-        let presentationFolderId = resolvedMotherFolderId;
-        if (existingFolders.length > 0 && existingFolders[0].id) {
-            presentationFolderId = existingFolders[0].id;
-        }
+        const presentationFolderId = existingFolders.length > 0 && existingFolders[0].id
+            ? existingFolders[0].id
+            : undefined;
 
         const motherFolderUrl = await getFolderWebViewLink(resolvedMotherFolderId);
-        const presentationFolderUrl = await getFolderWebViewLink(presentationFolderId);
+        const presentationFolderUrl = presentationFolderId
+            ? await getFolderWebViewLink(presentationFolderId)
+            : null;
 
         return {
             motherFolderId: resolvedMotherFolderId,
             motherFolderUrl: motherFolderUrl || undefined,
-            presentationFolderId: presentationFolderId,
+            presentationFolderId,
             presentationFolderUrl: presentationFolderUrl || undefined,
         };
     } catch (error) {
