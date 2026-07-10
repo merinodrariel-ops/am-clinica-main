@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Box, Download, Eye, EyeOff, Video, StopCircle, Share2, X, RotateCw, ArrowLeftRight } from 'lucide-react';
+import { Box, Download, Eye, EyeOff, Video, StopCircle, Share2, X, RotateCw, ArrowLeftRight, Layers } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type RecordFmt  = 'story' | 'post' | 'presentation';
@@ -18,6 +18,12 @@ interface VideoPreview {
 }
 type ModelSlot = 'primary' | 'secondary';
 
+interface AvailableModel {
+    id: string;
+    name: string;
+    format: 'stl' | 'ply';
+}
+
 interface STLViewerProps {
     url: string;
     format?: 'stl' | 'ply';
@@ -26,7 +32,15 @@ interface STLViewerProps {
     secondModelFormat?: 'stl' | 'ply';
     primaryLabel?: string;
     secondModelLabel?: string;
+    /** Other 3D models of the same patient, to load a second model from the cloud (no drag needed). */
+    availableModels?: AvailableModel[];
 }
+
+type TransitionStyle = 'crossfade' | 'wipe';
+const TRANSITIONS: { id: TransitionStyle; label: string }[] = [
+    { id: 'crossfade', label: 'Fundido' },
+    { id: 'wipe',      label: 'Barrido' },
+];
 
 // Output dimensions per format — true 4K for post & presentation
 const FMTS: Record<RecordFmt, { label: string; ratio: string; w: number; h: number; ar: number; bps: number }> = {
@@ -41,15 +55,16 @@ function getOutDims(fmt: RecordFmt): { w: number; h: number; ar: number; label: 
 
 const REC_DURATIONS = [8, 10, 12, 15] as const;
 type RecDuration = typeof REC_DURATIONS[number];
-const CTRL_H     = 52; // top control bar height in selecting mode
+const CTRL_H     = 52; // default top control bar height (measured at runtime for mobile wrap)
 
-function computeSel(cw: number, ch: number, ar: number): SelRect {
-    const maxW = cw - 48;
-    const maxH = ch - CTRL_H - 48;
+function computeSel(cw: number, ch: number, ar: number, ctrlH: number = CTRL_H): SelRect {
+    const margin = cw < 640 ? 20 : 48; // tighter margins on phones so the frame is usable
+    const maxW = cw - margin;
+    const maxH = ch - ctrlH - margin;
     let w: number, h: number;
     if (maxW / maxH <= ar) { w = maxW; h = w / ar; }
     else                   { h = maxH; w = h * ar; }
-    return { x: (cw - w) / 2, y: CTRL_H + (ch - CTRL_H - h) / 2, w, h };
+    return { x: (cw - w) / 2, y: ctrlH + (ch - ctrlH - h) / 2, w, h };
 }
 
 function dlBlob(blobUrl: string, name: string) {
@@ -105,8 +120,10 @@ export default function STLViewer({
     secondModelFormat = 'stl',
     primaryLabel = 'Superior',
     secondModelLabel = 'Inferior',
+    availableModels = [],
 }: STLViewerProps) {
     const mountRef  = useRef<HTMLDivElement>(null);
+    const ctrlBarRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sceneRef  = useRef<{
         renderer: any; camera: any; controls: any; animId: number;
@@ -120,7 +137,7 @@ export default function STLViewer({
         setPostRenderHook?: (fn: (() => void) | null) => void;
         startTurntableReel?: (opts: {
             durationMs: number;
-            crossfade: boolean;
+            transition: 'none' | 'crossfade' | 'wipe';
             onProgress?: (p: number) => void;
             onDone: () => void;
         }) => void;
@@ -150,15 +167,45 @@ export default function STLViewer({
     const [secondaryVisible, setSecondaryVisible] = useState(true);
     const [primaryOpacity, setPrimaryOpacity] = useState(1);
     const [secondaryOpacity, setSecondaryOpacity] = useState(1);
+    const [transition, setTransition] = useState<TransitionStyle>('crossfade');
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [pickedSecondName, setPickedSecondName] = useState<string | null>(null);
+    const [ctrlH, setCtrlH] = useState(CTRL_H);
+    const effectiveSecondLabel = pickedSecondName ?? secondModelLabel;
 
     // ── Enter selection mode ───────────────────────────────────────────────────
     const enterSelecting = useCallback(() => {
         const c = mountRef.current;
         if (!c) return;
         const dims = getOutDims(fmt);
-        setSel(computeSel(c.clientWidth, c.clientHeight, dims.ar));
+        setSel(computeSel(c.clientWidth, c.clientHeight, dims.ar, ctrlH));
         setMode('selecting');
-    }, [fmt]);
+    }, [fmt, ctrlH]);
+
+    // Measure the control bar (it wraps to two rows on mobile) so the selection
+    // frame never hides behind it and the record buttons stay reachable.
+    useEffect(() => {
+        if (mode !== 'selecting') { setCtrlH(CTRL_H); return; }
+        const bar = ctrlBarRef.current;
+        if (!bar) return;
+        const measure = () => {
+            const h = Math.round(bar.getBoundingClientRect().height) || CTRL_H;
+            setCtrlH(prev => (Math.abs(prev - h) > 1 ? h : prev));
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(bar);
+        return () => ro.disconnect();
+    }, [mode]);
+
+    // Recenter the frame when the measured bar height changes (mobile two-row bar).
+    useEffect(() => {
+        if (mode !== 'selecting') return;
+        const c = mountRef.current;
+        if (!c) return;
+        setSel(computeSel(c.clientWidth, c.clientHeight, getOutDims(fmt).ar, ctrlH));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ctrlH]);
 
     // ── Change format ──────────────────────────────────────────────────────────
     const changeFmt = useCallback((newFmt: RecordFmt) => {
@@ -294,10 +341,11 @@ export default function STLViewer({
         }
     }, [primaryVisible, primaryOpacity, secondaryVisible, secondaryOpacity, secondModel]);
 
-    // ── Auto reel: one perfect 360° turn, optional ANTES→DESPUÉS crossfade ─────
-    const startAutoReel = useCallback(async (crossfade: boolean) => {
+    // ── Auto reel: one perfect 360° turn, optional ANTES→DESPUÉS transition ─────
+    const startAutoReel = useCallback(async (beforeAfter: boolean) => {
         const sr = sceneRef.current;
         if (!sr || mode !== 'selecting' || !sel.w) return;
+        const reelTransition: 'none' | TransitionStyle = beforeAfter ? transition : 'none';
         const { renderer } = sr;
         const dims = getOutDims(fmt);
         const pr = renderer.getPixelRatio() as number;
@@ -316,7 +364,7 @@ export default function STLViewer({
         sr.setPostRenderHook?.(() => {
             try {
                 ctx.drawImage(renderer.domElement, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
-                if (crossfade) drawReelLabels(ctx, dims.w, dims.h, progress.current);
+                if (beforeAfter) drawReelLabels(ctx, dims.w, dims.h, progress.current);
             } catch (e) {
                 if (drawOk) { drawOk = false; console.warn('[3DReel] drawImage failed:', e); }
             }
@@ -353,7 +401,7 @@ export default function STLViewer({
         mr.onstop = () => {
             sceneRef.current?.setPostRenderHook?.(null);
             sceneRef.current?.stopTurntableReel?.();
-            if (crossfade) restoreModelState();
+            if (beforeAfter) restoreModelState();
             const finalMime = mr.mimeType || mimeType;
             const blob      = new Blob(chunksRef.current, { type: finalMime });
             const blobUrl   = URL.createObjectURL(blob);
@@ -372,14 +420,14 @@ export default function STLViewer({
 
         sr.startTurntableReel?.({
             durationMs: recSecs * 1000,
-            crossfade,
+            transition: reelTransition,
             onProgress: p => { progress.current = p; },
             onDone: () => {
                 if (tickRef.current) clearInterval(tickRef.current);
                 if (mrRef.current?.state === 'recording') mrRef.current.stop();
             },
         });
-    }, [mode, fmt, sel, recSecs, restoreModelState]);
+    }, [mode, fmt, sel, recSecs, restoreModelState, transition]);
 
     const stopRecording = useCallback(() => {
         sceneRef.current?.stopTurntableReel?.();
@@ -491,7 +539,29 @@ export default function STLViewer({
         sceneRef.current?.removeSecondModel?.();
         loadedSecondUrlRef.current = null;
         setSecondModel('none');
+        setPickedSecondName(null);
     }, []);
+
+    // Load a second model from the patient's cloud files (no drag needed — works on mobile).
+    const loadSecondModelFromCloud = useCallback(async (model: AvailableModel) => {
+        setPickerOpen(false);
+        if (loadStatus !== 'ready') return;
+        try {
+            // Replace any existing second model first
+            sceneRef.current?.removeSecondModel?.();
+            setSecondModel('loading');
+            const res = await fetch(`/api/drive/file/${model.id}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const buffer = await res.arrayBuffer();
+            await sceneRef.current?.loadSecondModel?.(buffer, model.format === 'ply');
+            loadedSecondUrlRef.current = null;
+            setPickedSecondName(model.name);
+            setSecondModel('loaded');
+        } catch (err) {
+            console.error('[3DViewer] second model load failed:', err);
+            setSecondModel('none');
+        }
+    }, [loadStatus]);
 
     // ── Preview actions — called directly from click → user gesture context ──
     const discardPreview = useCallback(() => {
@@ -588,6 +658,7 @@ export default function STLViewer({
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 renderer.shadowMap.enabled = true;
                 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                renderer.localClippingEnabled = true; // for the "barrido" (wipe) transition
                 container.appendChild(renderer.domElement);
 
                 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -645,13 +716,19 @@ export default function STLViewer({
                 // ── Auto turntable reel: perfect clock-driven 360° sweep ─────────────────
                 // Manual autoRotate depends on frame rate and never closes a clean loop;
                 // this drives the azimuth from the wall clock so the video is exactly one
-                // full turn, with an optional ANTES→DESPUÉS crossfade at the halfway point.
+                // full turn, with an optional ANTES→DESPUÉS transition at the halfway point.
                 let turntable: {
-                    startAt: number; durationMs: number; crossfade: boolean;
+                    startAt: number; durationMs: number;
+                    transition: 'none' | 'crossfade' | 'wipe';
                     radius: number; polar: number; azimuth0: number;
+                    wipeTop: number; wipeBottom: number;
+                    planePrimary: any; planeSecondary: any;
                     onProgress?: (p: number) => void; onDone: () => void;
                     prevAutoRotate: boolean;
                 } | null = null;
+
+                // Transition window (fraction of the full turn) where ANTES → DESPUÉS happens.
+                const TR_A = 0.40, TR_B = 0.60;
 
                 // Fade helper: opacity is clamped to 0.08 by setModelOpacityFn, so use
                 // visibility for the tail ends to get a true 0→1 crossfade.
@@ -664,23 +741,45 @@ export default function STLViewer({
                     }
                 }
 
-                function startTurntableReelFn(opts: { durationMs: number; crossfade: boolean; onProgress?: (p: number) => void; onDone: () => void }) {
+                function setSlotClippingPlanes(slot: ModelSlot, planes: any[] | null) {
+                    scene.traverse((obj: any) => {
+                        if (!obj.isMesh || obj.userData?.modelSlot !== slot) return;
+                        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                        for (const m of mats) { if (!m) continue; m.clippingPlanes = planes; m.clipShadows = true; m.needsUpdate = true; }
+                    });
+                }
+
+                function startTurntableReelFn(opts: { durationMs: number; transition: 'none' | 'crossfade' | 'wipe'; onProgress?: (p: number) => void; onDone: () => void }) {
                     const offset = camera.position.clone().sub(controls.target);
                     const sph = new THREE.Spherical().setFromVector3(offset);
+                    // World Y extent of the models, for the wipe sweep line
+                    const bb = new THREE.Box3();
+                    scene.traverse((o: any) => { if (o.isMesh && o.userData?.modelSlot) bb.expandByObject(o); });
+                    const wipeTop = bb.isEmpty() ? 50 : bb.max.y + 2;
+                    const wipeBottom = bb.isEmpty() ? -50 : bb.min.y - 2;
+                    const planePrimary = new THREE.Plane(new THREE.Vector3(0, -1, 0), wipeTop);
+                    const planeSecondary = new THREE.Plane(new THREE.Vector3(0, 1, 0), -wipeTop);
                     turntable = {
                         startAt: performance.now(),
                         durationMs: Math.max(1000, opts.durationMs),
-                        crossfade: opts.crossfade,
+                        transition: opts.transition,
                         radius: sph.radius, polar: sph.phi, azimuth0: sph.theta,
+                        wipeTop, wipeBottom, planePrimary, planeSecondary,
                         onProgress: opts.onProgress,
                         onDone: opts.onDone,
                         prevAutoRotate: controls.autoRotate,
                     };
                     controls.autoRotate = false;
                     controls.enabled = false;
-                    if (opts.crossfade) {
+                    if (opts.transition === 'crossfade') {
                         applyReelFade('primary', 1);
                         applyReelFade('secondary', 0);
+                    } else if (opts.transition === 'wipe') {
+                        // Both fully opaque; visibility governed by clipping planes.
+                        setModelVisibilityFn('primary', true);  setModelOpacityFn('primary', 1);
+                        setModelVisibilityFn('secondary', true); setModelOpacityFn('secondary', 1);
+                        setSlotClippingPlanes('primary', [planePrimary]);
+                        setSlotClippingPlanes('secondary', [planeSecondary]);
                     }
                 }
 
@@ -688,6 +787,9 @@ export default function STLViewer({
                     if (!turntable) return;
                     const t = turntable;
                     turntable = null;
+                    // Clear any clipping used by the wipe
+                    setSlotClippingPlanes('primary', null);
+                    setSlotClippingPlanes('secondary', null);
                     controls.autoRotate = t.prevAutoRotate;
                     controls.enabled = true;
                 }
@@ -700,11 +802,16 @@ export default function STLViewer({
                         const sph = new THREE.Spherical(turntable.radius, turntable.polar, theta);
                         camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
                         camera.lookAt(controls.target);
-                        if (turntable.crossfade) {
-                            // 0–42%: ANTES · 42–58%: crossfade · 58–100%: DESPUÉS
-                            const f = p < 0.42 ? 0 : p > 0.58 ? 1 : (p - 0.42) / 0.16;
+                        const f = p < TR_A ? 0 : p > TR_B ? 1 : (p - TR_A) / (TR_B - TR_A);
+                        if (turntable.transition === 'crossfade') {
                             applyReelFade('primary', 1 - f);
                             applyReelFade('secondary', f);
+                        } else if (turntable.transition === 'wipe') {
+                            // Sweep the clip line from top to bottom → cinematic reveal
+                            const eased = f * f * (3 - 2 * f); // smoothstep
+                            const sweepY = turntable.wipeTop + (turntable.wipeBottom - turntable.wipeTop) * eased;
+                            turntable.planePrimary.constant = sweepY;
+                            turntable.planeSecondary.constant = -sweepY;
                         }
                         turntable.onProgress?.(p);
                         if (p >= 1) {
@@ -1000,7 +1107,7 @@ export default function STLViewer({
             {isDragOver && (
                 <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#C9A96E]/15 border-2 border-dashed border-[#C9A96E]/70 rounded-2xl pointer-events-none">
                     <Box size={38} className="text-[#C9A96E]" />
-                    <p className="text-white font-semibold text-sm">Soltá para cargar modelo inferior</p>
+                    <p className="text-white font-semibold text-sm">Soltá para cargar el segundo modelo</p>
                 </div>
             )}
 
@@ -1090,7 +1197,7 @@ export default function STLViewer({
                                     },
                                     {
                                         slot: 'secondary' as const,
-                                        label: secondModelLabel,
+                                        label: effectiveSecondLabel,
                                         visible: secondaryVisible,
                                         opacity: secondaryOpacity,
                                         setVisible: setSecondaryVisible,
@@ -1128,15 +1235,43 @@ export default function STLViewer({
                                 <button
                                     onClick={handleRemoveSecondModel}
                                     className="w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 text-xs hover:text-white transition-all"
-                                    title={`Quitar ${secondModelLabel}`}
+                                    title={`Quitar ${effectiveSecondLabel}`}
                                 >
                                     <X size={11} /> Quitar segundo modelo
                                 </button>
                             </div>
                         )}
-                        {secondModel === 'none' && !wireframe && (
-                            <div className="px-2.5 py-1 rounded-full bg-black/30 border border-white/8 text-white/25 text-xs pointer-events-none">
-                                + Soltá inferior
+
+                        {/* Load a second model from the patient's cloud files (mobile-friendly) */}
+                        {secondModel !== 'loading' && availableModels.length > 0 && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setPickerOpen(o => !o)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/55 backdrop-blur border border-[#C9A96E]/40 text-[#C9A96E] text-xs font-medium hover:bg-[#C9A96E]/15 transition-all"
+                                >
+                                    <Layers size={13} /> {secondModel === 'loaded' ? 'Cambiar 2º modelo' : 'Cargar 2º modelo'}
+                                </button>
+                                {pickerOpen && (
+                                    <div className="absolute top-full left-0 mt-1.5 w-64 max-h-72 overflow-y-auto rounded-xl bg-[#14141c] border border-white/15 shadow-2xl p-1.5 z-20">
+                                        <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-white/35">Modelos del paciente</p>
+                                        {availableModels.map(m => (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => loadSecondModelFromCloud(m)}
+                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-white/80 text-xs hover:bg-[#C9A96E]/15 transition-colors"
+                                            >
+                                                <Box size={13} className="text-[#C9A96E] flex-shrink-0" />
+                                                <span className="min-w-0 flex-1 truncate">{m.name}</span>
+                                                <span className="text-white/30 text-[9px] uppercase flex-shrink-0">{m.format}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {secondModel === 'loading' && (
+                            <div className="px-2.5 py-1 rounded-full bg-black/40 border border-white/10 text-white/50 text-xs flex items-center gap-1.5 pointer-events-none">
+                                <span className="h-3 w-3 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" /> Cargando modelo…
                             </div>
                         )}
                     </div>
@@ -1151,8 +1286,9 @@ export default function STLViewer({
                     {/* Top control bar — pointer-events-auto so buttons are clickable.
                          Wheel forwarded so zoom works when cursor is over this bar. */}
                     <div
-                        className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 bg-black/80 backdrop-blur border-b border-white/10 z-10 pointer-events-auto"
-                        style={{ height: CTRL_H }}
+                        ref={ctrlBarRef}
+                        className="absolute top-0 left-0 right-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-2.5 sm:px-4 py-2 sm:py-0 bg-black/85 backdrop-blur border-b border-white/10 z-10 pointer-events-auto"
+                        style={{ minHeight: CTRL_H }}
                         onWheel={(e) => {
                             const canvas = sceneRef.current?.renderer?.domElement;
                             if (!canvas) return;
@@ -1163,12 +1299,13 @@ export default function STLViewer({
                             }));
                         }}
                     >
-                        <div className="flex items-center gap-1.5">
+                        {/* Row 1: format + duration (+ transition style) — scrolls on narrow screens */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0">
                             {(Object.keys(FMTS) as RecordFmt[]).map(k => (
                                 <button
                                     key={k}
                                     onClick={() => changeFmt(k)}
-                                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
                                         fmt === k
                                             ? 'bg-[#C9A96E] text-[#0D0D12]'
                                             : 'text-white/50 hover:text-white border border-white/15'
@@ -1178,12 +1315,12 @@ export default function STLViewer({
                                     <span className="ml-1 opacity-60">{FMTS[k].ratio}</span>
                                 </button>
                             ))}
-                            <span className="w-px h-4 bg-white/15 mx-0.5" />
+                            <span className="w-px h-4 bg-white/15 mx-0.5 flex-shrink-0" />
                             {REC_DURATIONS.map(s => (
                                 <button
                                     key={s}
                                     onClick={() => setRecSecs(s)}
-                                    className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                                    className={`flex-shrink-0 px-2 py-1 rounded-full text-xs font-medium transition-all ${
                                         recSecs === s
                                             ? 'bg-white/20 text-white'
                                             : 'text-white/40 hover:text-white/70'
@@ -1192,18 +1329,38 @@ export default function STLViewer({
                                     {s}s
                                 </button>
                             ))}
+                            {secondModel === 'loaded' && (
+                                <>
+                                    <span className="w-px h-4 bg-white/15 mx-0.5 flex-shrink-0" />
+                                    {TRANSITIONS.map(t => (
+                                        <button
+                                            key={t.id}
+                                            onClick={() => setTransition(t.id)}
+                                            title={`Transición Antes → Después: ${t.label}`}
+                                            className={`flex-shrink-0 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                                                transition === t.id
+                                                    ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
+                                                    : 'text-white/40 hover:text-white/70'
+                                            }`}
+                                        >
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </>
+                            )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        {/* Row 2 (mobile) / right group (desktop): actions — always visible */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                             <button
                                 onClick={() => setMode('idle')}
-                                className="px-3 py-1.5 rounded-full text-white/50 text-xs hover:text-white/80 transition-colors"
+                                className="px-2.5 py-1.5 rounded-full text-white/50 text-xs hover:text-white/80 transition-colors flex-shrink-0"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={() => startAutoReel(false)}
                                 title="Vuelta perfecta de 360° manejada por reloj — ideal para Instagram"
-                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-[#C9A96E]/40 text-[#C9A96E] font-semibold text-xs hover:bg-[#C9A96E]/15 transition-colors"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-[#C9A96E]/40 text-[#C9A96E] font-semibold text-xs hover:bg-[#C9A96E]/15 transition-colors flex-shrink-0"
                             >
                                 <RotateCw size={12} /> Auto 360°
                             </button>
@@ -1211,14 +1368,14 @@ export default function STLViewer({
                                 <button
                                     onClick={() => startAutoReel(true)}
                                     title="Vuelta de 360° con transición ANTES → DESPUÉS entre los dos modelos"
-                                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-emerald-400/40 text-emerald-300 font-semibold text-xs hover:bg-emerald-400/15 transition-colors"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600/85 border border-emerald-400/40 text-white font-semibold text-xs hover:bg-emerald-600 transition-colors flex-shrink-0"
                                 >
-                                    <ArrowLeftRight size={12} /> Antes → Después
+                                    <ArrowLeftRight size={12} /> Antes/Después
                                 </button>
                             )}
                             <button
                                 onClick={startRecording}
-                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#C9A96E] text-[#0D0D12] font-semibold text-xs hover:bg-[#d4b87e] transition-colors"
+                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#C9A96E] text-[#0D0D12] font-semibold text-xs hover:bg-[#d4b87e] transition-colors flex-shrink-0"
                             >
                                 <Video size={12} /> Grabar {recSecs}s
                             </button>
@@ -1227,7 +1384,7 @@ export default function STLViewer({
 
                     {/* Four dim strips — pointer-events-none so 3D model stays interactive */}
                     <div className="absolute bg-black/55 pointer-events-none"
-                        style={{ left: 0, top: CTRL_H, right: 0, height: Math.max(0, sel.y - CTRL_H) }} />
+                        style={{ left: 0, top: ctrlH, right: 0, height: Math.max(0, sel.y - ctrlH) }} />
                     <div className="absolute bg-black/55 pointer-events-none"
                         style={{ left: 0, top: sel.y + sel.h, right: 0, bottom: 0 }} />
                     <div className="absolute bg-black/55 pointer-events-none"

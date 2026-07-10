@@ -77,6 +77,12 @@ export default function DrivePreviewModal({
     const proxyUrl = `/api/drive/file/${file.id}`;
     const pairedProxyUrl = paired3DFile ? `/api/drive/file/${paired3DFile.id}` : undefined;
 
+    // Other 3D models of this patient → let the viewer load a second model from the
+    // cloud (no local file to drag). Excludes the currently open model.
+    const availableModels = allFolderFiles
+        .filter(f => f.id !== file.id && getPreviewType(f) === '3d')
+        .map(f => ({ id: f.id, name: f.name, format: get3DFormat(f) }));
+
     // Video / 3D → original minimal modal
     return (
         <AnimatePresence>
@@ -152,6 +158,7 @@ export default function DrivePreviewModal({
                                 secondModelFormat={paired3DFile ? get3DFormat(paired3DFile) : undefined}
                                 primaryLabel={paired3DFile ? file.name : 'Modelo'}
                                 secondModelLabel={paired3DFile?.name}
+                                availableModels={availableModels}
                             />
                         </div>
                     )}
