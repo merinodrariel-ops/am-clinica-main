@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Box, Download, Eye, EyeOff, Video, StopCircle, Share2, X } from 'lucide-react';
+import { Box, Download, Eye, EyeOff, Video, StopCircle, Share2, X, RotateCw, ArrowLeftRight } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type RecordFmt  = 'story' | 'post' | 'presentation';
@@ -57,6 +57,45 @@ function dlBlob(blobUrl: string, name: string) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
+// ── ANTES / DESPUÉS overlay for the auto reel (marketing) ──────────────────────
+// Drawn on the offscreen composite canvas, synced with the 3D crossfade timing.
+function drawReelLabels(ctx: CanvasRenderingContext2D, W: number, H: number, p: number) {
+    let text: string; let alpha: number;
+    if (p < 0.42)      { text = 'ANTES';   alpha = Math.min(1, p / 0.05); }
+    else if (p < 0.50) { text = 'ANTES';   alpha = Math.max(0, 1 - (p - 0.42) / 0.08); }
+    else if (p < 0.58) { text = 'DESPUÉS'; alpha = Math.min(1, (p - 0.50) / 0.08); }
+    else               { text = 'DESPUÉS'; alpha = 1; }
+    if (alpha <= 0.01) return;
+
+    const fontPx = Math.round(W * 0.055);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `800 ${fontPx}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const cx = W / 2;
+    const cy = H - Math.round(H * 0.09);
+    const textW = ctx.measureText(text).width;
+    const padX = fontPx * 0.75;
+    const pillW = textW + padX * 2;
+    const pillH = fontPx * 1.9;
+
+    // dark pill
+    ctx.fillStyle = 'rgba(8, 8, 14, 0.72)';
+    ctx.beginPath();
+    ctx.roundRect(cx - pillW / 2, cy - pillH / 2, pillW, pillH, pillH / 2);
+    ctx.fill();
+    // gold underline accent
+    ctx.fillStyle = '#C9A96E';
+    ctx.fillRect(cx - textW / 2, cy + fontPx * 0.62, textW, Math.max(2, fontPx * 0.06));
+    // text
+    ctx.fillStyle = '#ffffff';
+    ctx.letterSpacing = `${Math.round(fontPx * 0.12)}px`;
+    ctx.fillText(text, cx, cy);
+    ctx.restore();
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function STLViewer({
     url,
@@ -79,6 +118,13 @@ export default function STLViewer({
         setModelVisibility?: (slot: ModelSlot, visible: boolean) => void;
         setModelOpacity?: (slot: ModelSlot, opacity: number) => void;
         setPostRenderHook?: (fn: (() => void) | null) => void;
+        startTurntableReel?: (opts: {
+            durationMs: number;
+            crossfade: boolean;
+            onProgress?: (p: number) => void;
+            onDone: () => void;
+        }) => void;
+        stopTurntableReel?: () => void;
     } | null>(null);
     const dragRef            = useRef<{ sx: number; sy: number; orig: SelRect; resize: boolean } | null>(null);
     const mrRef              = useRef<MediaRecorder | null>(null);
@@ -236,11 +282,112 @@ export default function STLViewer({
         }, recSecs * 1000);
     }, [mode, fmt, sel, recSecs]);
 
+    // Restore user's model visibility/opacity after a crossfade reel
+    const restoreModelState = useCallback(() => {
+        const sr = sceneRef.current;
+        if (!sr) return;
+        sr.setModelVisibility?.('primary', primaryVisible);
+        sr.setModelOpacity?.('primary', primaryOpacity);
+        if (secondModel === 'loaded') {
+            sr.setModelVisibility?.('secondary', secondaryVisible);
+            sr.setModelOpacity?.('secondary', secondaryOpacity);
+        }
+    }, [primaryVisible, primaryOpacity, secondaryVisible, secondaryOpacity, secondModel]);
+
+    // ── Auto reel: one perfect 360° turn, optional ANTES→DESPUÉS crossfade ─────
+    const startAutoReel = useCallback(async (crossfade: boolean) => {
+        const sr = sceneRef.current;
+        if (!sr || mode !== 'selecting' || !sel.w) return;
+        const { renderer } = sr;
+        const dims = getOutDims(fmt);
+        const pr = renderer.getPixelRatio() as number;
+        const sx = Math.max(0, sel.x) * pr;
+        const sy = Math.max(0, sel.y) * pr;
+        const sw = sel.w * pr;
+        const sh = sel.h * pr;
+
+        const oc  = document.createElement('canvas');
+        oc.width  = dims.w;
+        oc.height = dims.h;
+        const ctx = oc.getContext('2d')!;
+
+        const progress = { current: 0 };
+        let drawOk = true;
+        sr.setPostRenderHook?.(() => {
+            try {
+                ctx.drawImage(renderer.domElement, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
+                if (crossfade) drawReelLabels(ctx, dims.w, dims.h, progress.current);
+            } catch (e) {
+                if (drawOk) { drawOk = false; console.warn('[3DReel] drawImage failed:', e); }
+            }
+        });
+
+        const mimeType =
+            MediaRecorder.isTypeSupported('video/mp4;codecs=avc1') ? 'video/mp4;codecs=avc1' :
+            MediaRecorder.isTypeSupported('video/mp4')             ? 'video/mp4' :
+            MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' :
+            'video/webm';
+
+        let mr: MediaRecorder;
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            mr = new MediaRecorder((oc as any).captureStream(30), { mimeType, videoBitsPerSecond: FMTS[fmt].bps });
+        } catch {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                mr = new MediaRecorder((oc as any).captureStream(30));
+            } catch (e2) {
+                sr.setPostRenderHook?.(null);
+                console.error('[3DReel] MediaRecorder not supported:', e2);
+                setMode('idle');
+                return;
+            }
+        }
+
+        chunksRef.current = [];
+        mrRef.current = mr;
+        const snapFmt  = fmt;
+        const snapSecs = recSecs;
+
+        mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        mr.onstop = () => {
+            sceneRef.current?.setPostRenderHook?.(null);
+            sceneRef.current?.stopTurntableReel?.();
+            if (crossfade) restoreModelState();
+            const finalMime = mr.mimeType || mimeType;
+            const blob      = new Blob(chunksRef.current, { type: finalMime });
+            const blobUrl   = URL.createObjectURL(blob);
+            setVidPreview({ url: blobUrl, blob, mimeType: finalMime, fmt: snapFmt, secs: snapSecs });
+            setMode('idle');
+            setCdown(0);
+        };
+
+        mr.start(100);
+        setMode('recording');
+        setCdown(recSecs);
+
+        tickRef.current = setInterval(() => {
+            setCdown(prev => (prev <= 1 ? 0 : prev - 1));
+        }, 1000);
+
+        sr.startTurntableReel?.({
+            durationMs: recSecs * 1000,
+            crossfade,
+            onProgress: p => { progress.current = p; },
+            onDone: () => {
+                if (tickRef.current) clearInterval(tickRef.current);
+                if (mrRef.current?.state === 'recording') mrRef.current.stop();
+            },
+        });
+    }, [mode, fmt, sel, recSecs, restoreModelState]);
+
     const stopRecording = useCallback(() => {
+        sceneRef.current?.stopTurntableReel?.();
+        restoreModelState();
         if (mrRef.current?.state === 'recording') mrRef.current.stop();
         if (tickRef.current) clearInterval(tickRef.current);
         sceneRef.current?.setPostRenderHook?.(null);
-    }, []);
+    }, [restoreModelState]);
 
     // ── Wireframe toggle (W key) ────────────────────────────────────────────────
     useEffect(() => {
@@ -495,8 +642,77 @@ export default function STLViewer({
 
                 let postRenderHook: (() => void) | null = null;
 
+                // ── Auto turntable reel: perfect clock-driven 360° sweep ─────────────────
+                // Manual autoRotate depends on frame rate and never closes a clean loop;
+                // this drives the azimuth from the wall clock so the video is exactly one
+                // full turn, with an optional ANTES→DESPUÉS crossfade at the halfway point.
+                let turntable: {
+                    startAt: number; durationMs: number; crossfade: boolean;
+                    radius: number; polar: number; azimuth0: number;
+                    onProgress?: (p: number) => void; onDone: () => void;
+                    prevAutoRotate: boolean;
+                } | null = null;
+
+                // Fade helper: opacity is clamped to 0.08 by setModelOpacityFn, so use
+                // visibility for the tail ends to get a true 0→1 crossfade.
+                function applyReelFade(slot: ModelSlot, o: number) {
+                    if (o <= 0.02) {
+                        setModelVisibilityFn(slot, false);
+                    } else {
+                        setModelVisibilityFn(slot, true);
+                        setModelOpacityFn(slot, o);
+                    }
+                }
+
+                function startTurntableReelFn(opts: { durationMs: number; crossfade: boolean; onProgress?: (p: number) => void; onDone: () => void }) {
+                    const offset = camera.position.clone().sub(controls.target);
+                    const sph = new THREE.Spherical().setFromVector3(offset);
+                    turntable = {
+                        startAt: performance.now(),
+                        durationMs: Math.max(1000, opts.durationMs),
+                        crossfade: opts.crossfade,
+                        radius: sph.radius, polar: sph.phi, azimuth0: sph.theta,
+                        onProgress: opts.onProgress,
+                        onDone: opts.onDone,
+                        prevAutoRotate: controls.autoRotate,
+                    };
+                    controls.autoRotate = false;
+                    controls.enabled = false;
+                    if (opts.crossfade) {
+                        applyReelFade('primary', 1);
+                        applyReelFade('secondary', 0);
+                    }
+                }
+
+                function stopTurntableReelFn() {
+                    if (!turntable) return;
+                    const t = turntable;
+                    turntable = null;
+                    controls.autoRotate = t.prevAutoRotate;
+                    controls.enabled = true;
+                }
+
                 function animate() {
                     animId = requestAnimationFrame(animate);
+                    if (turntable) {
+                        const p = Math.min(1, (performance.now() - turntable.startAt) / turntable.durationMs);
+                        const theta = turntable.azimuth0 + p * Math.PI * 2;
+                        const sph = new THREE.Spherical(turntable.radius, turntable.polar, theta);
+                        camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+                        camera.lookAt(controls.target);
+                        if (turntable.crossfade) {
+                            // 0–42%: ANTES · 42–58%: crossfade · 58–100%: DESPUÉS
+                            const f = p < 0.42 ? 0 : p > 0.58 ? 1 : (p - 0.42) / 0.16;
+                            applyReelFade('primary', 1 - f);
+                            applyReelFade('secondary', f);
+                        }
+                        turntable.onProgress?.(p);
+                        if (p >= 1) {
+                            const done = turntable.onDone;
+                            stopTurntableReelFn();
+                            done();
+                        }
+                    }
                     controls.update();
                     renderer.render(scene, camera);
                     postRenderHook?.(); // copy frame to offscreen canvas if recording
@@ -742,6 +958,8 @@ export default function STLViewer({
                     setModelVisibility: setModelVisibilityFn,
                     setModelOpacity: setModelOpacityFn,
                     setPostRenderHook: (fn) => { postRenderHook = fn; },
+                    startTurntableReel: startTurntableReelFn,
+                    stopTurntableReel: stopTurntableReelFn,
                 };
 
                 return () => {
@@ -982,6 +1200,22 @@ export default function STLViewer({
                             >
                                 Cancelar
                             </button>
+                            <button
+                                onClick={() => startAutoReel(false)}
+                                title="Vuelta perfecta de 360° manejada por reloj — ideal para Instagram"
+                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-[#C9A96E]/40 text-[#C9A96E] font-semibold text-xs hover:bg-[#C9A96E]/15 transition-colors"
+                            >
+                                <RotateCw size={12} /> Auto 360°
+                            </button>
+                            {secondModel === 'loaded' && (
+                                <button
+                                    onClick={() => startAutoReel(true)}
+                                    title="Vuelta de 360° con transición ANTES → DESPUÉS entre los dos modelos"
+                                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-emerald-400/40 text-emerald-300 font-semibold text-xs hover:bg-emerald-400/15 transition-colors"
+                                >
+                                    <ArrowLeftRight size={12} /> Antes → Después
+                                </button>
+                            )}
                             <button
                                 onClick={startRecording}
                                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#C9A96E] text-[#0D0D12] font-semibold text-xs hover:bg-[#d4b87e] transition-colors"
