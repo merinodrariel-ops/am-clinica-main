@@ -21,6 +21,12 @@ import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shou
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
 import { shouldStartPhotoStudioInPresentation } from '@/lib/photo-studio/mobile-presentation';
+import {
+    createPhotoStudioImageLoadState,
+    resolvePhotoStudioImageLoadFailure,
+    resolvePhotoStudioImageLoadSuccess,
+    shouldShowBlurPlaceholder,
+} from '@/lib/photo-studio-image-loading';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -320,6 +326,12 @@ function clampMenuToViewport(x: number, y: number, width: number, height: number
 function driveImageUrl(f: { id: string; modifiedTime?: string }): string {
     const v = f.modifiedTime ? `&v=${encodeURIComponent(f.modifiedTime)}` : '';
     return `/api/drive/file/${f.id}?cors=1${v}`;
+}
+
+function driveThumbnailUrl(f: { id: string; modifiedTime?: string; thumbnailLink?: string }): string | null {
+    if (!f.thumbnailLink) return null;
+    const v = f.modifiedTime ? `&v=${encodeURIComponent(f.modifiedTime)}` : '';
+    return `/api/drive/thumbnail/${encodeURIComponent(f.id)}?s=400${v}`;
 }
 
 function AirDropIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
@@ -913,12 +925,31 @@ export default function PhotoStudioModal({
     // Active file in the studio (may differ from initial file when user clicks thumbnails)
     const [activeFile, setActiveFile] = useState<DriveFile | null>(file);
     const [imageUrl, setImageUrl] = useState(() => file ? driveImageUrl(file) : '');
-    const [imgLoaded, setImgLoaded] = useState(false);
+    const [imageLoadState, setImageLoadState] = useState(() => file
+        ? createPhotoStudioImageLoadState({
+            fileId: file.id,
+            originalUrl: driveImageUrl(file),
+            thumbnailUrl: driveThumbnailUrl(file),
+        })
+        : null
+    );
+    const activeImageFileId = activeFile?.id ?? null;
+    const activeImageModifiedTime = activeFile?.modifiedTime;
+    const activeImageThumbnailLink = activeFile?.thumbnailLink;
 
-    // Reset loading flag whenever we switch to a Drive-proxied URL (not local blobs/base64)
+    // Track loading per active URL so stale onLoad/onError events from rapid thumbnail
+    // switches cannot leave the editor stuck on the blurred placeholder.
     useEffect(() => {
-        if (imageUrl.startsWith('/api/drive/file/')) setImgLoaded(false);
-    }, [imageUrl]);
+        if (!activeFile || !imageUrl) {
+            setImageLoadState(null);
+            return;
+        }
+        setImageLoadState(createPhotoStudioImageLoadState({
+            fileId: activeFile.id,
+            originalUrl: imageUrl,
+            thumbnailUrl: driveThumbnailUrl(activeFile),
+        }));
+    }, [activeFile, activeImageFileId, activeImageModifiedTime, activeImageThumbnailLink, imageUrl]);
 
     // Edit state
     const [rotation, setRotation] = useState(0);
@@ -4949,8 +4980,10 @@ export default function PhotoStudioModal({
         setThumbnailDropIndicator(null);
 
         if (folderId) {
-            const result = await saveFotosOrderAction(patientId, folderId, nextOrder);
+            const coverFileId = nextOrder[0] || null;
+            const result = await saveFotosOrderAction(patientId, folderId, nextOrder, coverFileId);
             if (result.error) toast.error(result.error);
+            else onSaved({ silent: true });
         }
     }
 
@@ -5142,14 +5175,6 @@ export default function PhotoStudioModal({
         objectFit: 'contain',
         display: 'block',
     };
-
-    // Fast thumbnail shown as blurred placeholder while the full-res loads.
-    // Uses our cached proxy (reliable + already warmed by the grid) instead of Google's
-    // raw thumbnailLink, which is slow/unreliable for private files. This makes the modal
-    // show the photo instantly while the full-resolution original streams in on top.
-    const thumbPlaceholderUrl = activeFile?.thumbnailLink
-        ? `/api/drive/thumbnail/${encodeURIComponent(activeFile.id)}?s=400${activeFile.modifiedTime ? `&v=${encodeURIComponent(activeFile.modifiedTime)}` : ''}`
-        : null;
 
     return (
         <>
@@ -5673,7 +5698,8 @@ export default function PhotoStudioModal({
                                             alt={activeFile.name}
                                             crossOrigin={imageUrl.startsWith('blob:') || imageUrl.startsWith('data:') ? undefined : 'anonymous'}
                                             onLoad={(event) => {
-                                                setImgLoaded(true);
+                                                const loadedUrl = event.currentTarget.getAttribute('src') || event.currentTarget.currentSrc || event.currentTarget.src;
+                                                setImageLoadState(prev => prev ? resolvePhotoStudioImageLoadSuccess(prev, loadedUrl) : prev);
                                                 if (activeCropAspect) {
                                                     applyCropAspectPreset(cropAspectPreset, event.currentTarget);
                                                 }
@@ -5803,9 +5829,9 @@ export default function PhotoStudioModal({
                                         </>
                                     ) : (
                                     <div className="relative" style={{ lineHeight: 0 }}>
-                                        {!imgLoaded && thumbPlaceholderUrl && (
+                                        {imageLoadState && shouldShowBlurPlaceholder(imageLoadState) && imageLoadState.thumbnailUrl && (
                                             <img
-                                                src={thumbPlaceholderUrl}
+                                                src={imageLoadState.thumbnailUrl}
                                                 aria-hidden="true"
                                                 alt=""
                                                 style={{
@@ -5821,14 +5847,21 @@ export default function PhotoStudioModal({
                                         )}
                                         <img
                                             ref={imgRef}
-                                            src={imageUrl}
+                                            src={imageLoadState?.displayUrl ?? imageUrl}
                                             alt={activeFile.name}
                                             crossOrigin="anonymous"
-                                            onLoad={() => setImgLoaded(true)}
+                                            onLoad={(event) => {
+                                                const loadedUrl = event.currentTarget.getAttribute('src') || event.currentTarget.currentSrc || event.currentTarget.src;
+                                                setImageLoadState(prev => prev ? resolvePhotoStudioImageLoadSuccess(prev, loadedUrl) : prev);
+                                            }}
+                                            onError={(event) => {
+                                                const failedUrl = event.currentTarget.getAttribute('src') || event.currentTarget.currentSrc || event.currentTarget.src;
+                                                setImageLoadState(prev => prev ? resolvePhotoStudioImageLoadFailure(prev, failedUrl) : prev);
+                                            }}
                                             style={{
                                                 ...imageStyle,
-                                                opacity: imgLoaded ? 1 : 0,
-                                                transition: imgLoaded ? 'opacity 0.2s ease' : 'none',
+                                                opacity: imageLoadState?.status === 'loading' ? 0 : 1,
+                                                transition: imageLoadState?.status === 'loaded' ? 'opacity 0.2s ease' : 'none',
                                             }}
                                         />
                                     </div>
