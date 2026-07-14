@@ -66,14 +66,14 @@ export async function getCurrentWorkerProfile(): Promise<WorkerProfile | null> {
     return data as WorkerProfile;
 }
 
-export async function getUserAppProfile(): Promise<{ categoria: string | null } | null> {
+export async function getUserAppProfile(): Promise<{ categoria: string | null; access_overrides?: Record<string, string> | null } | null> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('categoria')
+        .select('categoria, access_overrides')
         .eq('id', user.id)
         .single();
 

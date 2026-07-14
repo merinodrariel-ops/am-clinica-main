@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
     CalendarDays,
+    CalendarRange,
     DollarSign,
     FileText,
     LogOut,
@@ -18,6 +19,8 @@ const NAV_ITEMS = [
     { href: '/portal/prestaciones', icon: Stethoscope, label: 'Mis Prestaciones' },
     { href: '/portal/liquidation', icon: DollarSign, label: 'Liquidaciones' },
 ];
+
+const FULL_AGENDA_ITEM = { href: '/agenda', icon: CalendarRange, label: 'Agenda completa' };
 
 function NavLink({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
     const pathname = usePathname();
@@ -41,14 +44,21 @@ function NavLink({ href, icon: Icon, label }: { href: string; icon: LucideIcon; 
     );
 }
 
-export default function PortalLayoutClient({ children, workerName, workerRole, workerInitials }: {
+function mobileLabel(label: string) {
+    if (label === 'Agenda completa') return 'Completa';
+    return label.replace('Mi ', '');
+}
+
+export default function PortalLayoutClient({ children, workerName, workerRole, workerInitials, hasFullAgendaAccess }: {
     children: React.ReactNode;
     workerName: string;
     workerRole: string;
     workerInitials: string;
+    hasFullAgendaAccess: boolean;
 }) {
     const isAdmin = workerRole?.toLowerCase().includes('admin') || workerRole?.toLowerCase().includes('administra');
     const pathname = usePathname();
+    const navItems = hasFullAgendaAccess ? [...NAV_ITEMS, FULL_AGENDA_ITEM] : NAV_ITEMS;
 
     return (
         <div className="min-h-screen bg-[#0a0a0f] text-slate-100 font-sans antialiased selection:bg-indigo-500/30 lg:flex lg:h-screen">
@@ -86,7 +96,7 @@ export default function PortalLayoutClient({ children, workerName, workerRole, w
 
                     {/* Navigation */}
                     <nav className="p-3 space-y-0.5">
-                        {NAV_ITEMS.map(item => (
+                        {navItems.map(item => (
                             <NavLink key={item.href} {...item} />
                         ))}
                     </nav>
@@ -152,8 +162,8 @@ export default function PortalLayoutClient({ children, workerName, workerRole, w
             </main>
 
             {/* Mobile primary navigation */}
-            <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t border-slate-800/80 bg-slate-950/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur-xl lg:hidden">
-                {NAV_ITEMS.map(item => {
+            <nav className={`fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-800/80 bg-slate-950/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur-xl lg:hidden ${navItems.length > 3 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                {navItems.map(item => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
 
@@ -167,7 +177,7 @@ export default function PortalLayoutClient({ children, workerName, workerRole, w
                                 }`}
                         >
                             <Icon size={20} />
-                            <span>{item.label.replace('Mi ', '')}</span>
+                            <span>{mobileLabel(item.label)}</span>
                         </Link>
                     );
                 })}
