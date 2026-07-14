@@ -52,6 +52,7 @@ import PublicCasePublishModal from './PublicCasePublishModal';
 import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo-tags';
 import { getContextMenuSelection, updatePhotoGridSelection } from '@/lib/drive-photo-grid-selection';
 import { toggle3DSelection, canOpenPair, resolveSelectionPair } from '@/lib/drive-3d-selection';
+import { uploadFilesToDrive } from '@/lib/drive-upload-files';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -762,6 +763,35 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         resetGlobalDrag();
     };
 
+    // Upload files dropped ANYWHERE on the full-screen overlay (not only on the small
+    // centered dropzone). This is what the admin expects when dragging photos in.
+    const handleOverlayDrop = async (event: DragEvent<HTMLElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const files = event.dataTransfer?.files;
+        const dropFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
+        resetGlobalDrag();
+        if (!canUpload || !dropFolderId || !files || files.length === 0) return;
+
+        const toastId = toast.loading(`Subiendo ${files.length} archivo${files.length > 1 ? 's' : ''}…`);
+        try {
+            const { successCount, errors } = await uploadFilesToDrive(files, {
+                folderId: dropFolderId,
+                patientId,
+                fileNamePrefix: buildPatientPrefix(patientName, 'archivos'),
+            });
+            toast.dismiss(toastId);
+            errors.forEach(err => toast.error(`Error subiendo ${err}`));
+            if (successCount > 0) {
+                toast.success(`${successCount} archivo${successCount > 1 ? 's' : ''} subido${successCount > 1 ? 's' : ''} correctamente`);
+                handleUploadedToFolder();
+            }
+        } catch (err) {
+            toast.dismiss(toastId);
+            toast.error(`No se pudieron subir los archivos: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+        }
+    };
+
     // Empty state: no Drive folder configured
     if (!currentFolderUrl) {
         return (
@@ -1058,9 +1088,13 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     </div>
                 )}
 
-                {/* Global dropzone overlay */}
+                {/* Global dropzone overlay — the WHOLE overlay accepts drops, not just the box */}
                 {canUpload && isGlobalDragging && motherFolderId && (
-                    <div className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] p-4 sm:p-8 flex items-center justify-center">
+                    <div
+                        className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] p-4 sm:p-8 flex items-center justify-center"
+                        onDragOver={(e) => { e.preventDefault(); }}
+                        onDrop={handleOverlayDrop}
+                    >
                         <div className="w-full max-w-3xl rounded-2xl border border-blue-400/35 bg-slate-950/85 p-6 shadow-2xl space-y-4">
                             <div className="flex items-center justify-between border-b border-white/5 pb-2">
                                 <p className="text-sm font-semibold text-white">

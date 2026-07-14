@@ -3,24 +3,7 @@
 import { useRef, useState } from 'react';
 import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { compressImage } from '@/lib/image-compression';
-
-function toSlug(str: string): string {
-    return str
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-}
-
-function buildSeoFileName(prefix: string, index: number, ext: string): string {
-    const now = new Date();
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const seq = String(index).padStart(3, '0');
-    const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
-    return `${prefix}_${ym}_${seq}${cleanExt}`;
-}
+import { uploadFilesToDrive } from '@/lib/drive-upload-files';
 
 interface DriveUploadButtonProps {
     folderId: string;
@@ -51,50 +34,9 @@ export default function DriveUploadButton({
 
     const handleFiles = async (files: FileList) => {
         setUploading(true);
-        let successCount = 0;
+        const { successCount, errors } = await uploadFilesToDrive(files, { folderId, patientId, fileNamePrefix });
 
-        const filesArray = Array.from(files);
-        for (let i = 0; i < filesArray.length; i++) {
-            const file = filesArray[i];
-            try {
-                let fileToUpload: File | Blob = file;
-
-                // Compress images before upload
-                if (file.type.startsWith('image/') && file.size > 500 * 1024) {
-                    const compressed = await compressImage(file, {
-                        maxWidth: 2000,
-                        maxHeight: 2000,
-                        quality: 0.8,
-                        maxSizeKB: 500,
-                    });
-                    fileToUpload = compressed.blob;
-                }
-
-                const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
-                const uploadName = fileNamePrefix
-                    ? buildSeoFileName(fileNamePrefix, i + 1, ext)
-                    : file.name;
-
-                const formData = new FormData();
-                formData.append('file', fileToUpload, uploadName);
-                formData.append('folderId', folderId);
-                formData.append('patientId', patientId);
-
-                const res = await fetch('/api/drive/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Error al subir');
-                }
-
-                successCount++;
-            } catch (error) {
-                toast.error(`Error subiendo ${file.name}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-            }
-        }
+        errors.forEach(err => toast.error(`Error subiendo ${err}`));
 
         if (successCount > 0) {
             const defaultMessage = `${successCount} archivo${successCount > 1 ? 's' : ''} subido${successCount > 1 ? 's' : ''}`;
@@ -131,6 +73,7 @@ export default function DriveUploadButton({
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={(e) => {
                         e.preventDefault();
+                        e.stopPropagation(); // don't also trigger the full-screen overlay drop
                         setIsDragging(false);
                         if (uploading) return;
                         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
