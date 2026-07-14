@@ -2,11 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import AgendaCalendar from '@/components/agenda/AgendaCalendar';
 import TodaySchedulePanel from '@/components/agenda/TodaySchedulePanel';
 import { Calendar, Settings, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
+const AgendaCalendar = dynamic(() => import('@/components/agenda/AgendaCalendar'), {
+    ssr: false,
+    loading: () => (
+        <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+            <div className="h-8 w-48 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            <div className="mt-4 grid h-[calc(100%-3rem)] grid-cols-1 gap-2 md:grid-cols-7">
+                {Array.from({ length: 7 }).map((_, index) => (
+                    <div
+                        key={index}
+                        className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 animate-pulse"
+                    />
+                ))}
+            </div>
+        </div>
+    ),
+});
 const MonthlyAgendaDashboard = dynamic(() => import('@/components/agenda/MonthlyAgendaDashboard'), { ssr: false });
 const DoctorScheduleConfig = dynamic(() => import('@/components/agenda/DoctorScheduleConfig'), { ssr: false });
 const AgendaBlocksManager = dynamic(() => import('@/components/agenda/AgendaBlocksManager'), { ssr: false });
