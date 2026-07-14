@@ -359,7 +359,6 @@ export async function getAppointments(start: string, end: string) {
             color_tag,
             created_at,
             created_by,
-            is_primera_vez,
             patient_data:patient_id (nombre, apellido, whatsapp, primera_consulta_fecha, fecha_alta, intervalo_limpieza_meses),
             doctor_data:doctor_id (full_name)
         `)
