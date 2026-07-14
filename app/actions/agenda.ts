@@ -342,12 +342,25 @@ type AppointmentUpdatePayload = Partial<{
 export async function getAppointments(start: string, end: string) {
     const supabase = await createClient();
 
-    // Fetch appointments within range
+    // Fetch only the fields needed by the agenda views.
     const { data, error } = await supabase
         .from('agenda_appointments')
         .select(`
-            *,
-            patient_data:patient_id (nombre, apellido, whatsapp, primera_consulta_fecha, intervalo_limpieza_meses),
+            id,
+            title,
+            start_time,
+            end_time,
+            status,
+            type,
+            modality,
+            notes,
+            patient_id,
+            doctor_id,
+            color_tag,
+            created_at,
+            created_by,
+            is_primera_vez,
+            patient_data:patient_id (nombre, apellido, whatsapp, primera_consulta_fecha, fecha_alta, intervalo_limpieza_meses),
             doctor_data:doctor_id (full_name)
         `)
         .gte('start_time', start)
