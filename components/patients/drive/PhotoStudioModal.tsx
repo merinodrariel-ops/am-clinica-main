@@ -18,6 +18,7 @@ import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAc
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
+import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
 import { shouldStartPhotoStudioInPresentation } from '@/lib/photo-studio/mobile-presentation';
@@ -832,11 +833,15 @@ export default function PhotoStudioModal({
                 return;
             }
             // Hydrate all canvases from DB
+            let lostLayers = 0;
             const hydrated = await Promise.all(data.map(async (row) => {
                 const layers = await Promise.all((row.layers as any[]).map(async (l: any) => {
-                    if (l.src?.startsWith('blob:')) return null;
+                    // Las URLs blob: mueren al recargar la página: si una capa quedó
+                    // guardada así, su imagen ya no existe y se pierde. Se cuentan
+                    // para avisar en vez de desaparecer en silencio.
+                    if (l.src?.startsWith('blob:')) { lostLayers++; return null; }
                     try { const img = await loadCanvasImage(l.src); return { ...l, img }; }
-                    catch { return null; }
+                    catch { lostLayers++; return null; }
                 }));
                 return {
                     id: row.id,
@@ -849,6 +854,11 @@ export default function PhotoStudioModal({
             setCanvases(hydrated);
             setActiveCanvasId(hydrated[0]?.id ?? null);
             if (hydrated.length > 0) setHasCanvas(true);
+            if (lostLayers > 0) {
+                toast.warning(
+                    `${lostLayers === 1 ? 'Una capa del lienzo no se pudo restaurar' : `${lostLayers} capas del lienzo no se pudieron restaurar`}: eran imágenes temporales de una edición previa. Volvé a agregarlas desde las fotos del paciente.`
+                );
+            }
         });
     }, [patientId]);
 
@@ -3597,6 +3607,60 @@ export default function PhotoStudioModal({
         return items;
     }
 
+    /**
+     * Deja el export por debajo del límite de subida (20 MB del server action).
+     * Un PNG con fondo removido a resolución completa lo supera facilmente; se
+     * reduce la resolución y, si hace falta, se pasa a WebP (mantiene alpha).
+     */
+    async function shrinkBlobForUpload(blob: Blob): Promise<Blob> {
+        if (!isOverLimit(blob.size)) return blob;
+
+        const hasAlpha = supportsAlpha(blob.type);
+        const url = URL.createObjectURL(blob);
+        try {
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                const i = new Image();
+                i.onload = () => resolve(i);
+                i.onerror = () => reject(new Error('No se pudo leer la imagen exportada'));
+                i.src = url;
+            });
+
+            let current = blob;
+            // Hasta 3 intentos: reducir resolución y, si sigue grande, cambiar formato.
+            for (let attempt = 0; attempt < 3 && isOverLimit(current.size); attempt++) {
+                const scale = computeScaleForLimit(current.size);
+                const targetMime = attempt === 0 && hasAlpha
+                    ? blob.type
+                    : pickFallbackMime(blob.type, hasAlpha);
+                const w = Math.max(1, Math.round(img.naturalWidth * scale));
+                const h = Math.max(1, Math.round(img.naturalHeight * scale));
+
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                const cctx = c.getContext('2d')!;
+                cctx.drawImage(img, 0, 0, w, h);
+
+                const next = await new Promise<Blob | null>(res =>
+                    c.toBlob(b => res(b), targetMime, 0.92)
+                );
+                if (!next) break;
+                current = next;
+            }
+
+            if (isOverLimit(current.size)) {
+                throw new Error(
+                    `La imagen exportada pesa ${formatBytes(current.size)} y supera el máximo permitido. Probá recortarla o guardarla con fondo (no transparente).`
+                );
+            }
+            if (current.size < blob.size) {
+                toast.info(`Imagen optimizada para subir: ${formatBytes(blob.size)} → ${formatBytes(current.size)}`);
+            }
+            return current;
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
+
     async function exportCanvasToBlob(): Promise<Blob> {
         const r = CANVAS_RATIOS.find(r => r.value === canvasRatio)!;
         const shorter = Math.min(r.w, r.h);
@@ -3613,7 +3677,30 @@ export default function PhotoStudioModal({
             ctx.fillStyle = effectiveBg === 'black' ? '#000000' : '#ffffff';
             ctx.fillRect(0, 0, expW, expH);
         }
-        for (const layer of canvasLayers) {
+        // Asegurar que TODA capa tenga su imagen lista antes de dibujar. Antes se
+        // salteaban en silencio las capas con la imagen no cargada, y el lienzo se
+        // guardaba incompleto (ej. se perdía la foto del "después") sin ningún aviso.
+        const ready = await Promise.all(canvasLayers.map(async (layer) => {
+            const ok = (im: unknown): im is HTMLImageElement =>
+                im instanceof HTMLImageElement && im.complete && im.naturalWidth > 0;
+            if (ok(layer.img)) return { layer, img: layer.img };
+            try {
+                const img = await loadCanvasImage(layer.src);
+                return ok(img) ? { layer, img } : { layer, img: null };
+            } catch {
+                return { layer, img: null };
+            }
+        }));
+
+        const failed = ready.filter(r => !r.img).length;
+        if (failed > 0) {
+            throw new Error(
+                `No se ${failed === 1 ? 'pudo cargar 1 capa' : `pudieron cargar ${failed} capas`} del lienzo. ` +
+                'No se guardó para no perder esas imágenes. Volvé a agregarlas y probá de nuevo.'
+            );
+        }
+
+        for (const { layer, img } of ready) {
             const px = layer.x * expW;
             const py = layer.y * expH;
             const pw = layer.w * expW;
@@ -3629,18 +3716,7 @@ export default function PhotoStudioModal({
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
-            // Safety check for export
-            if (
-                layer.img instanceof HTMLImageElement &&
-                layer.img.complete &&
-                layer.img.naturalWidth > 0 &&
-                Number.isFinite(pw) &&
-                Number.isFinite(ph) &&
-                pw > 0 &&
-                ph > 0
-            ) {
-                ctx.drawImage(layer.img, -pw / 2, -ph / 2, pw, ph);
-            }
+            ctx.drawImage(img!, -pw / 2, -ph / 2, pw, ph);
             ctx.restore();
         }
         // Bake draw annotations on top if visible
@@ -5041,9 +5117,13 @@ export default function PhotoStudioModal({
         }
         setSaving(mode);
         try {
-            const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
+            const rawBlob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
+            // Un PNG con transparencia a resolución completa supera el límite de 20 MB
+            // del server action y la subida fallaba sin guardar nada. Lo achicamos
+            // preservando el canal alpha antes de subir.
+            const blob = await shrinkBlobForUpload(rawBlob);
             const isPng = blob.type === 'image/png';
-            const ext = isPng ? 'png' : 'jpg';
+            const ext = isPng ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
             
             const customBase = exportFileName.trim() || activeFile.name.replace(/\.[^.]+$/, '');
             const filename = `${customBase}.${ext}`;
