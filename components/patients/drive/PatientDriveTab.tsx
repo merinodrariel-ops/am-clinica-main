@@ -334,7 +334,7 @@ function isGridPhoto(file: DriveFile): boolean {
 }
 
 const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
-const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente']);
+const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
 
 type PhotoContextMenuState = {
     x: number;
