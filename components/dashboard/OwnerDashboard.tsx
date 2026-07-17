@@ -539,19 +539,6 @@ function MonthlyTrendsPanel({
     );
 }
 
-function parseDateOnlyLocal(date: string | null | undefined): Date | null {
-    if (!date) return null;
-    const [yearRaw, monthRaw, dayRaw] = date.split('T')[0].split('-').map(Number);
-    if (!yearRaw || !monthRaw || !dayRaw) return null;
-    return new Date(yearRaw, monthRaw - 1, dayRaw);
-}
-
-function getInstallmentNumberForMonth(plan: { fecha_inicio?: string | null }, targetDate: Date): number | null {
-    const startDate = parseDateOnlyLocal(plan.fecha_inicio);
-    if (!startDate) return null;
-    return ((targetDate.getFullYear() - startDate.getFullYear()) * 12) + (targetDate.getMonth() - startDate.getMonth());
-}
-
 export default function OwnerDashboard() {
     const [stats, setStats] = useState<OwnerDashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
@@ -794,32 +781,10 @@ export default function OwnerDashboard() {
 
     if (!stats) return null;
 
-    const targetDateForFinanc = new Date(selectedYear, selectedMonth, 1);
-
-    const pendingPlanes = stats.planesFinanciacion.filter((p) => {
-        const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
-        const total = Number(p.cuotas_total || 0);
-        const paid = Number(p.cuotas_pagadas || 0);
-        const isFuture = instNum !== null && instNum < 1;
-        const hasLeft = paid < total;
-        return !isFuture && hasLeft && (
-            (instNum !== null && paid < instNum) ||
-            (instNum !== null && instNum > total && paid < total)
-        );
-    });
-
-    const okPlanes = stats.planesFinanciacion.filter((p) => {
-        const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
-        const total = Number(p.cuotas_total || 0);
-        const paid = Number(p.cuotas_pagadas || 0);
-        const isFuture = instNum !== null && instNum < 1;
-        const hasLeft = paid < total;
-        const isPending = !isFuture && hasLeft && (
-            (instNum !== null && paid < instNum) ||
-            (instNum !== null && instNum > total && paid < total)
-        );
-        return !isPending;
-    });
+    const nextFinancingMonthLabel = MONTH_NAMES[(selectedMonth + 1) % 12];
+    const activeFinancingPlans = stats.planesFinanciacion
+        .filter((plan) => Number(plan.cuotas_pagadas || 0) < Number(plan.cuotas_total || 0))
+        .sort((a, b) => (Number(b.monto_cuota_usd) || 0) - (Number(a.monto_cuota_usd) || 0));
 
     const cardData: Partial<Record<CardId, Omit<KpiCardProps, 'isEditing' | 'isHidden' | 'canRemove' | 'onToggleVisibility' | 'onRemove'>>> = {
         'total-pacientes': {
@@ -894,96 +859,72 @@ export default function OwnerDashboard() {
         'en-financiacion': {
             id: 'en-financiacion',
             icon: CreditCard,
-            label: 'Financiación mensual',
-            value: `$${stats.cobroMensualFinanciacionUsd.toLocaleString()} USD/mes`,
-            secondaryValue: `${stats.personasEnFinanciacion} personas`,
-            secondaryLabel: 'Activas',
-            subtitle: 'Cuotas activas a cobrar',
+            label: `A cobrar ${nextFinancingMonthLabel}`,
+            value: `$${stats.cobroMensualFinanciacionUsd.toLocaleString()} USD`,
+            secondaryValue: `${activeFinancingPlans.length}`,
+            secondaryLabel: 'Planes activos',
+            subtitle: 'Suma de cuotas mensuales activas',
             supportingMetrics: [
                 {
-                    label: `Cobrado ${selectedMonthLabel}`,
-                    value: `$${stats.financiacionMensualCobradoUsd.toLocaleString()} USD`,
-                    color: 'hsl(150 80% 50%)',
+                    label: 'Saldo financiado',
+                    value: `$${stats.deudaTotalUsd.toLocaleString()} USD`,
+                    color: 'hsl(35 95% 60%)',
                 },
             ],
             gradient: 'linear-gradient(135deg, hsl(270 67% 55%), hsl(285 65% 50%))',
             iconBg: 'hsla(270, 67%, 55%, 0.15)',
             iconColor: 'hsl(270 67% 65%)',
+            isGiant: true,
             expandContent: stats.planesFinanciacion.length > 0 ? (
-                <div className="space-y-4">
-                    {/* Seguimiento de cuotas del mes */}
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-bold tracking-wider uppercase text-amber-500/80">
-                                Cuotas a revisar ({pendingPlanes.length})
-                            </span>
-                            {pendingPlanes.length > 0 && (
-                                <span className="text-[10px] text-amber-500/80 bg-amber-500/10 px-1.5 py-0.5 rounded font-mono font-medium">
-                                    Revisión: ${pendingPlanes.reduce((sum, p) => sum + (Number(p.monto_cuota_usd) || 0), 0).toLocaleString()} USD
-                                </span>
-                            )}
-                        </div>
-                        {pendingPlanes.length === 0 ? (
-                            <p className="text-xs text-slate-500 italic">Todos los planes están al día.</p>
-                        ) : (
-                            <ul className="space-y-1.5">
-                                {pendingPlanes.map((p) => {
-                                    const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
-                                    const total = Number(p.cuotas_total || 0);
-                                    const isOverdue = instNum !== null && instNum > total;
-                                    return (
-                                        <li key={p.id} className="text-xs p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors">
-                                            <div className="flex items-center justify-between">
-                                                <span className="font-medium text-slate-200">{p.paciente_nombre}</span>
-                                                <span className="font-mono text-amber-500 font-bold">
-                                                    ${(Number(p.monto_cuota_usd) || 0).toLocaleString()} USD
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
-                                                <span>{p.tratamiento}</span>
-                                                <span>
-                                                    {isOverdue
-                                                        ? `Revisar plan (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
-                                                        : `Cuota ${instNum} a revisar (pagadas ${p.cuotas_pagadas}/${p.cuotas_total})`
-                                                    }
-                                                </span>
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        )}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-[10px] font-bold tracking-wider uppercase text-teal-400/90">
+                            Financiaciones en curso ({activeFinancingPlans.length})
+                        </span>
+                        <span className="text-[10px] text-teal-300/90 bg-teal-500/10 px-1.5 py-0.5 rounded font-mono font-medium">
+                            ${stats.cobroMensualFinanciacionUsd.toLocaleString()} USD/mes
+                        </span>
                     </div>
-
-                    {/* Lista de Al Día / Futuros */}
-                    {okPlanes.length > 0 && (
-                        <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-teal-500/80">
-                                    Al Día / Futuros ({okPlanes.length})
-                                </span>
-                            </div>
-                            <ul className="space-y-1 opacity-60 hover:opacity-100 transition-opacity max-h-48 overflow-y-auto pr-1">
-                                {okPlanes.map((p) => {
-                                    const instNum = getInstallmentNumberForMonth(p, targetDateForFinanc);
-                                    const isFuture = instNum !== null && instNum < 1;
-                                    return (
-                                        <li key={p.id} className="text-[11px] flex items-center justify-between py-1 border-b border-white/[0.03]">
-                                            <div className="truncate pr-2">
-                                                <span className="font-medium text-slate-300">{p.paciente_nombre}</span>
-                                                <span className="text-[9px] text-slate-500 ml-1.5 font-normal">({p.tratamiento})</span>
+                    {activeFinancingPlans.length === 0 ? (
+                        <p className="text-xs text-slate-500 italic">No hay financiaciones activas con cuotas pendientes.</p>
+                    ) : (
+                        <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                            {activeFinancingPlans.map((p) => {
+                                const total = Number(p.cuotas_total || 0);
+                                const paid = Number(p.cuotas_pagadas || 0);
+                                const progress = total > 0 ? Math.min(100, Math.max(0, Math.round((paid / total) * 100))) : 0;
+                                return (
+                                    <li key={p.id} className="text-xs p-3 rounded-lg bg-white/[0.025] border border-white/[0.04] hover:bg-white/[0.05] transition-colors">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-slate-100 truncate">{p.paciente_nombre}</p>
+                                                <p className="mt-0.5 text-[10px] text-slate-500 truncate">{p.tratamiento}</p>
                                             </div>
-                                            <div className="text-right flex-shrink-0 text-slate-400 font-mono text-[10px]">
-                                                {isFuture
-                                                    ? 'Inicia pronto'
-                                                    : `Al día (${p.cuotas_pagadas}/${p.cuotas_total})`
-                                                }
+                                            <div className="text-right flex-shrink-0">
+                                                <p className="font-mono text-teal-300 font-bold">
+                                                    ${(Number(p.monto_cuota_usd) || 0).toLocaleString()} USD/mes
+                                                </p>
+                                                <p className="mt-0.5 text-[10px] text-slate-500">
+                                                    saldo ${(Number(p.saldo_restante_usd) || 0).toLocaleString()} USD
+                                                </p>
                                             </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
+                                        </div>
+                                        <div className="mt-2">
+                                            <div className="h-2 rounded-full bg-slate-900/80 overflow-hidden border border-white/[0.03]">
+                                                <div
+                                                    className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400"
+                                                    style={{ width: `${progress}%` }}
+                                                />
+                                            </div>
+                                            <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500">
+                                                <span>{paid}/{total} cuotas</span>
+                                                <span>{progress}%</span>
+                                            </div>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     )}
                 </div>
             ) : undefined,

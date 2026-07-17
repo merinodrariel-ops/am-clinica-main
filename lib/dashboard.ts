@@ -182,6 +182,7 @@ export interface PlanFinanciacionDashboard {
 
 export function getCobroMensualFinanciacionUsd(planes: PlanFinanciacionDashboard[] = []): number {
     return planes
+        .filter((plan) => plan.estado === 'En curso')
         .filter((plan) => Number(plan.cuotas_pagadas || 0) < Number(plan.cuotas_total || 0))
         .reduce((sum, plan) => sum + (Number(plan.monto_cuota_usd) || 0), 0);
 }

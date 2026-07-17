@@ -33,6 +33,15 @@ test('sums expected monthly financing charges for active plans with remaining in
     assert.equal(total, 3726.67);
 });
 
+test('excludes finished financing plans from monthly active collection', () => {
+    const total = getCobroMensualFinanciacionUsd([
+        plan({ id: 'active', estado: 'En curso', cuotas_pagadas: 2, cuotas_total: 12, monto_cuota_usd: 917 }),
+        plan({ id: 'finished', estado: 'Finalizado', cuotas_pagadas: 2, cuotas_total: 12, monto_cuota_usd: 1200 }),
+    ]);
+
+    assert.equal(total, 917);
+});
+
 test('keeps programmed financing as the main monthly asset and separates collected from pending installments', () => {
     const resumen = getFinanciacionMensualResumen(
         [

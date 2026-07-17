@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
-import { getFinanciacionMensualResumen } from '@/lib/dashboard';
+import { getCobroMensualFinanciacionUsd } from '@/lib/dashboard';
 import type { DashboardStats, OwnerDashboardStats, PlanFinanciacionDashboard, ReferralStat } from '@/lib/dashboard';
 
 type PrimeraConsultaRow = {
@@ -244,17 +244,7 @@ export async function getOwnerDashboardStatsAction(
             .eq('estado', 'En curso');
 
         const planesFinanciacion = (financData || []) as PlanFinanciacionDashboard[];
-        const { data: cuotaPaymentsData } = await supabase
-            .from('caja_recepcion_movimientos')
-            .select('usd_equivalente')
-            .eq('is_deleted', false)
-            .eq('estado', 'pagado')
-            .not('cuota_nro', 'is', null)
-            .gte('fecha_movimiento', monthStart)
-            .lt('fecha_movimiento', nextMonthStart);
-
-        const cuotasCobradasMesUsd = cuotaPaymentsData?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
-        const financiacionMensual = getFinanciacionMensualResumen(planesFinanciacion, new Date(year, month, 1), cuotasCobradasMesUsd);
+        const cobroMensualFinanciacionUsd = getCobroMensualFinanciacionUsd(planesFinanciacion);
 
         return {
             totalPacientes: totalPacientes || 0,
@@ -266,9 +256,9 @@ export async function getOwnerDashboardStatsAction(
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
             personasEnFinanciacion: planesFinanciacion.length,
-            cobroMensualFinanciacionUsd: Math.round(financiacionMensual.programadoUsd),
-            financiacionMensualCobradoUsd: Math.round(financiacionMensual.cobradoUsd),
-            financiacionMensualPendienteUsd: Math.round(financiacionMensual.pendienteUsd),
+            cobroMensualFinanciacionUsd: Math.round(cobroMensualFinanciacionUsd),
+            financiacionMensualCobradoUsd: 0,
+            financiacionMensualPendienteUsd: 0,
             deudaTotalUsd: Math.round(planesFinanciacion.reduce((sum, p) => sum + (Number(p.saldo_restante_usd) || 0), 0)),
             planesFinanciacion,
         };
