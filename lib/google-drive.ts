@@ -2,6 +2,7 @@
 
 import { google } from 'googleapis';
 import { Readable } from 'stream';
+import { getActiveLaboratoryEditorEmails } from '@/lib/laboratory-drive-access';
 
 // Folder IDs for different areas
 const FOLDER_IDS = {
@@ -133,6 +134,73 @@ function getDrive() {
 
 export function getDriveClient() {
     return getDrive();
+}
+
+export interface DriveWriterAccessResult {
+    granted: string[];
+    alreadyWriter: string[];
+    failed: Array<{ email: string; error: string }>;
+}
+
+/** Ensures named users can edit a Drive folder and everything inherited below it. */
+export async function ensureDriveFolderWriterAccess(
+    folderId: string,
+    emailAddresses: string[]
+): Promise<DriveWriterAccessResult> {
+    const drive = getDrive();
+    const result: DriveWriterAccessResult = { granted: [], alreadyWriter: [], failed: [] };
+
+    const permissions = await drive.permissions.list({
+        fileId: folderId,
+        supportsAllDrives: true,
+        fields: 'permissions(id,type,role,emailAddress)',
+    });
+    const byEmail = new Map(
+        (permissions.data.permissions || [])
+            .filter((permission) => permission.emailAddress)
+            .map((permission) => [permission.emailAddress!.toLowerCase(), permission])
+    );
+
+    for (const email of emailAddresses) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const existing = byEmail.get(normalizedEmail);
+
+        try {
+            if (existing && ['owner', 'organizer', 'fileOrganizer', 'writer'].includes(existing.role || '')) {
+                result.alreadyWriter.push(normalizedEmail);
+                continue;
+            }
+
+            if (existing?.id) {
+                await drive.permissions.update({
+                    fileId: folderId,
+                    permissionId: existing.id,
+                    supportsAllDrives: true,
+                    requestBody: { role: 'writer' },
+                });
+            } else {
+                await drive.permissions.create({
+                    fileId: folderId,
+                    supportsAllDrives: true,
+                    sendNotificationEmail: false,
+                    requestBody: {
+                        type: 'user',
+                        role: 'writer',
+                        emailAddress: normalizedEmail,
+                    },
+                });
+            }
+
+            result.granted.push(normalizedEmail);
+        } catch (error) {
+            result.failed.push({
+                email: normalizedEmail,
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+
+    return result;
 }
 
 export interface UploadResult {
@@ -1042,6 +1110,18 @@ export async function ensureExocadHtmlFolder(
         const htmlResult = await createDriveFolder(drive, exocadResult.folderId, 'HTML');
         if (htmlResult.error || !htmlResult.folderId) {
             return { error: htmlResult.error || 'No se pudo crear carpeta HTML' };
+        }
+
+        const laboratoryEditors = await getActiveLaboratoryEditorEmails();
+        if (laboratoryEditors.error) {
+            return { error: `No se pudieron resolver los editores de laboratorio: ${laboratoryEditors.error}` };
+        }
+
+        const writerAccess = await ensureDriveFolderWriterAccess(exocadResult.folderId, laboratoryEditors.emails);
+        if (writerAccess.failed.length > 0) {
+            return {
+                error: `La carpeta EXOCAD se creó, pero no se pudo otorgar edición a ${writerAccess.failed.length} cuenta(s) de laboratorio`,
+            };
         }
 
         return {

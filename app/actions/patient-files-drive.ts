@@ -16,6 +16,7 @@ import {
     getDriveClient,
     extractSlidesAsImages,
 } from '@/lib/google-drive';
+import { canManagePatientDrive } from '@/lib/patient-drive-access';
 
 /**
  * Server action to rename a file in Drive (categorization)
@@ -237,7 +238,6 @@ export async function createPatientDriveFolderAction(
 
 // ─── Fotos order persistence ────────────────────────────────────────────────
 
-const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente']);
 const DRIVE_ID_RE = /^[a-zA-Z0-9_-]{10,}$/;
 
 async function requireDriveManageRole(actionLabel: string): Promise<{ error?: string }> {
@@ -251,7 +251,7 @@ async function requireDriveManageRole(actionLabel: string): Promise<{ error?: st
         .eq('id', user.id)
         .single();
 
-    if (!profile?.categoria || !DRIVE_MANAGE_ROLES.has(profile.categoria)) {
+    if (!canManagePatientDrive(profile?.categoria)) {
         return { error: `Sin permisos para ${actionLabel}` };
     }
 

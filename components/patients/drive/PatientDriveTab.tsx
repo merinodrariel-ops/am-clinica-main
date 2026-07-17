@@ -291,7 +291,7 @@ function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] 
 }
 
 const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
-const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente']);
+const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
 
 interface PatientDriveTabProps {
     patientId: string;
