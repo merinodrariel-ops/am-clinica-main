@@ -160,12 +160,89 @@ export interface OwnerDashboardStats {
     limpiezasMensual: Array<{ key: string; label: string; shortLabel: string; count: number }>;
     ingresosMesUsd: number;
     egresosMesUsd: number;
+    egresosPorCategoria: ExpenseCategoryComparison[];
+    egresosComparacionLabel: string;
     personasEnFinanciacion: number;
     cobroMensualFinanciacionUsd: number;
     financiacionMensualCobradoUsd: number;
     financiacionMensualPendienteUsd: number;
     deudaTotalUsd: number;
     planesFinanciacion: PlanFinanciacionDashboard[];
+}
+
+export interface ExpenseCategoryComparison {
+    categoria: string;
+    actualUsd: number;
+    anteriorUsd: number;
+    diferenciaUsd: number;
+    variacionPorcentaje: number | null;
+    esFijo: boolean;
+}
+
+type ExpenseCategoryRow = {
+    subtipo?: string | null;
+    usd_equivalente_total?: unknown;
+};
+
+function normalizeExpenseCategory(value?: string | null): string {
+    const trimmed = (value || '').trim();
+    return trimmed || 'Sin categoría';
+}
+
+function roundExpenseAmount(value: number): number {
+    return Math.round(value * 100) / 100;
+}
+
+export function getExpenseCategoryComparisons(
+    currentRows: ExpenseCategoryRow[] = [],
+    previousRows: ExpenseCategoryRow[] = [],
+    topLimit = 5,
+): ExpenseCategoryComparison[] {
+    const aggregate = (rows: ExpenseCategoryRow[]) => rows.reduce<Record<string, number>>((totals, row) => {
+        const category = normalizeExpenseCategory(row.subtipo);
+        totals[category] = (totals[category] || 0) + (Number(row.usd_equivalente_total) || 0);
+        return totals;
+    }, {});
+
+    const currentTotals = aggregate(currentRows);
+    const previousTotals = aggregate(previousRows);
+    const sortedCurrent = Object.entries(currentTotals)
+        .filter(([, amount]) => amount > 0)
+        .sort(([, amountA], [, amountB]) => amountB - amountA);
+
+    const primary = sortedCurrent.slice(0, Math.max(1, topLimit));
+    const remaining = sortedCurrent.slice(Math.max(1, topLimit));
+    if (remaining.length > 0) {
+        primary.push([
+            'Otros',
+            remaining.reduce((sum, [, amount]) => sum + amount, 0),
+        ]);
+        previousTotals.Otros = remaining.reduce(
+            (sum, [category]) => sum + (previousTotals[category] || 0),
+            0,
+        );
+    }
+
+    return primary.map(([categoria, currentAmount]) => {
+        const actualUsd = roundExpenseAmount(currentAmount);
+        const anteriorUsd = roundExpenseAmount(previousTotals[categoria] || 0);
+        const diferenciaUsd = roundExpenseAmount(actualUsd - anteriorUsd);
+        const normalizedKey = categoria
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+        return {
+            categoria,
+            actualUsd,
+            anteriorUsd,
+            diferenciaUsd,
+            variacionPorcentaje: anteriorUsd > 0
+                ? Math.round((diferenciaUsd / anteriorUsd) * 100)
+                : null,
+            esFijo: normalizedKey.includes('alquiler'),
+        };
+    });
 }
 
 export interface PlanFinanciacionDashboard {
@@ -374,6 +451,8 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             limpiezasMensual: [],
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
+            egresosPorCategoria: [],
+            egresosComparacionLabel: '',
             personasEnFinanciacion,
             cobroMensualFinanciacionUsd: Math.round(financiacionMensual.programadoUsd),
             financiacionMensualCobradoUsd: Math.round(financiacionMensual.cobradoUsd),
@@ -392,6 +471,8 @@ export async function getOwnerDashboardStats(): Promise<OwnerDashboardStats> {
             limpiezasMensual: [],
             ingresosMesUsd: 0,
             egresosMesUsd: 0,
+            egresosPorCategoria: [],
+            egresosComparacionLabel: '',
             personasEnFinanciacion: 0,
             cobroMensualFinanciacionUsd: 0,
             financiacionMensualCobradoUsd: 0,

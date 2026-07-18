@@ -482,6 +482,90 @@ function MiniBarChart({
     );
 }
 
+function ExpenseBreakdown({
+    categories,
+    comparisonLabel,
+    totalUsd,
+}: {
+    categories: OwnerDashboardStats['egresosPorCategoria'];
+    comparisonLabel: string;
+    totalUsd: number;
+}) {
+    const formatUsd = (value: number) => `$${Math.abs(value).toLocaleString('en-US', {
+        maximumFractionDigits: 0,
+    })}`;
+
+    if (categories.length === 0) {
+        return <p className="text-xs text-slate-500">Sin gastos registrados en este período.</p>;
+    }
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                    Principales categorías
+                </p>
+                <span className="text-[10px] text-slate-500">{comparisonLabel}</span>
+            </div>
+
+            {categories.map((category) => {
+                const share = totalUsd > 0
+                    ? Math.max(3, Math.round((category.actualUsd / totalUsd) * 100))
+                    : 0;
+                const increased = category.diferenciaUsd > 0;
+                const decreased = category.diferenciaUsd < 0;
+
+                return (
+                    <div key={category.categoria} className="rounded-lg border border-white/5 bg-white/[0.02] p-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="truncate text-xs font-semibold text-slate-200">
+                                {category.categoria}
+                            </span>
+                            <span className="shrink-0 font-mono text-xs font-bold text-white">
+                                {formatUsd(category.actualUsd)} USD
+                            </span>
+                        </div>
+
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5">
+                            <div
+                                className="h-full rounded-full bg-red-400/70"
+                                style={{ width: `${Math.min(100, share)}%` }}
+                            />
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
+                            <span className="text-slate-500">{share}% del gasto mensual</span>
+                            {category.esFijo ? (
+                                <span className="rounded-full bg-slate-500/10 px-2 py-0.5 font-semibold text-slate-400">
+                                    Fijo
+                                </span>
+                            ) : category.anteriorUsd === 0 ? (
+                                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-400">
+                                    Nuevo este mes
+                                </span>
+                            ) : (
+                                <span className={`inline-flex items-center gap-1 font-semibold ${
+                                    increased
+                                        ? 'text-red-400'
+                                        : decreased
+                                            ? 'text-emerald-400'
+                                            : 'text-slate-400'
+                                }`}>
+                                    {increased ? <TrendingUp size={11} /> : decreased ? <TrendingDown size={11} /> : null}
+                                    {increased ? '+' : decreased ? '−' : ''}{formatUsd(category.diferenciaUsd)}
+                                    {category.variacionPorcentaje !== null && (
+                                        <span>({category.variacionPorcentaje > 0 ? '+' : ''}{category.variacionPorcentaje}%)</span>
+                                    )}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 function MonthlyTrendsPanel({
     primeraVez,
     limpiezas,
@@ -890,6 +974,13 @@ export default function OwnerDashboard() {
             iconBg: 'hsla(0, 75%, 55%, 0.15)',
             iconColor: 'hsl(0 75% 60%)',
             isLarge: true,
+            expandContent: (
+                <ExpenseBreakdown
+                    categories={stats.egresosPorCategoria}
+                    comparisonLabel={stats.egresosComparacionLabel}
+                    totalUsd={stats.egresosMesUsd}
+                />
+            ),
         },
         'en-financiacion': {
             id: 'en-financiacion',
