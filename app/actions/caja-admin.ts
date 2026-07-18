@@ -18,6 +18,7 @@ export async function updateCajaAdminMovimientoSecure(input: {
     fecha_movimiento: string;
     descripcion: string;
     nota?: string;
+    adjuntos?: string[];
     registro_editado?: boolean;
     lines: MovimientoLineaInput[];
     usdTotalOverride?: number;
@@ -65,6 +66,12 @@ export async function updateCajaAdminMovimientoSecure(input: {
             };
         }).filter((line) => line.cuenta_id && line.importe > 0);
 
+        const normalizedAttachments = (input.adjuntos || [])
+            .filter((value): value is string => typeof value === 'string')
+            .map((value) => value.trim())
+            .filter(Boolean)
+            .slice(0, 20);
+
         if ((input.lines || []).length > 0 && normalizedLines.length === 0) {
             return { success: false, error: 'No hay lineas validas para guardar. Completa importes mayores a 0.' };
         }
@@ -94,6 +101,7 @@ export async function updateCajaAdminMovimientoSecure(input: {
                 fecha_movimiento: input.fecha_movimiento,
                 descripcion: input.descripcion,
                 nota: input.nota ?? null,
+                adjuntos: normalizedAttachments,
                 registro_editado: Boolean(input.registro_editado),
                 usd_equivalente_total: usdTotal,
                 updated_at: new Date().toISOString(),
