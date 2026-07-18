@@ -71,6 +71,7 @@ import { getLocalISODate } from "@/lib/local-date";
 import { Textarea } from "@/components/ui/Textarea";
 import MoneyInput from "@/components/ui/MoneyInput";
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { calculateMonthlyAdminExpensesUsd } from '@/lib/caja-admin/expense-metrics';
 
 interface Props {
   sucursal: Sucursal;
@@ -281,11 +282,18 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       setMovimientos(movData || []);
 
       const supabase = createClient();
+      const transferStartDate = `${mesActual}-01`;
+      const [transferYear, transferMonth] = mesActual.split("-").map(Number);
+      const transferEndDate = new Date(transferYear, transferMonth, 1)
+        .toISOString()
+        .split("T")[0];
       const { data: transData } = await supabase
         .from("transferencias_caja")
         .select("*")
         .or(`caja_origen.eq.ADMIN,caja_destino.eq.ADMIN`)
         .eq("estado", "confirmada")
+        .gte("fecha_movimiento", transferStartDate)
+        .lt("fecha_movimiento", transferEndDate)
         .order("fecha_hora", { ascending: false });
 
       setTransfers((transData || []) as TransferenciaAdmin[]);
@@ -877,11 +885,26 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
         );
       }
 
+      const previousAttachmentCount = Array.isArray(editingMov.adjuntos)
+        ? editingMov.adjuntos.length
+        : 0;
+      if (previousAttachmentCount !== editData.adjuntos.length) {
+        await logMovimientoEdit(
+          editingMov.id,
+          "caja_admin_movimientos",
+          "adjuntos",
+          `${previousAttachmentCount} archivo(s)`,
+          `${editData.adjuntos.length} archivo(s)`,
+          editData.motivo,
+        );
+      }
+
       const { success, error } = await updateCajaAdminMovimientoSecure({
         movimientoId: editingMov.id,
         fecha_movimiento: editData.fecha,
         descripcion: editData.descripcion,
         nota: editData.nota,
+        adjuntos: editData.adjuntos,
         registro_editado: true,
         lines: normalizedLinesToSave,
         usdTotalOverride: editData.totalUsd,
@@ -1146,13 +1169,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     (t) => !t.onlyUnificada || sucursal.modo_caja === "UNIFICADA",
   );
 
-  // --- Gastos del mes (EGRESO + RETIRO, todas las cuentas, en USD equivalente) ---
-  const totalGastosMesUsd = movimientos
-    .filter((m) => (m.tipo_movimiento === "EGRESO" || m.tipo_movimiento === "RETIRO") && m.estado !== "Anulado")
-    .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0) +
-    transfers
-      .filter(t => t.tipo_transferencia === "RETIRO_EFECTIVO")
-      .reduce((sum, t) => sum + (t.moneda === 'USD' ? t.monto : (t.monto / (tcBna || 1))), 0);
+  // Gastos operativos: solo EGRESO. Retiros, traspasos y cambios de moneda
+  // mueven fondos, pero no representan consumo real de dinero.
+  const totalGastosMesUsd = calculateMonthlyAdminExpensesUsd(movimientos);
 
 
   // --- Helper for Privacy Mode ---
@@ -1968,6 +1987,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                   Medio
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">
+                  Comprobantes
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">
                   Acciones
                 </th>
               </tr>
@@ -2019,6 +2041,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                       <td className="px-6 py-3 text-center">
                         <PlayCircle className="w-5 h-5 text-teal-500 mx-auto" />
                       </td>
+                      <td className="px-6 py-3 text-center text-slate-300">—</td>
                       <td className="px-6 py-3 text-center text-slate-300">—</td>
                     </motion.tr>
                   );
@@ -2077,12 +2100,16 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                       </td>
                       <td className="px-6 py-3 text-center text-slate-400 text-xs">—</td>
                       <td className="px-6 py-3 text-center text-slate-300">—</td>
+                      <td className="px-6 py-3 text-center text-slate-300">—</td>
                     </motion.tr>
                   );
                 }
 
                 // kind === "movimiento"
                 const mov = row.data;
+                const movementAttachments = Array.isArray(mov.adjuntos)
+                  ? mov.adjuntos.filter((value): value is string => Boolean(value))
+                  : [];
                 return (
                   <motion.tr
                     key={mov.id}
@@ -2170,6 +2197,25 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                     })()}
                     <td className="px-6 py-4 text-center">
                       {getMedioPagoChip(mov)}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {movementAttachments.length > 0 ? (
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          {movementAttachments.map((storedValue, index) => (
+                            <ComprobanteLink
+                              key={`${mov.id}-adjunto-${index}`}
+                              storedValue={storedValue}
+                              area="caja-admin"
+                              className="h-8 min-w-8 justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+                              iconSize={14}
+                              label={`Abrir comprobante ${index + 1} de ${movementAttachments.length}`}
+                              showLabel={movementAttachments.length === 1}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-300 dark:text-slate-600">Sin adjunto</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -2539,6 +2585,73 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                   }
                   placeholder="Detalle adicional..."
                   className="w-full px-4 py-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white min-h-[80px]"
+                />
+              </div>
+
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      <Paperclip className="h-4 w-4 text-indigo-500" />
+                      Comprobantes adjuntos
+                    </label>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Abrí los recibos existentes o agregá uno nuevo a este movimiento.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300">
+                    {editData.adjuntos.length}
+                  </span>
+                </div>
+
+                {editData.adjuntos.length > 0 ? (
+                  <div className="mb-3 space-y-2">
+                    {editData.adjuntos.map((storedValue, index) => (
+                      <div
+                        key={`${storedValue}-${index}`}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        <ComprobanteLink
+                          storedValue={storedValue}
+                          area="caja-admin"
+                          className="min-w-0 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-300"
+                          iconSize={15}
+                          label={`Ver comprobante ${index + 1}`}
+                          showLabel
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            setEditData((current) => ({
+                              ...current,
+                              adjuntos: current.adjuntos.filter((_, itemIndex) => itemIndex !== index),
+                            }))
+                          }
+                          className="h-8 w-8 shrink-0 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                          title={`Quitar comprobante ${index + 1}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mb-3 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    Este movimiento todavía no tiene comprobantes.
+                  </p>
+                )}
+
+                <ComprobanteUpload
+                  area="caja-admin"
+                  movimientoId={editingMov.id}
+                  onUploadComplete={(result) =>
+                    setEditData((current) => ({
+                      ...current,
+                      adjuntos: [...current.adjuntos, result.path || result.url],
+                    }))
+                  }
                 />
               </div>
 
