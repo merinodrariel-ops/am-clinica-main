@@ -839,6 +839,8 @@ export default function PhotoStudioModal({
     }, [activeCanvasId, activeCanvas]);
 
     const [canvasSelectedId, setCanvasSelectedId] = useState<string | null>(null);
+    const [canvasLayerInteracting, setCanvasLayerInteracting] = useState(false);
+    const [rotationGridAssist, setRotationGridAssist] = useState(false);
     const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
     const [canvasLayerCropId, setCanvasLayerCropId] = useState<string | null>(null);
     const [canvasLayerCropAspectPreset, setCanvasLayerCropAspectPreset] = useState<CropAspectPresetId>('free');
@@ -910,6 +912,13 @@ export default function PhotoStudioModal({
     const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
     const [cropAspectPreset, setCropAspectPreset] = useState<CropAspectPresetId>('free');
+    const selectedCanvasLayer = canvasActive && canvasSelectedId
+        ? canvasLayers.find(layer => layer.id === canvasSelectedId) ?? null
+        : null;
+    const effectiveBgDone = selectedCanvasLayer
+        ? Boolean(selectedCanvasLayer.backgroundRemoved)
+        : bgDone;
+    const isAlignmentGridVisible = showGrid || isDragging || canvasLayerInteracting || rotationGridAssist;
     const activeCropAspect = getCropAspectPreset(cropAspectPreset).aspect;
     const cropActiveRef = useRef(false);
     useEffect(() => { cropActiveRef.current = cropActive; }, [cropActive]);
@@ -929,7 +938,13 @@ export default function PhotoStudioModal({
     const [healCursor, setHealCursor] = useState<{ x: number; y: number; size: number; visible: boolean }>({ x: 0, y: 0, size: 28, visible: false });
 
     type PhotoSnapshot = { kind: 'photo'; imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor; hasTransparentBg?: boolean };
-    type CanvasLayerSnapshot = { kind: 'canvas-layer'; canvasId: string; layerId: string; layerSrc: string };
+    type CanvasLayerSnapshot = {
+        kind: 'canvas-layer';
+        canvasId: string;
+        layerId: string;
+        layerSrc: string;
+        backgroundRemoved?: boolean;
+    };
     type Snapshot = PhotoSnapshot | CanvasLayerSnapshot;
     const [history, setHistory] = useState<Snapshot[]>([]);
 
@@ -1922,7 +1937,12 @@ export default function PhotoStudioModal({
                         ...canvas,
                         layers: canvas.layers.map(layer =>
                             layer.id === snap.layerId
-                                ? { ...layer, src: snap.layerSrc, img }
+                                ? {
+                                    ...layer,
+                                    src: snap.layerSrc,
+                                    img,
+                                    backgroundRemoved: snap.backgroundRemoved,
+                                }
                                 : layer
                         ),
                     };
@@ -1983,7 +2003,8 @@ export default function PhotoStudioModal({
                     kind: 'canvas-layer',
                     canvasId: activeCanvasId,
                     layerId: selectedLayer.id,
-                    layerSrc: selectedLayer.src
+                    layerSrc: selectedLayer.src,
+                    backgroundRemoved: selectedLayer.backgroundRemoved,
                 });
             } else {
                 pushHistory();
@@ -2007,18 +2028,18 @@ export default function PhotoStudioModal({
                     if (uploadRes.error || !uploadRes.fileId) {
                         console.error('[canvas-layer-bg-upload] error:', uploadRes.error);
                         const img = await loadCanvasImage(newUrl);
-                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img } : l));
+                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img, backgroundRemoved: true } : l));
                         toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
                     } else {
                         const driveUrl = `/api/drive/file/${uploadRes.fileId}`;
                         const img = await loadCanvasImage(driveUrl);
-                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: driveUrl, img, fileId: uploadRes.fileId } : l));
+                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: driveUrl, img, fileId: uploadRes.fileId, backgroundRemoved: true } : l));
                         toast.success('Fondo de capa eliminado y guardado en Drive', { id: saveToastId });
                     }
                 } catch (uploadErr) {
                     console.error('[canvas-layer-bg-upload] exception:', uploadErr);
                     const img = await loadCanvasImage(newUrl);
-                    setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img } : l));
+                    setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img, backgroundRemoved: true } : l));
                     toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
                 }
             } else {
@@ -2914,16 +2935,19 @@ export default function PhotoStudioModal({
                     startX: nx, startY: ny, origLayer: { ...layer },
                 };
                 setCanvasSelectedId(layer.id);
+                setCanvasLayerInteracting(true);
                 return;
             }
             if (hitTestLayerBody(layer, nx, ny, W, H)) {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 canvasLayerDragRef.current = { layerId: layer.id, mode: 'move', startX: nx, startY: ny, origLayer: { ...layer } };
                 setCanvasSelectedId(layer.id);
+                setCanvasLayerInteracting(true);
                 return;
             }
         }
         setCanvasSelectedId(null);
+        setCanvasLayerInteracting(false);
     }
 
     function handleCanvasLayerPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -3000,6 +3024,7 @@ export default function PhotoStudioModal({
             return;
         }
         canvasLayerDragRef.current = null;
+        setCanvasLayerInteracting(false);
     }
 
     function handleCanvasLayerDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -3078,7 +3103,9 @@ export default function PhotoStudioModal({
         if (fileId) {
             try {
                 const img = await loadCanvasImage(`/api/drive/file/${fileId}?cors=1`);
-                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, `/api/drive/file/${fileId}?cors=1`, fileId, dropX, dropY)]);
+                const layer = makeCanvasLayer(img, `/api/drive/file/${fileId}?cors=1`, fileId, dropX, dropY);
+                setCanvasLayers(prev => [...prev, layer]);
+                setCanvasSelectedId(layer.id);
             } catch { toast.error('No se pudo cargar la foto'); }
             return;
         }
@@ -3087,7 +3114,9 @@ export default function PhotoStudioModal({
             const src = URL.createObjectURL(pcFile);
             try {
                 const img = await loadCanvasImage(src);
-                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, src, undefined, dropX, dropY)]);
+                const layer = makeCanvasLayer(img, src, undefined, dropX, dropY);
+                setCanvasLayers(prev => [...prev, layer]);
+                setCanvasSelectedId(layer.id);
             } catch { URL.revokeObjectURL(src); toast.error('No se pudo cargar la imagen'); }
         }
     }
@@ -3326,6 +3355,7 @@ export default function PhotoStudioModal({
         }
         for (const layer of canvasLayers) {
             ctx.save();
+            ctx.filter = `brightness(${layer.brightness ?? 100}%)`;
             ctx.translate(layer.x * expW, layer.y * expH);
             ctx.rotate(layer.rotation * Math.PI / 180);
             // Safety check for export
@@ -4657,6 +4687,20 @@ export default function PhotoStudioModal({
         if (!activeFile) return;
         setSaving(mode);
         try {
+            // A flattened JPG/PNG is only the deliverable. Persist the layer document first
+            // so the same canvas can be reopened and adjusted later.
+            if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
+                const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+                const editableSave = await savePatientCanvasAction({
+                    id: activeCanvas.id,
+                    layers: activeCanvas.layers.map(layer => ({ ...layer, img: undefined })),
+                    ratio: activeCanvas.ratio,
+                    bgColor: activeCanvas.bgColor,
+                });
+                if (editableSave.error) {
+                    throw new Error(`No se pudo guardar el lienzo editable: ${editableSave.error}`);
+                }
+            }
             const blob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
             const isPng = blob.type === 'image/png';
             const ext = isPng ? 'png' : 'jpg';
@@ -4672,7 +4716,9 @@ export default function PhotoStudioModal({
                     toast.error(`Error al guardar en Selección: ${result.error}`);
                     return;
                 }
-                toast.success('Guardado en la carpeta de Selección');
+                toast.success(canvasActive
+                    ? 'Copia guardada; el lienzo editable queda disponible'
+                    : 'Guardado en la carpeta de Selección');
             } else if (mode === 'replace') {
                 // Update existing file content in-place (preserves file ID, no duplicate)
                 const formData = new FormData();
@@ -4708,7 +4754,9 @@ export default function PhotoStudioModal({
                     pendingCopyIdRef.current = result.fileId;
                     markAsEdited(result.fileId);
                 }
-                toast.success('Copia guardada en Drive');
+                toast.success(canvasActive
+                    ? 'Copia guardada; el lienzo editable queda disponible'
+                    : 'Copia guardada en Drive');
             }
 
             setSaveDialogOpen(false);
@@ -4801,6 +4849,9 @@ export default function PhotoStudioModal({
                                 <span className="text-[10px] text-white/30 flex items-center gap-1">
                                     <Loader2 size={10} className="animate-spin" /> guardando…
                                 </span>
+                            )}
+                            {canvasActive && !canvasSaving && (
+                                <span className="text-[10px] text-emerald-300/60">proyecto editable</span>
                             )}
                         </p>
                     </div>
@@ -5364,6 +5415,10 @@ export default function PhotoStudioModal({
                                                         <input
                                                             type="range" min={-180} max={180} step={0.5}
                                                             value={canvasLayerCropRotation}
+                                                            onPointerDown={() => setRotationGridAssist(true)}
+                                                            onPointerUp={() => setRotationGridAssist(false)}
+                                                            onPointerCancel={() => setRotationGridAssist(false)}
+                                                            onBlur={() => setRotationGridAssist(false)}
                                                             onChange={e => setCanvasLayerCropRotation(Number(e.target.value))}
                                                             className="flex-1 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
                                                         />
@@ -5430,7 +5485,8 @@ export default function PhotoStudioModal({
                                                   : drawMode === 'selected' ? 'move'
                                                   : drawShapes.length > 0 ? 'pointer'
                                                   : 'default',
-                                            pointerEvents: (!healMode && (drawMode !== 'idle' || drawShapes.length > 0 || textToolActive || textAnnotations.length > 0)) ? 'auto' : 'none',
+                                            // Photo annotations must never intercept layer selection/resizing in canvas mode.
+                                            pointerEvents: (!canvasActive && !healMode && (drawMode !== 'idle' || drawShapes.length > 0 || textToolActive || textAnnotations.length > 0)) ? 'auto' : 'none',
                                         }}
                                         onClick={handleDrawClick}
                                         onDoubleClick={handleDrawDblClick}
@@ -5609,19 +5665,19 @@ export default function PhotoStudioModal({
                         )}
 
                         {/* Bipupillar grid overlay — full grid when rotating/toggled; center crosshair also during pan */}
-                        {(showGrid || rotation !== 0 || isDragging || zoom > 1) && (
+                        {isAlignmentGridVisible && (
                             <svg
                                 className="absolute inset-0 w-full h-full pointer-events-none"
                                 xmlns="http://www.w3.org/2000/svg"
                             >
-                                {/* Rule-of-thirds — only when grid is explicitly active */}
-                                {(showGrid || rotation !== 0) && (<>
+                                {/* Rule-of-thirds — manual or temporarily while moving/rotating */}
+                                <>
                                     <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                     <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                     <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                     <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                                </>)}
-                                {/* Center crosshair — always visible when zoomed/panning or grid active */}
+                                </>
+                                {/* Center crosshair */}
                                 <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(255,255,255,0.75)" strokeWidth="1.5" strokeDasharray="8 4" />
                                 <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(255,255,255,0.45)" strokeWidth="1" strokeDasharray="8 4" />
                             </svg>
@@ -5642,6 +5698,10 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
+                                onPointerDown={() => setRotationGridAssist(true)}
+                                onPointerUp={() => setRotationGridAssist(false)}
+                                onPointerCancel={() => setRotationGridAssist(false)}
+                                onBlur={() => setRotationGridAssist(false)}
                                 onChange={e => setRotation(Number(e.target.value))}
                                 className="w-48 md:w-64 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
                             />
@@ -5892,10 +5952,10 @@ export default function PhotoStudioModal({
                                 canvasLayerCropPreBakeRef.current = null;
                                 setCanvasLayerCropId(null);
                             } : handleCancelCrop}
-                            bgProcessing={bgProcessing} bgDone={bgDone}
+                            bgProcessing={bgProcessing} bgDone={effectiveBgDone}
                             bgColor={bgColor} setBgColor={setBgColor}
                             onRemoveBg={handleRemoveBackground}
-                            onUndoBg={handleUndoBgRemoval}
+                            onUndoBg={selectedCanvasLayer ? handleUndo : handleUndoBgRemoval}
                             onCancelBg={handleCancelBgProcessing}
                             onMoveSubject={() => setSubjectTransformOpen(true)}
                             brushMode={brushMode}
@@ -5953,9 +6013,10 @@ export default function PhotoStudioModal({
                             onUndo={handleUndo}
                             onPushHistory={pushHistory}
                             historyCount={history.length}
-                            showGrid={showGrid}
                             setShowGrid={setShowGrid}
-                            isGridVisible={showGrid || rotation !== 0}
+                            isGridVisible={isAlignmentGridVisible}
+                            onRotationInteractionStart={() => setRotationGridAssist(true)}
+                            onRotationInteractionEnd={() => setRotationGridAssist(false)}
                             onConfirmBg={handleConfirmBg}
                             drawMode={drawMode}
                             onSetDrawMode={(mode) => {
@@ -6024,6 +6085,10 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
+                                onPointerDown={() => setRotationGridAssist(true)}
+                                onPointerUp={() => setRotationGridAssist(false)}
+                                onPointerCancel={() => setRotationGridAssist(false)}
+                                onBlur={() => setRotationGridAssist(false)}
                                 onChange={e => setRotation(Number(e.target.value))}
                                 className="w-20 accent-white/70"
                             />
@@ -6091,10 +6156,10 @@ export default function PhotoStudioModal({
                         ) : (
                             <button
                                 onClick={handleRemoveBackground}
-                                disabled={bgDone}
+                                disabled={effectiveBgDone || (canvasActive && !canvasSelectedId)}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md bg-violet-600/30 text-violet-300 text-xs disabled:opacity-50"
                             >
-                                {bgDone ? <Check size={13} /> : <Wand2 size={13} />}
+                                {effectiveBgDone ? <Check size={13} /> : <Wand2 size={13} />}
                                 Sin fondo
                             </button>
                         )}
@@ -6110,13 +6175,13 @@ export default function PhotoStudioModal({
                         <button
                             onClick={() => setShowGrid(v => !v)}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-                                (showGrid || rotation !== 0) ? 'bg-[#C9A96E]/30 text-[#C9A96E]' : 'bg-white/10 text-white/70'
+                                isAlignmentGridVisible ? 'bg-[#C9A96E]/30 text-[#C9A96E]' : 'bg-white/10 text-white/70'
                             }`}
                         >
                             <Grid size={13} /> Grilla
                         </button>
                         {/* Mover sujeto — mobile */}
-                        {bgDone && (
+                        {bgDone && !canvasActive && (
                             <button
                                 onClick={() => setSubjectTransformOpen(true)}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/70 transition-colors"
@@ -6125,7 +6190,7 @@ export default function PhotoStudioModal({
                             </button>
                         )}
                         {/* Cancelar / Confirmar bg removal — mobile */}
-                        {bgDone && (
+                        {bgDone && !canvasActive && (
                             <button
                                 onClick={handleUndoBgRemoval}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/50 transition-colors"
@@ -6680,9 +6745,10 @@ interface ToolsPanelProps {
     onUndo: () => void;
     onPushHistory: () => void;
     historyCount: number;
-    showGrid: boolean;
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
     isGridVisible: boolean;
+    onRotationInteractionStart: () => void;
+    onRotationInteractionEnd: () => void;
     onConfirmBg: () => void;
     drawMode: 'idle' | 'drawing' | 'selected' | 'editing';
     onSetDrawMode: (mode: 'idle' | 'drawing' | 'selected' | 'editing') => void;
@@ -6748,8 +6814,10 @@ function ToolsPanel({
     onUndo,
     onPushHistory,
     historyCount,
-    showGrid, setShowGrid,
+    setShowGrid,
     isGridVisible,
+    onRotationInteractionStart,
+    onRotationInteractionEnd,
     onConfirmBg,
     drawMode, onSetDrawMode,
     drawVisible, onToggleDrawVisible,
@@ -6813,7 +6881,10 @@ function ToolsPanel({
                         <input
                             type="range" min={-180} max={180} step={0.5}
                             value={rotation}
-                            onPointerDown={() => onPushHistory()}
+                            onPointerDown={() => { onPushHistory(); onRotationInteractionStart(); }}
+                            onPointerUp={onRotationInteractionEnd}
+                            onPointerCancel={onRotationInteractionEnd}
+                            onBlur={onRotationInteractionEnd}
                             onChange={(e) => setRotation(Number(e.target.value))}
                             className="w-full accent-white/70 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer"
                         />
@@ -7114,7 +7185,7 @@ function ToolsPanel({
                 )}
 
                 {/* Move/scale subject (Canva-style) */}
-                {bgDone && !bgProcessing && (
+                {bgDone && !bgProcessing && !canvasActive && (
                     <button
                         onClick={onMoveSubject}
                         className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-sm font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
@@ -7124,7 +7195,7 @@ function ToolsPanel({
                 )}
 
                 {/* Background color selector — only visible after bg removed */}
-                {bgDone && !bgProcessing && (
+                {bgDone && !bgProcessing && !canvasActive && (
                     <div className="space-y-1.5">
                         <p className="text-white/50 text-sm">Reemplazar con:</p>
                         <div className="flex gap-2">
@@ -7161,6 +7232,20 @@ function ToolsPanel({
                                 <Check size={18} /> Confirmar
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {bgDone && !bgProcessing && canvasActive && canvasSelectedId && (
+                    <div className="space-y-2 rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
+                        <p className="text-sm text-violet-100">
+                            Fondo eliminado en esta foto. Podés moverla y agrandarla desde sus esquinas.
+                        </p>
+                        <button
+                            onClick={onUndoBg}
+                            className="w-full py-2 rounded-lg bg-white/10 text-white/70 text-sm font-semibold hover:bg-white/20 transition-colors"
+                        >
+                            Restaurar fondo de esta foto
+                        </button>
                     </div>
                 )}
             </div>
