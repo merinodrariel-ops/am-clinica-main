@@ -31,8 +31,10 @@ export interface CajaAdminMovimiento {
     nota?: string;
     adjuntos?: string[];
     tc_bna_venta?: number;
+    tc_operacion?: number;
     tc_fuente?: 'BNA_AUTO' | 'MANUAL' | 'N/A';
     tc_fecha_hora?: string;
+    idempotency_key?: string;
     usd_equivalente_total: number;
     ref_transferencia_recepcion_id?: string;
     paciente_id?: string;
@@ -357,4 +359,3 @@ export interface PersonalValoresHoraHistoria {
     created_by: string | null;
     editor?: { full_name: string } | null;
 }
-

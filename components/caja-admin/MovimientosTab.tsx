@@ -50,11 +50,14 @@ import {
   getArqueosForMonth,
   getCurrentBalanceAdmin,
   logMovimientoEdit,
-  deleteMovimiento,
   getCategorias,
   type CajaAdminCategoria,
 } from "@/lib/caja-admin";
-import { updateCajaAdminMovimientoSecure } from "@/app/actions/caja-admin";
+import {
+  anularCajaAdminMovimientoSecure,
+  createCajaAdminExchangeSecure,
+  updateCajaAdminMovimientoSecure,
+} from "@/app/actions/caja-admin";
 import {
   getLiquidacionesPendientesParaCaja,
   sincronizarLiquidacionDesdeMovimientoCaja,
@@ -194,6 +197,8 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   const [manualRate, setManualRate] = useState<string>("");
   const [exchangeAmountUSD, setExchangeAmountUSD] = useState<string>("");
   const handledActionRef = useRef<string | null>(null);
+  const submitInFlightRef = useRef(false);
+  const exchangeSubmissionKeyRef = useRef<string | null>(null);
 
   const formatArqueoSaldos = (saldos: Record<string, number> | undefined | null) => {
     if (!saldos) return <span className="text-slate-400">—</span>;
@@ -339,7 +344,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   useEffect(() => {
     if (formData.tipo_movimiento === "CAMBIO_MONEDA" && exchangeAmountUSD) {
       const usdVal = parseFloat(exchangeAmountUSD) || 0;
-      const rateVal = parseFloat(manualRate) || tcBna || 0;
+      const rateVal = parseFloat(manualRate) || 0;
       const arsVal = usdVal * rateVal;
 
       const newLines: MovimientoLinea[] = [];
@@ -374,7 +379,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
 
       setFormLineas(newLines);
     }
-  }, [exchangeAmountUSD, manualRate, formData.tipo_movimiento, cuentas, tcBna]);
+  }, [exchangeAmountUSD, manualRate, formData.tipo_movimiento, cuentas]);
 
   // ... (rest of logic)
 
@@ -939,7 +944,8 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     return () => window.removeEventListener("keydown", handleEsc);
   }, [editingMov]);
 
-  useModalKeyboard(showForm, () => setShowForm(false), handleSubmit, { disabled: submitting });
+  // Escape is global; Enter is handled once by the form container below.
+  useModalKeyboard(showForm, () => setShowForm(false), undefined, { disabled: submitting });
 
   async function handleSubmit() {
     setFormError(null);
@@ -996,6 +1002,84 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       setAdjuntos([]);
       refreshBalance();
       loadData();
+      return;
+    }
+
+    if (formData.tipo_movimiento === "CAMBIO_MONEDA") {
+      const usdAmount = Number(exchangeAmountUSD);
+      const exchangeRate = Number(manualRate);
+      const usdAccount = cuentas.find(
+        (cuenta) => cuenta.moneda === "USD" && cuenta.tipo_cuenta === "EFECTIVO",
+      );
+      const arsAccount = cuentas.find(
+        (cuenta) => cuenta.moneda === "ARS" && cuenta.tipo_cuenta === "EFECTIVO",
+      );
+
+      if (!Number.isFinite(usdAmount) || usdAmount <= 0) {
+        setFormError("El monto en USD debe ser mayor a cero");
+        return;
+      }
+
+      if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+        setFormError("Ingresa la cotización pactada con la casa de cambio");
+        return;
+      }
+
+      if (!usdAccount || !arsAccount) {
+        setFormError("Falta configurar una cuenta de efectivo USD o ARS para registrar el cambio");
+        return;
+      }
+
+      if (submitInFlightRef.current) return;
+      submitInFlightRef.current = true;
+      setSubmitting(true);
+
+      const idempotencyKey = exchangeSubmissionKeyRef.current || crypto.randomUUID();
+      exchangeSubmissionKeyRef.current = idempotencyKey;
+
+      try {
+        const result = await createCajaAdminExchangeSecure({
+          sucursalId: sucursal.id,
+          fechaMovimiento: formData.fecha_movimiento,
+          descripcion: formData.descripcion,
+          nota: formData.nota || undefined,
+          adjuntos,
+          usdAmount,
+          exchangeRate,
+          bnaReference: tcBna,
+          usdAccountId: usdAccount.id,
+          arsAccountId: arsAccount.id,
+          idempotencyKey,
+        });
+
+        if (!result.success) {
+          setFormError(result.error || "No se pudo registrar el cambio de moneda");
+          return;
+        }
+
+        exchangeSubmissionKeyRef.current = null;
+        setShowForm(false);
+        setFormData({
+          tipo_movimiento: "EGRESO",
+          subtipo: "",
+          descripcion: "",
+          nota: "",
+          fecha_movimiento: getLocalISODate(),
+          personal_id: "",
+          liquidacion_id: "",
+        });
+        setExchangeAmountUSD("");
+        setManualRate("");
+        setFormLineas([]);
+        setAdjuntos([]);
+        refreshBalance();
+        loadData();
+      } catch (error) {
+        setFormError(error instanceof Error ? error.message : "No se pudo registrar el cambio de moneda");
+      } finally {
+        submitInFlightRef.current = false;
+        setSubmitting(false);
+      }
       return;
     }
 
@@ -1731,17 +1815,20 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
 
                   <div className="flex-[1.2]">
                     <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-[0.2em]">
-                      Cotización <span className="text-[9px] lowercase font-medium ml-1 opacity-60">(Oficial: ${tcBna})</span>
+                      Cotización pactada
                     </label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-[55%] text-slate-300 font-black text-lg">AR$</span>
                       <MoneyInput
-                        value={Number(manualRate) || tcBna || 0}
+                        value={Number(manualRate) || 0}
                         onChange={(val) => setManualRate(String(val))}
-                        placeholder={tcBna ? String(tcBna) : "0"}
+                        placeholder="Cotización de la casa de cambio"
                         className="w-full h-14 text-xl font-bold pl-12 bg-white dark:bg-slate-950 border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-inner focus:ring-4 ring-blue-500/10 transition-all"
                       />
                     </div>
+                    <p className="mt-2 text-[10px] text-slate-400">
+                      Casa de cambio · BNA solo referencia: {tcBna ? `$${tcBna.toLocaleString("es-AR")}` : "no disponible"}
+                    </p>
                   </div>
 
                   <div className="flex-[2] pt-2 md:pt-6">
@@ -1757,7 +1844,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                               maximumFractionDigits: 0
                             }).format(
                               (parseFloat(exchangeAmountUSD) || 0) *
-                              (parseFloat(manualRate) || tcBna || 0),
+                              (parseFloat(manualRate) || 0),
                             )}
                           </span>
                           <span className="text-[10px] text-blue-200 mt-1 font-medium opacity-80 italic">ARS Físico</span>
@@ -1779,7 +1866,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                     </div>
                     <div>
                       <span className="block font-bold text-green-400">INGRESO:</span>
-                      Caja ARS Físico: <b>+AR$ {((parseFloat(exchangeAmountUSD) || 0) * (parseFloat(manualRate) || tcBna || 0)).toLocaleString('es-AR')}</b>
+                      Caja ARS Físico: <b>+AR$ {((parseFloat(exchangeAmountUSD) || 0) * (parseFloat(manualRate) || 0)).toLocaleString('es-AR')}</b>
                     </div>
                   </div>
                 </details>
@@ -1947,7 +2034,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       )}
 
       {/* Movements Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-x-auto">
         {loading ? (
           <div className="p-12 text-center text-slate-400">
             <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4" />
@@ -1959,7 +2046,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
             <p>No hay movimientos para este período</p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[1400px]">
             <thead className="bg-slate-50 dark:bg-slate-900">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">
@@ -1989,7 +2076,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                 <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">
                   Comprobantes
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase sticky right-0 bg-slate-50 dark:bg-slate-900 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.8)]">
                   Acciones
                 </th>
               </tr>
@@ -2115,7 +2202,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                     key={mov.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
+                    className={`${mov.estado === "Anulado" ? "opacity-55 bg-slate-100/70 dark:bg-slate-950/50" : "hover:bg-slate-50 dark:hover:bg-slate-900/50"} transition-colors`}
                   >
                     <td className="px-6 py-4 text-sm">
                       {new Date(mov.fecha_hora).toLocaleDateString("es-AR")}
@@ -2137,7 +2224,14 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium">
-                      <div>{mov.descripcion}</div>
+                      <div className="flex items-center gap-2">
+                        <span>{mov.descripcion}</span>
+                        {mov.estado === "Anulado" && (
+                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                            ANULADO
+                          </span>
+                        )}
+                      </div>
                       {mov.nota && (
                         <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 font-normal line-clamp-1 italic" title={mov.nota}>
                           {mov.nota}
@@ -2145,7 +2239,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">
-                      {mov.subtipo || "-"}
+                      {mov.tipo_movimiento === "CAMBIO_MONEDA" && mov.tc_operacion
+                        ? `Casa de cambio · $${Number(mov.tc_operacion).toLocaleString("es-AR")}`
+                        : mov.subtipo || "-"}
                     </td>
                     {(() => {
                       let finalArs = (mov.caja_admin_movimiento_lineas || [])
@@ -2217,7 +2313,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                         <span className="text-xs text-slate-300 dark:text-slate-600">Sin adjunto</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-4 text-center sticky right-0 bg-white dark:bg-slate-800 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.8)]">
                       <div className="flex items-center justify-center gap-2">
                         {(mov as { registro_editado?: boolean })
                           .registro_editado && (
@@ -2231,7 +2327,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                               CSV
                             </span>
                           )}
-                        {canEditAdminAmounts && (
+                        {canEditAdminAmounts &&
+                          mov.estado !== "Anulado" &&
+                          mov.tipo_movimiento !== "CAMBIO_MONEDA" && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -2277,7 +2375,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                             <Pencil className="w-4 h-4" />
                           </Button>
                         )}
-                        {(role === "admin" || role === "owner") && (
+                        {(role === "admin" || role === "owner") && mov.estado !== "Anulado" && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -2287,7 +2385,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                               setDeletionReason("");
                             }}
                             className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                            title="Eliminar movimiento"
+                            title="Anular movimiento"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -2302,7 +2400,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
         )}
       </div>
 
-      {/* Modal de Confirmación de Eliminación */}
+      {/* Modal de Confirmación de Anulación */}
       {deletingMovId && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <motion.div
@@ -2313,19 +2411,18 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4 text-red-600 dark:text-red-400">
                 <AlertTriangle className="w-8 h-8" />
-                <h3 className="text-xl font-bold">¡Advertencia Crítica!</h3>
+                <h3 className="text-xl font-bold">Anular movimiento</h3>
               </div>
 
               <p className="text-slate-600 dark:text-slate-300 mb-4">
-                Está a punto de eliminar un registro financiero. Esta acción es{" "}
-                <strong>IRREVERSIBLE</strong> y quedará registrada en el
-                historial de auditoría.
+                El movimiento dejará de afectar los saldos, pero permanecerá visible
+                como <strong>ANULADO</strong> para conservar la trazabilidad.
               </p>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
-                    Motivo de la eliminación (Obligatorio)
+                    Motivo de la anulación (Obligatorio)
                   </label>
                   <Textarea
                     value={deletionReason}
@@ -2340,7 +2437,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
                     Para confirmar, escriba{" "}
                     <span className="font-mono font-bold select-all">
-                      ELIMINAR
+                      ANULAR
                     </span>{" "}
                     abajo:
                   </label>
@@ -2349,7 +2446,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                     value={deletionConfirmation}
                     onChange={(e) => setDeletionConfirmation(e.target.value)}
                     className="w-full px-3 py-2 border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus-visible:ring-red-500 font-mono"
-                    placeholder="ELIMINAR"
+                    placeholder="ANULAR"
                   />
                 </div>
               </div>
@@ -2365,40 +2462,30 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                 <Button
                   onClick={async () => {
                     if (
-                      deletionConfirmation !== "ELIMINAR" ||
+                      deletionConfirmation !== "ANULAR" ||
                       !deletionReason.trim()
                     )
                       return;
 
-                    // Temporary: fetch user here.
-                    const {
-                      data: { user },
-                    } = await createClient().auth.getUser();
-                    if (!user) {
-                      alert("Sesión no válida");
-                      return;
-                    }
-
-                    const { success, error } = await deleteMovimiento(
-                      deletingMovId,
-                      user.id,
-                      deletionReason,
-                    );
+                    const { success, error } = await anularCajaAdminMovimientoSecure({
+                      movimientoId: deletingMovId,
+                      motivo: deletionReason,
+                    });
                     if (success) {
                       setDeletingMovId(null);
                       loadData();
                     } else {
-                      alert("Error al eliminar: " + error);
+                      alert("Error al anular: " + error);
                     }
                   }}
                   disabled={
-                    deletionConfirmation !== "ELIMINAR" ||
+                    deletionConfirmation !== "ANULAR" ||
                     !deletionReason.trim()
                   }
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-lg shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Confirmar Eliminación
+                  Confirmar Anulación
                 </Button>
               </div>
             </div>
