@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_BACKGROUND_BRUSH_MODE, eraseContiguousColor, paintSelectionMask, scaleMagicWandTolerance } from './magic-wand';
+import {
+    DEFAULT_BACKGROUND_BRUSH_MODE,
+    DEFAULT_MAGIC_WAND_TOLERANCE,
+    eraseContiguousColor,
+    paintSelectionMask,
+    scaleMagicWandTolerance,
+} from './magic-wand';
 
 function pixels(colors: Array<[number, number, number, number]>) {
     return new Uint8ClampedArray(colors.flat());
@@ -39,4 +45,8 @@ test('scaleMagicWandTolerance clamps the UI range and favors precision', () => {
 
 test('manual background editing starts in erase mode', () => {
     assert.equal(DEFAULT_BACKGROUND_BRUSH_MODE, 'erase');
+});
+
+test('intraoral magic wand starts at the clinically preferred tolerance', () => {
+    assert.equal(DEFAULT_MAGIC_WAND_TOLERANCE, 65);
 });
