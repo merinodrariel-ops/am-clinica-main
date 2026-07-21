@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
     buildCenteredAspectCrop,
     getCropAspectPreset,
+    shouldPreserveCanvasLayerAlpha,
     shouldExportPhotoAsPng,
 } from './crop-aspects';
 
@@ -29,5 +30,11 @@ describe('photo studio crop aspect helpers', () => {
         assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: false, bgColor: 'transparent', hasTransparentBg: true }), true);
         assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: false, bgColor: 'transparent', mimeType: 'image/png' }), true);
         assert.equal(shouldExportPhotoAsPng({ fileName: 'rostro.jpg', bgDone: false, bgColor: 'transparent', mimeType: 'image/jpeg' }), false);
+    });
+
+    it('keeps alpha while rotating or cropping a removed-background canvas layer', () => {
+        assert.equal(shouldPreserveCanvasLayerAlpha({ source: '/api/drive/file/face', backgroundRemoved: true }), true);
+        assert.equal(shouldPreserveCanvasLayerAlpha({ source: 'blob:facial-cutout' }), true);
+        assert.equal(shouldPreserveCanvasLayerAlpha({ source: 'https://example.test/face.jpg' }), false);
     });
 });

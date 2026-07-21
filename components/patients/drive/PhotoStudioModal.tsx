@@ -18,7 +18,7 @@ import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAc
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import FabricCanvasStage from './FabricCanvasStage';
-import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
+import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, shouldPreserveCanvasLayerAlpha, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
@@ -45,6 +45,7 @@ import {
     getCanvasDocumentContextTargets,
     updateCanvasDocumentSelection,
 } from '@/lib/photo-studio/canvas-selection';
+import { buildDriveImageInfoTitle } from '@/lib/photo-studio/drive-image-info';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -808,6 +809,9 @@ export default function PhotoStudioModal({
     const activeCanvas = canvases.find(c => c.id === activeCanvasId) ?? null;
     const canvasLayers: CanvasLayer[] = activeCanvas?.layers ?? [];
     const canvasRatio: CanvasRatio = (activeCanvas?.ratio as CanvasRatio) ?? '1:1';
+    const hasUnsavedCanvasAssets = Boolean(activeCanvas?.layers.some(
+        layer => layer.src.startsWith('blob:') || layer.src.startsWith('data:')
+    ));
 
     // Setters that update the active canvas inside canvases[]
     const setCanvasLayers = useCallback((updater: CanvasLayer[] | ((prev: CanvasLayer[]) => CanvasLayer[])) => {
@@ -893,6 +897,13 @@ export default function PhotoStudioModal({
         if (!activeCanvasId || activeCanvasId.startsWith('legacy-')) return;
         if (!activeCanvas) return;
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        // A blob/data URL only exists in this browser session. Saving it into the
+        // editable document would make the layer disappear after reload. Wait for
+        // the user's explicit Save, which materializes it as an internal Drive asset.
+        if (activeCanvas.layers.some(layer => layer.src.startsWith('blob:') || layer.src.startsWith('data:'))) {
+            setCanvasSaving(false);
+            return;
+        }
         saveTimerRef.current = setTimeout(async () => {
             setCanvasSaving(true);
             const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
@@ -918,6 +929,7 @@ export default function PhotoStudioModal({
     const [canvasLayerCropRotation, setCanvasLayerCropRotation] = useState(0);
     const [canvasLayerCropBakedSrc, setCanvasLayerCropBakedSrc] = useState<string | null>(null);
     const canvasLayerCropPreBakeRef = useRef<string | null>(null); // layer.src before any rotation bake
+    const canvasLayerCropPreserveAlphaRef = useRef(false);
     const canvasLayerCropRebakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const canvasLayerCropImgRef = useRef<HTMLImageElement>(null);
     const canvasLayersRef = useRef<HTMLCanvasElement>(null);
@@ -1397,8 +1409,9 @@ export default function PhotoStudioModal({
                 ctx.rotate(radians);
                 ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
+                const mime = canvasLayerCropPreserveAlphaRef.current ? 'image/png' : 'image/jpeg';
                 const blob = await new Promise<Blob>((res, rej) =>
-                    canvas.toBlob(b => b ? res(b) : rej(new Error('null')), 'image/jpeg', 0.95)
+                    canvas.toBlob(b => b ? res(b) : rej(new Error('null')), mime, 0.95)
                 );
                 const newUrl = URL.createObjectURL(blob);
                 setCanvasLayerCropBakedSrc(prev => {
@@ -1688,7 +1701,7 @@ export default function PhotoStudioModal({
         setShowGrid(false);
         setBrushMode(null);
         setMagicWandActive(false);
-        setMagicWandTolerance(15);
+        setMagicWandTolerance(DEFAULT_MAGIC_WAND_TOLERANCE);
         setHealMode(false);
         hideHealCursor();
         offscreenCanvasRef.current = null;
@@ -2348,35 +2361,13 @@ export default function PhotoStudioModal({
             createdBlobUrlsRef.current.push(newUrl);
             
             if (selectedLayer) {
-                let baseName = 'recorte';
-                if (selectedLayer.fileId) {
-                    baseName = `recorte_${selectedLayer.fileId}`;
-                }
-                const filename = `${baseName}_${Date.now()}.png`;
-                
-                const formData = new FormData();
-                formData.append('file', new File([resultBlob], filename, { type: 'image/png' }));
-                
-                const saveToastId = toast.loading('Guardando recorte en Drive...');
-                try {
-                    const uploadRes = await uploadEditedPhotoAction(folderId, filename, formData);
-                    if (uploadRes.error || !uploadRes.fileId) {
-                        console.error('[canvas-layer-bg-upload] error:', uploadRes.error);
-                        const img = await loadCanvasImage(newUrl);
-                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img, backgroundRemoved: true } : l));
-                        toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
-                    } else {
-                        const driveUrl = `/api/drive/file/${uploadRes.fileId}`;
-                        const img = await loadCanvasImage(driveUrl);
-                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: driveUrl, img, fileId: uploadRes.fileId, backgroundRemoved: true } : l));
-                        toast.success('Fondo de capa eliminado y guardado en Drive', { id: saveToastId });
-                    }
-                } catch (uploadErr) {
-                    console.error('[canvas-layer-bg-upload] exception:', uploadErr);
-                    const img = await loadCanvasImage(newUrl);
-                    setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img, backgroundRemoved: true } : l));
-                    toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
-                }
+                const img = await loadCanvasImage(newUrl);
+                setCanvasLayers(prev => prev.map(layer =>
+                    layer.id === selectedLayer.id
+                        ? { ...layer, src: newUrl, img, fileId: undefined, backgroundRemoved: true }
+                        : layer
+                ));
+                toast.success('Fondo de capa eliminado. Se guardará solamente cuando guardes el lienzo.');
             } else {
                 objectUrlRef.current = newUrl;
                 preCropImageRef.current = null; // bg changed — crop reference must be refreshed
@@ -3324,6 +3315,10 @@ export default function PhotoStudioModal({
         if (!layer) return;
         const initialRot = layer.rotation ?? 0;
         canvasLayerCropPreBakeRef.current = layer.src;
+        canvasLayerCropPreserveAlphaRef.current = shouldPreserveCanvasLayerAlpha({
+            source: layer.src,
+            backgroundRemoved: layer.backgroundRemoved,
+        });
         setCanvasLayerCropRotation(initialRot);
         setCanvasLayerCropBakedSrc(initialRot === 0 ? layer.src : null);
         setCanvasLayerCropId(layer.id);
@@ -3366,10 +3361,12 @@ export default function PhotoStudioModal({
         cc.width = srcW; cc.height = srcH;
         cc.getContext('2d')!.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
         try {
+            const mime = canvasLayerCropPreserveAlphaRef.current ? 'image/png' : 'image/jpeg';
             const blob = await new Promise<Blob>((res, rej) =>
-                cc.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/jpeg', 0.95)
+                cc.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), mime, 0.95)
             );
             const newUrl = URL.createObjectURL(blob);
+            createdBlobUrlsRef.current.push(newUrl);
             const newImg = await loadCanvasImage(newUrl);
             setCanvasLayers(prev => prev.map(l => {
                 if (l.id !== canvasLayerCropId) return l;
@@ -3383,6 +3380,7 @@ export default function PhotoStudioModal({
                 return null;
             });
             canvasLayerCropPreBakeRef.current = null;
+            canvasLayerCropPreserveAlphaRef.current = false;
             setCanvasLayerCropId(null);
         } catch {
             toast.error('No se pudo aplicar el recorte');
@@ -5367,6 +5365,35 @@ export default function PhotoStudioModal({
         }
     }
 
+    async function materializeCanvasLayersForSave(canvasDocument: CanvasDoc): Promise<CanvasLayer[]> {
+        const { uploadCanvasLayerAssetAction } = await import('@/app/actions/patient-files-drive');
+        const persisted: CanvasLayer[] = [];
+
+        for (const layer of canvasDocument.layers) {
+            if (!layer.src.startsWith('blob:') && !layer.src.startsWith('data:')) {
+                persisted.push(layer);
+                continue;
+            }
+
+            const response = await fetch(layer.src);
+            if (!response.ok) throw new Error('No se pudo leer una capa temporal del lienzo');
+            const sourceBlob = await response.blob();
+            const blob = await shrinkBlobForUpload(sourceBlob);
+            const formData = new FormData();
+            formData.append('file', blob, 'recurso-lienzo');
+            const upload = await uploadCanvasLayerAssetAction(folderId, canvasDocument.id, formData);
+            if (upload.error || !upload.fileId) {
+                throw new Error(upload.error || 'No se pudo guardar una capa del lienzo');
+            }
+
+            const src = `/api/drive/file/${upload.fileId}?cors=1`;
+            const img = await loadCanvasImage(src);
+            persisted.push({ ...layer, src, img, fileId: upload.fileId });
+        }
+
+        return persisted;
+    }
+
     async function handleSaveToDrive(mode: 'replace' | 'copy', dest: 'patient' | 'social') {
         if (!activeFile) return;
         if (canvasActive && mode === 'replace') {
@@ -5375,13 +5402,22 @@ export default function PhotoStudioModal({
         }
         setSaving(mode);
         try {
+            let canvasLayersForSave = activeCanvas?.layers ?? [];
             // A flattened JPG/PNG is only the deliverable. Persist the layer document first
             // so the same canvas can be reopened and adjusted later.
             if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
+                canvasLayersForSave = await materializeCanvasLayersForSave(activeCanvas);
+                if (canvasLayersForSave !== activeCanvas.layers) {
+                    setCanvases(prev => prev.map(canvasDocument =>
+                        canvasDocument.id === activeCanvas.id
+                            ? { ...canvasDocument, layers: canvasLayersForSave }
+                            : canvasDocument
+                    ));
+                }
                 const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
                 const editableSave = await savePatientCanvasAction({
                     id: activeCanvas.id,
-                    layers: activeCanvas.layers.map(layer => ({ ...layer, img: undefined })),
+                    layers: canvasLayersForSave.map(layer => ({ ...layer, img: undefined })),
                     ratio: activeCanvas.ratio,
                     bgColor: activeCanvas.bgColor,
                 });
@@ -5546,7 +5582,7 @@ export default function PhotoStudioModal({
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
                     <button
                         onClick={async () => {
-                            if (isDirty && !confirm('Tenés cambios sin guardar. ¿Salir de todas formas?')) return;
+                            if ((isDirty || hasUnsavedCanvasAssets) && !confirm('Tenés cambios sin guardar. ¿Salir de todas formas?')) return;
                             await flushPhotoStateSave();
                             onClose();
                         }}
@@ -5568,7 +5604,10 @@ export default function PhotoStudioModal({
                                     <Loader2 size={10} className="animate-spin" /> guardando…
                                 </span>
                             )}
-                            {canvasActive && !canvasSaving && (
+                            {canvasActive && !canvasSaving && hasUnsavedCanvasAssets && (
+                                <span className="text-[10px] text-amber-300/80">cambios sin guardar</span>
+                            )}
+                            {canvasActive && !canvasSaving && !hasUnsavedCanvasAssets && (
                                 <span className="text-[10px] text-emerald-300/60">proyecto editable</span>
                             )}
                         </p>
@@ -5850,6 +5889,7 @@ export default function PhotoStudioModal({
                                     <button
                                         key={f.id}
                                         draggable
+                                        title={buildDriveImageInfoTitle(f)}
                                         onContextMenu={(e) => openThumbnailContextMenu(e, f)}
                                         onDragStart={(e) => {
                                             if (canvasActive) {
@@ -6508,13 +6548,18 @@ export default function PhotoStudioModal({
                                 return (
                                 <button
                                     key={`edited-${editedFile.id}`}
+                                    draggable
+                                    onDragStart={(event) => {
+                                        preparePhotoStudioCanvasDrag(event.dataTransfer, editedFile.id);
+                                        event.dataTransfer.effectAllowed = 'copy';
+                                    }}
                                     onClick={(event) => handleThumbnailSelect(editedFile, event)}
                                     onContextMenu={(event) => openThumbnailContextMenu(event, editedFile)}
                                     aria-pressed={isEditedOutputSelected}
                                     className={`relative flex flex-shrink-0 flex-col items-center gap-1 ${
                                         isEditedOutputSelected || (!canvasActive && activeFile.id === editedFile.id) ? 'text-[#C9A96E]' : 'text-white/55'
                                     }`}
-                                    title={`Abrir resultado ${editedFile.name}`}
+                                    title={buildDriveImageInfoTitle(editedFile)}
                                 >
                                     <span className={`relative block h-14 w-20 overflow-hidden rounded-lg border-2 ${
                                         isEditedOutputSelected
@@ -6522,7 +6567,7 @@ export default function PhotoStudioModal({
                                             : !canvasActive && activeFile.id === editedFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
                                     }`}>
                                         {editedFile.thumbnailLink ? (
-                                            <img src={editedFile.thumbnailLink} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                                            <img src={editedFile.thumbnailLink} alt="" referrerPolicy="no-referrer" draggable={false} className="pointer-events-none h-full w-full object-cover" />
                                         ) : (
                                             <span className="flex h-full w-full items-center justify-center bg-white/5"><ImageIcon size={16} /></span>
                                         )}

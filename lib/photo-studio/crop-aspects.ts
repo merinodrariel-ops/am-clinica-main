@@ -57,3 +57,14 @@ export function shouldExportPhotoAsPng(options: {
     const isOriginalPng = options.fileName.toLowerCase().endsWith('.png') || options.mimeType === 'image/png';
     return !!options.hasTransparentBg || isOriginalPng;
 }
+
+export function shouldPreserveCanvasLayerAlpha(options: {
+    source: string;
+    backgroundRemoved?: boolean;
+}): boolean {
+    if (options.backgroundRemoved) return true;
+    const source = options.source.toLowerCase();
+    return source.startsWith('blob:') ||
+        source.startsWith('data:image/png') ||
+        /\.png(?:$|[?#])/.test(source);
+}
