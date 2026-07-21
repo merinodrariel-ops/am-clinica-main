@@ -717,14 +717,14 @@ export async function ensurePatientPresentationFolder(
 /**
  * List files in any folder by its ID
  */
-export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string; modifiedTime?: string; thumbnailLink?: string; size?: string }[]; error?: string }> {
+export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string; modifiedTime?: string; thumbnailLink?: string; size?: string; imageWidth?: number; imageHeight?: number }[]; error?: string }> {
     try {
         const drive = getDrive();
         const response = await drive.files.list({
             q: `'${folderId}' in parents and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
-            fields: 'files(id, name, webViewLink, mimeType, createdTime, modifiedTime, thumbnailLink, size)',
+            fields: 'files(id, name, webViewLink, mimeType, createdTime, modifiedTime, thumbnailLink, size, imageMediaMetadata(width,height))',
             orderBy: 'createdTime asc',
         });
 
@@ -738,6 +738,8 @@ export async function listFolderFiles(folderId: string): Promise<{ files?: { id:
                 modifiedTime: f.modifiedTime || undefined,
                 thumbnailLink: f.thumbnailLink || undefined,
                 size: f.size || undefined,
+                imageWidth: f.imageMediaMetadata?.width ? Number(f.imageMediaMetadata.width) : undefined,
+                imageHeight: f.imageMediaMetadata?.height ? Number(f.imageMediaMetadata.height) : undefined,
             })) || [],
         };
     } catch (error) {

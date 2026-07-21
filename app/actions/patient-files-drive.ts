@@ -58,6 +58,8 @@ export interface DriveFile {
     modifiedTime?: string;
     thumbnailLink?: string;
     size?: string;
+    imageWidth?: number;
+    imageHeight?: number;
     parentName?: string;
     relativePath?: string;
 }
@@ -79,6 +81,11 @@ export interface PatientDriveFoldersResult {
 }
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const CANVAS_ASSETS_FOLDER = '[RECURSOS INTERNOS CANVA]';
+
+function isInternalCanvasAssetsFolder(folderName: string): boolean {
+    return folderName === CANVAS_ASSETS_FOLDER;
+}
 
 function isSelectionFolderName(folderName: string): boolean {
     return folderName.startsWith('[Selección]') ||
@@ -164,7 +171,9 @@ async function listFilesRecursive(
 
     for (const item of result.files) {
         if (item.mimeType === FOLDER_MIME) {
-            subfolders.push({ id: item.id, name: item.name });
+            if (!isInternalCanvasAssetsFolder(item.name)) {
+                subfolders.push({ id: item.id, name: item.name });
+            }
         } else {
             const fileRelativePath = currentPath ? `${currentPath}/${item.name}` : item.name;
             files.push({
@@ -207,7 +216,9 @@ export async function getPatientDriveFolders(
         }
 
         const allItems = result.files || [];
-        const subfolders = allItems.filter(f => f.mimeType === FOLDER_MIME);
+        const subfolders = allItems.filter(f =>
+            f.mimeType === FOLDER_MIME && !isInternalCanvasAssetsFolder(f.name)
+        );
         const rootFiles: DriveFile[] = allItems.filter(f => f.mimeType !== FOLDER_MIME);
 
         // Only create folder stubs — DO NOT fetch files yet (lazy loaded on expand)
@@ -434,6 +445,48 @@ export async function uploadEditedPhotoAction(
 
         if (!result.success) return { error: result.error };
         return { fileId: result.fileId, webViewLink: result.webViewLink };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Persist a temporary canvas layer only when the user explicitly saves the
+ * editable canvas. Assets live in an internal folder excluded from the photo
+ * library, so they never appear as accidental edited copies.
+ */
+export async function uploadCanvasLayerAssetAction(
+    folderId: string,
+    canvasId: string,
+    formData: FormData
+): Promise<{ fileId?: string; error?: string }> {
+    try {
+        const roleCheck = await requireDriveManageRole('guardar recursos del lienzo en Drive');
+        if (roleCheck.error) return roleCheck;
+        if (!folderId || !DRIVE_ID_RE.test(folderId)) return { error: 'Carpeta inválida' };
+
+        const file = formData.get('file') as File | null;
+        if (!file) return { error: 'No file in FormData' };
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+            return { error: 'Tipo de archivo no permitido' };
+        }
+        if (file.size > 20 * 1024 * 1024) return { error: 'El archivo supera el límite de 20 MB' };
+
+        const drive = getDriveClient();
+        const { folderId: assetsFolderId, error: folderError } = await createDriveFolder(
+            drive,
+            folderId,
+            CANVAS_ASSETS_FOLDER
+        );
+        if (!assetsFolderId) return { error: folderError ?? 'No se pudo crear la carpeta interna del lienzo' };
+
+        const safeCanvasId = canvasId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80) || 'lienzo';
+        const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+        const fileName = `${safeCanvasId}_${Date.now()}.${extension}`;
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const result = await uploadFileToFolder(assetsFolderId, fileName, buffer, file.type);
+        if (!result.success) return { error: result.error };
+        return { fileId: result.fileId };
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
     }
