@@ -23,7 +23,10 @@ import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { shouldHandleGlobalPatientDriveFileDrag } from '@/lib/patient-drive-drop-routing';
+import {
+    hasPhotoStudioCanvasDragType,
+    shouldHandleGlobalPatientDriveFileDrag,
+} from '@/lib/patient-drive-drop-routing';
 import {
     getPatientAllFilesAction,
     extractSlidesAsImagesAction,
@@ -566,8 +569,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const shouldHandleGlobalFileDrag = (event: DragEvent<HTMLElement>) =>
         shouldHandleGlobalPatientDriveFileDrag({
             canUpload,
-            previewOpen: Boolean(previewFile),
+            previewOpen: Boolean(previewFile)
+                || (event.target instanceof Element && Boolean(event.target.closest('[data-photo-studio-modal="true"]'))),
             isFileDrag: isFileDrag(event),
+            isPhotoStudioCanvasDrag: hasPhotoStudioCanvasDragType(event.dataTransfer.types),
         });
 
     const resetGlobalDrag = () => {

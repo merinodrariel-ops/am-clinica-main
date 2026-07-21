@@ -28,6 +28,10 @@ import {
     resolvePhotoStudioImageLoadSuccess,
     shouldShowBlurPlaceholder,
 } from '@/lib/photo-studio-image-loading';
+import {
+    getPhotoStudioCanvasDragId,
+    preparePhotoStudioCanvasDrag,
+} from '@/lib/patient-drive-drop-routing';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -3145,7 +3149,7 @@ export default function PhotoStudioModal({
     ) {
         e.preventDefault();
         e.stopPropagation();
-        const fileId = e.dataTransfer.getData('driveFileId');
+        const fileId = getPhotoStudioCanvasDragId(e.dataTransfer);
         if (fileId) {
             try {
                 const img = await loadCanvasImage(`/api/drive/file/${fileId}?cors=1`);
@@ -4878,6 +4882,7 @@ export default function PhotoStudioModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-50 bg-[#0D0D12] flex flex-col"
+                data-photo-studio-modal="true"
             >
                 {/* ── Header ─────────────────────────────────────────────── */}
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
@@ -5163,7 +5168,7 @@ export default function PhotoStudioModal({
                                         onContextMenu={(e) => openThumbnailContextMenu(e, f)}
                                         onDragStart={(e) => {
                                             if (canvasActive) {
-                                                e.dataTransfer.setData('driveFileId', f.id);
+                                                preparePhotoStudioCanvasDrag(e.dataTransfer, f.id);
                                                 e.dataTransfer.effectAllowed = 'copy';
                                                 return;
                                             }
@@ -5205,7 +5210,7 @@ export default function PhotoStudioModal({
                                         } ${thumbnailDragId === f.id ? 'opacity-60 scale-95' : ''}`}
                                     >
                                         {f.thumbnailLink ? (
-                                            <img src={f.thumbnailLink} alt={f.name} referrerPolicy="no-referrer" className={`w-full h-full object-cover ${isDuplicating ? 'opacity-30' : ''}`} />
+                                            <img src={f.thumbnailLink} alt={f.name} referrerPolicy="no-referrer" className={`pointer-events-none w-full h-full object-cover ${isDuplicating ? 'opacity-30' : ''}`} />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-white/5">
                                                 <ImageIcon size={16} className="text-white/30" />
