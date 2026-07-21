@@ -1989,10 +1989,7 @@ export default function PhotoStudioModal({
             const { removeBackground: removeBg } = await import('@imgly/background-removal');
             const response = await fetch(srcToUse);
             const blob = await response.blob();
-            const resultBlob = await removeBg(blob, {
-                model: 'isnet_quint8',
-                device: 'gpu'
-            });
+            const resultBlob = await removeBg(blob);
             if (cancelBgRef.current) {
                 if (!selectedLayer) preBgUrlRef.current = null;
                 return;
