@@ -3144,6 +3144,7 @@ export default function PhotoStudioModal({
         dropY: number,
     ) {
         e.preventDefault();
+        e.stopPropagation();
         const fileId = e.dataTransfer.getData('driveFileId');
         if (fileId) {
             try {

@@ -23,6 +23,7 @@ import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { shouldHandleGlobalPatientDriveFileDrag } from '@/lib/patient-drive-drop-routing';
 import {
     getPatientAllFilesAction,
     extractSlidesAsImagesAction,
@@ -562,25 +563,32 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
             ? event.dataTransfer.types.includes('Files')
             : Array.from(event?.dataTransfer?.types || []).includes('Files');
 
+    const shouldHandleGlobalFileDrag = (event: DragEvent<HTMLElement>) =>
+        shouldHandleGlobalPatientDriveFileDrag({
+            canUpload,
+            previewOpen: Boolean(previewFile),
+            isFileDrag: isFileDrag(event),
+        });
+
     const resetGlobalDrag = () => {
         globalDragDepthRef.current = 0;
         setIsGlobalDragging(false);
     };
 
     const handleGlobalDragEnter = (event: DragEvent<HTMLElement>) => {
-        if (!canUpload || !isFileDrag(event)) return;
+        if (!shouldHandleGlobalFileDrag(event)) return;
         event.preventDefault();
         globalDragDepthRef.current += 1;
         setIsGlobalDragging(true);
     };
 
     const handleGlobalDragOver = (event: DragEvent<HTMLElement>) => {
-        if (!canUpload || !isFileDrag(event)) return;
+        if (!shouldHandleGlobalFileDrag(event)) return;
         event.preventDefault();
     };
 
     const handleGlobalDragLeave = (event: DragEvent<HTMLElement>) => {
-        if (!canUpload || !isFileDrag(event)) return;
+        if (!shouldHandleGlobalFileDrag(event)) return;
         event.preventDefault();
         globalDragDepthRef.current = Math.max(0, globalDragDepthRef.current - 1);
         if (globalDragDepthRef.current === 0) {
@@ -589,7 +597,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     };
 
     const handleGlobalDrop = (event: DragEvent<HTMLElement>) => {
-        if (!canUpload || !isFileDrag(event)) return;
+        if (!shouldHandleGlobalFileDrag(event)) return;
         resetGlobalDrag();
     };
 
@@ -870,7 +878,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 )}
 
                 {/* Global dropzone overlay */}
-                {canUpload && isGlobalDragging && motherFolderId && (
+                {canUpload && !previewFile && isGlobalDragging && motherFolderId && (
                     <div className="fixed inset-0 z-[70] bg-black/35 backdrop-blur-[1px] p-4 sm:p-8 flex items-center justify-center">
                         <div className="w-full max-w-3xl rounded-2xl border border-blue-400/35 bg-slate-950/85 p-6 shadow-2xl space-y-4">
                             <div className="flex items-center justify-between border-b border-white/5 pb-2">

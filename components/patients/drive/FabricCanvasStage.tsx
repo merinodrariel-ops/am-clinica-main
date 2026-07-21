@@ -312,9 +312,13 @@ export default function FabricCanvasStage({
             data-layer-count={layers.length}
             data-selected-layer={selectedId ?? ''}
             aria-label="Lienzo editable"
-            onDragOver={event => event.preventDefault()}
+            onDragOver={event => {
+                event.preventDefault();
+                event.stopPropagation();
+            }}
             onDrop={event => {
                 event.preventDefault();
+                event.stopPropagation();
                 const rect = event.currentTarget.getBoundingClientRect();
                 onDrop(
                     event,
