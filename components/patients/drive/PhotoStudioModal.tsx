@@ -17,10 +17,12 @@ import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
+import FabricCanvasStage from './FabricCanvasStage';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
+import { DEFAULT_BACKGROUND_BRUSH_MODE, eraseContiguousColor, paintSelectionMask, scaleMagicWandTolerance } from '@/lib/photo-studio/magic-wand';
 import { shouldStartPhotoStudioInPresentation } from '@/lib/photo-studio/mobile-presentation';
 import {
     createPhotoStudioImageLoadState,
@@ -28,6 +30,10 @@ import {
     resolvePhotoStudioImageLoadSuccess,
     shouldShowBlurPlaceholder,
 } from '@/lib/photo-studio-image-loading';
+import {
+    getPhotoStudioCanvasDragId,
+    preparePhotoStudioCanvasDrag,
+} from '@/lib/patient-drive-drop-routing';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -326,7 +332,7 @@ function clampMenuToViewport(x: number, y: number, width: number, height: number
 // CDN cache when a photo is replaced in place (same fileId, new bytes).
 function driveImageUrl(f: { id: string; modifiedTime?: string }): string {
     const v = f.modifiedTime ? `&v=${encodeURIComponent(f.modifiedTime)}` : '';
-    return `/api/drive/file/${f.id}?cors=1${v}`;
+    return `/api/drive/file/${encodeURIComponent(f.id)}?cors=1${v}`;
 }
 
 function driveThumbnailUrl(f: { id: string; modifiedTime?: string; thumbnailLink?: string }): string | null {
@@ -883,6 +889,8 @@ export default function PhotoStudioModal({
     }, [activeCanvasId, activeCanvas]);
 
     const [canvasSelectedId, setCanvasSelectedId] = useState<string | null>(null);
+    const [canvasLayerInteracting, setCanvasLayerInteracting] = useState(false);
+    const [rotationGridAssist, setRotationGridAssist] = useState(false);
     const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; layerId: string } | null>(null);
     const [canvasLayerCropId, setCanvasLayerCropId] = useState<string | null>(null);
     const [canvasLayerCropAspectPreset, setCanvasLayerCropAspectPreset] = useState<CropAspectPresetId>('free');
@@ -947,8 +955,8 @@ export default function PhotoStudioModal({
     const activeImageModifiedTime = activeFile?.modifiedTime;
     const activeImageThumbnailLink = activeFile?.thumbnailLink;
 
-    // Track loading per active URL so stale onLoad/onError events from rapid thumbnail
-    // switches cannot leave the editor stuck on the blurred placeholder.
+    // Each active URL owns its loading state, so late events from rapid thumbnail
+    // switches cannot mark the current photo as loaded or leave it blurred.
     useEffect(() => {
         if (!activeFile || !imageUrl) {
             setImageLoadState(null);
@@ -973,6 +981,13 @@ export default function PhotoStudioModal({
     const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
     const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
     const [cropAspectPreset, setCropAspectPreset] = useState<CropAspectPresetId>('free');
+    const selectedCanvasLayer = canvasActive && canvasSelectedId
+        ? canvasLayers.find(layer => layer.id === canvasSelectedId) ?? null
+        : null;
+    const effectiveBgDone = selectedCanvasLayer
+        ? Boolean(selectedCanvasLayer.backgroundRemoved)
+        : bgDone;
+    const isAlignmentGridVisible = showGrid || isDragging || canvasLayerInteracting || rotationGridAssist;
     const activeCropAspect = getCropAspectPreset(cropAspectPreset).aspect;
     const cropActiveRef = useRef(false);
     useEffect(() => { cropActiveRef.current = cropActive; }, [cropActive]);
@@ -984,7 +999,7 @@ export default function PhotoStudioModal({
     const [brushSize, setBrushSize] = useState(40);
     const [brushFeather, setBrushFeather] = useState(80);
     const [magicWandActive, setMagicWandActive] = useState(false);
-    const [magicWandTolerance, setMagicWandTolerance] = useState(25);
+    const [magicWandTolerance, setMagicWandTolerance] = useState(50);
     const [exportFileName, setExportFileName] = useState('');
     const [healMode, setHealMode] = useState(false);
     const [healSize, setHealSize] = useState(16);
@@ -993,7 +1008,13 @@ export default function PhotoStudioModal({
     const manualBackgroundToolActive = brushMode !== null || magicWandActive || healMode;
 
     type PhotoSnapshot = { kind: 'photo'; imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor; hasTransparentBg?: boolean };
-    type CanvasLayerSnapshot = { kind: 'canvas-layer'; canvasId: string; layerId: string; layerSrc: string };
+    type CanvasLayerSnapshot = {
+        kind: 'canvas-layer';
+        canvasId: string;
+        layerId: string;
+        layerSrc: string;
+        backgroundRemoved?: boolean;
+    };
     type Snapshot = PhotoSnapshot | CanvasLayerSnapshot;
     const [history, setHistory] = useState<Snapshot[]>([]);
     const [redoStack, setRedoStack] = useState<Snapshot[]>([]);
@@ -1410,6 +1431,10 @@ export default function PhotoStudioModal({
 
         return [...ordered, ...byId.values()];
     }, [baseImageFiles, imageOrderIds]);
+    const editedOutputFiles = useMemo(
+        () => imageFiles.filter(item => editedFileIds.has(item.id) || item.name.toLowerCase().includes('_editada')),
+        [editedFileIds, imageFiles],
+    );
 
     // Prefetch neighboring photos so arrow-key navigation feels instant.
     // Warms the small placeholder for a ±2 window (cheap) and the full-res original
@@ -2104,7 +2129,12 @@ export default function PhotoStudioModal({
                         ...canvas,
                         layers: canvas.layers.map(layer =>
                             layer.id === snap.layerId
-                                ? { ...layer, src: snap.layerSrc, img }
+                                ? {
+                                    ...layer,
+                                    src: snap.layerSrc,
+                                    img,
+                                    backgroundRemoved: snap.backgroundRemoved,
+                                }
                                 : layer
                         ),
                     };
@@ -2275,10 +2305,7 @@ export default function PhotoStudioModal({
             const { removeBackground: removeBg } = await import('@imgly/background-removal');
             const response = await fetch(srcToUse);
             const blob = await response.blob();
-            const resultBlob = await removeBg(blob, {
-                model: 'isnet_quint8',
-                device: 'gpu'
-            });
+            const resultBlob = await removeBg(blob);
             if (cancelBgRef.current) {
                 if (!selectedLayer) preBgUrlRef.current = null;
                 return;
@@ -2289,7 +2316,8 @@ export default function PhotoStudioModal({
                     kind: 'canvas-layer',
                     canvasId: activeCanvasId,
                     layerId: selectedLayer.id,
-                    layerSrc: selectedLayer.src
+                    layerSrc: selectedLayer.src,
+                    backgroundRemoved: selectedLayer.backgroundRemoved,
                 });
             } else {
                 pushHistory();
@@ -2314,18 +2342,18 @@ export default function PhotoStudioModal({
                     if (uploadRes.error || !uploadRes.fileId) {
                         console.error('[canvas-layer-bg-upload] error:', uploadRes.error);
                         const img = await loadCanvasImage(newUrl);
-                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img } : l));
+                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img, backgroundRemoved: true } : l));
                         toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
                     } else {
                         const driveUrl = `/api/drive/file/${uploadRes.fileId}`;
                         const img = await loadCanvasImage(driveUrl);
-                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: driveUrl, img, fileId: uploadRes.fileId } : l));
+                        setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: driveUrl, img, fileId: uploadRes.fileId, backgroundRemoved: true } : l));
                         toast.success('Fondo de capa eliminado y guardado en Drive', { id: saveToastId });
                     }
                 } catch (uploadErr) {
                     console.error('[canvas-layer-bg-upload] exception:', uploadErr);
                     const img = await loadCanvasImage(newUrl);
-                    setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img } : l));
+                    setCanvasLayers(prev => prev.map(l => l.id === selectedLayer.id ? { ...l, src: newUrl, img, backgroundRemoved: true } : l));
                     toast.success('Fondo de capa eliminado (sesión temporal)', { id: saveToastId });
                 }
             } else {
@@ -2447,85 +2475,8 @@ export default function PhotoStudioModal({
         const width = ctx.canvas.width;
         const height = ctx.canvas.height;
         const imgData = ctx.getImageData(0, 0, width, height);
-        const data = imgData.data;
-        
-        const tolerance = (tolerancePercent / 100) * 441.67;
-        const startIdx = (startY * width + startX) * 4;
-        const targetR = data[startIdx];
-        const targetG = data[startIdx + 1];
-        const targetB = data[startIdx + 2];
-        const targetA = data[startIdx + 3];
-        
-        if (targetA === 0) return;
-        
-        const visited = new Uint8Array(width * height);
-        
-        function match(x: number, y: number): boolean {
-            const idx = (y * width + x) * 4;
-            if (data[idx + 3] === 0) return false;
-            const r = data[idx];
-            const g = data[idx + 1];
-            const b = data[idx + 2];
-            const dist = Math.sqrt((r - targetR) ** 2 + (g - targetG) ** 2 + (b - targetB) ** 2);
-            return dist <= tolerance;
-        }
-        
-        const queueX: number[] = [startX];
-        const queueY: number[] = [startY];
-        
-        while (queueX.length > 0) {
-            const cx = queueX.pop()!;
-            const cy = queueY.pop()!;
-            
-            let lx = cx;
-            while (lx > 0 && match(lx - 1, cy) && !visited[cy * width + (lx - 1)]) {
-                lx--;
-            }
-            
-            let rx = cx;
-            while (rx < width - 1 && match(rx + 1, cy) && !visited[cy * width + (rx + 1)]) {
-                rx++;
-            }
-            
-            for (let x = lx; x <= rx; x++) {
-                const idx = cy * width + x;
-                visited[idx] = 1;
-                const pIdx = idx * 4;
-                data[pIdx + 3] = 0;
-            }
-            
-            let scanUp = false;
-            let scanDown = false;
-            for (let x = lx; x <= rx; x++) {
-                if (cy > 0) {
-                    const isMatch = match(x, cy - 1);
-                    const isVisited = visited[(cy - 1) * width + x];
-                    if (isMatch && !isVisited) {
-                        if (!scanUp) {
-                            queueX.push(x);
-                            queueY.push(cy - 1);
-                            scanUp = true;
-                        }
-                    } else {
-                        scanUp = false;
-                    }
-                }
-                if (cy < height - 1) {
-                    const isMatch = match(x, cy + 1);
-                    const isVisited = visited[(cy + 1) * width + x];
-                    if (isMatch && !isVisited) {
-                        if (!scanDown) {
-                            queueX.push(x);
-                            queueY.push(cy + 1);
-                            scanDown = true;
-                        }
-                    } else {
-                        scanDown = false;
-                    }
-                }
-            }
-        }
-        
+        const visited = eraseContiguousColor(imgData, startX, startY, tolerancePercent);
+        if (!visited) return null;
         ctx.putImageData(imgData, 0, 0);
         return visited;
     }
@@ -2706,6 +2657,43 @@ export default function PhotoStudioModal({
             y: v * layer.img.naturalHeight,
             radius: Math.max(4, sizeCss * ((scaleX + scaleY) / 2)),
         };
+    }
+
+    async function handleConfirmBg() {
+        pushHistory({
+            kind: 'photo',
+            imageUrl: preBgUrlRef.current ?? imageUrl,
+            rotation,
+            brightness,
+            bgDone: false,
+            bgColor: 'transparent',
+            hasTransparentBg,
+        });
+        const img = await loadCanvasImage(imageUrl);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d')!;
+        if (bgColor === 'white' || bgColor === 'black') {
+            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#111111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.drawImage(img, 0, 0);
+        const isPng = bgColor === 'transparent';
+        canvas.toBlob(blob => {
+            if (!blob) return;
+            const newUrl = URL.createObjectURL(blob);
+            createdBlobUrlsRef.current.push(newUrl);
+            objectUrlRef.current = newUrl;
+            setImageUrl(newUrl);
+            setBgDone(false);
+            setBgColor('transparent');
+            setHasTransparentBg(isPng);
+            setBrushMode(null);
+            offscreenCanvasRef.current = null;
+            preBgUrlRef.current = null;
+            preCropImageRef.current = null;
+        }, isPng ? 'image/png' : 'image/jpeg', 0.95);
     }
 
     function handleUndoBgRemoval() {
@@ -3124,7 +3112,7 @@ export default function PhotoStudioModal({
                 ctx.restore();
             }
         }
-    }, [canvasActive, canvasLayers, canvasSelectedId, canvasRatio, activeCanvas?.bgColor, healPreviewNonce]);
+    }, [canvasActive, canvasLayers, canvasSelectedId, canvasRatio, activeCanvas?.bgColor, healPreviewNonce, healMode]);
 
     // ── Canvas layer interaction ──────────────────────────────────────────────
     function getCanvasLayerNorm(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
@@ -3151,6 +3139,12 @@ export default function PhotoStudioModal({
             setSelectedTextId(null);
         }
     }, [canvasActive, canvasSelectedId, multiSelectedIds, selectedShapeId, selectedTextId]);
+
+    const handleFabricLayerChange = useCallback((layerId: string, patch: Partial<CanvasLayer>) => {
+        setCanvasLayers(prev => prev.map(layer =>
+            layer.id === layerId ? { ...layer, ...patch } : layer
+        ));
+    }, [setCanvasLayers]);
 
     function handleCanvasLayerPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
         if (healMode) {
@@ -3198,16 +3192,19 @@ export default function PhotoStudioModal({
                     startX: nx, startY: ny, origLayer: { ...layer },
                 };
                 setCanvasSelectedId(layer.id);
+                setCanvasLayerInteracting(true);
                 return;
             }
             if (hitTestLayerBody(layer, nx, ny, W, H)) {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 canvasLayerDragRef.current = { layerId: layer.id, mode: 'move', startX: nx, startY: ny, origLayer: { ...layer } };
                 setCanvasSelectedId(layer.id);
+                setCanvasLayerInteracting(true);
                 return;
             }
         }
         setCanvasSelectedId(null);
+        setCanvasLayerInteracting(false);
     }
 
     function handleCanvasLayerPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -3298,6 +3295,20 @@ export default function PhotoStudioModal({
             return;
         }
         canvasLayerDragRef.current = null;
+        setCanvasLayerInteracting(false);
+    }
+
+    function openCanvasLayerCrop(layerId: string) {
+        const layer = canvasLayers.find(item => item.id === layerId);
+        if (!layer) return;
+        const initialRot = layer.rotation ?? 0;
+        canvasLayerCropPreBakeRef.current = layer.src;
+        setCanvasLayerCropRotation(initialRot);
+        setCanvasLayerCropBakedSrc(initialRot === 0 ? layer.src : null);
+        setCanvasLayerCropId(layer.id);
+        setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+        setCanvasLayerCompletedCrop(null);
+        setCanvasSelectedId(null);
     }
 
     function handleCanvasLayerDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -3306,18 +3317,9 @@ export default function PhotoStudioModal({
         const ny = (e.clientY - rect.top) / rect.height;
         const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
         for (let i = canvasLayers.length - 1; i >= 0; i--) {
-            if (hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) {
-                const layer = canvasLayers[i];
-                const initialRot = layer.rotation ?? 0;
-                canvasLayerCropPreBakeRef.current = layer.src;
-                setCanvasLayerCropRotation(initialRot);
-                setCanvasLayerCropBakedSrc(initialRot === 0 ? layer.src : null); // will bake via useEffect if != 0
-                setCanvasLayerCropId(layer.id);
-                setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
-                setCanvasLayerCompletedCrop(null);
-                setCanvasSelectedId(null);
-                return;
-            }
+            if (!hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) continue;
+            openCanvasLayerCrop(canvasLayers[i].id);
+            return;
         }
     }
 
@@ -3367,16 +3369,20 @@ export default function PhotoStudioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canvasLayerCropId, canvasLayers, canvasLayerCompletedCrop]);
 
-    async function handleCanvasLayerDrop(e: React.DragEvent<HTMLCanvasElement>) {
+    async function addDroppedCanvasLayer(
+        e: React.DragEvent<HTMLElement>,
+        dropX: number,
+        dropY: number,
+    ) {
         e.preventDefault();
-        const rect = e.currentTarget.getBoundingClientRect();
-        const dropX = (e.clientX - rect.left) / rect.width;
-        const dropY = (e.clientY - rect.top) / rect.height;
-        const fileId = e.dataTransfer.getData('driveFileId');
+        e.stopPropagation();
+        const fileId = getPhotoStudioCanvasDragId(e.dataTransfer);
         if (fileId) {
             try {
                 const img = await loadCanvasImage(`/api/drive/file/${fileId}?cors=1`);
-                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, `/api/drive/file/${fileId}?cors=1`, fileId, dropX, dropY)]);
+                const layer = makeCanvasLayer(img, `/api/drive/file/${fileId}?cors=1`, fileId, dropX, dropY);
+                setCanvasLayers(prev => [...prev, layer]);
+                setCanvasSelectedId(layer.id);
             } catch { toast.error('No se pudo cargar la foto'); }
             return;
         }
@@ -3385,9 +3391,20 @@ export default function PhotoStudioModal({
             const src = URL.createObjectURL(pcFile);
             try {
                 const img = await loadCanvasImage(src);
-                setCanvasLayers(prev => [...prev, makeCanvasLayer(img, src, undefined, dropX, dropY)]);
+                const layer = makeCanvasLayer(img, src, undefined, dropX, dropY);
+                setCanvasLayers(prev => [...prev, layer]);
+                setCanvasSelectedId(layer.id);
             } catch { URL.revokeObjectURL(src); toast.error('No se pudo cargar la imagen'); }
         }
+    }
+
+    function handleCanvasLayerDrop(e: React.DragEvent<HTMLCanvasElement>) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        void addDroppedCanvasLayer(
+            e,
+            (e.clientX - rect.left) / Math.max(rect.width, 1),
+            (e.clientY - rect.top) / Math.max(rect.height, 1),
+        );
     }
 
     function handleCanvasLayerContextMenu(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -3404,6 +3421,11 @@ export default function PhotoStudioModal({
                 return;
             }
         }
+    }
+
+    function openCanvasLayerContextMenu(layerId: string, clientX: number, clientY: number) {
+        setCanvasSelectedId(layerId);
+        setCanvasContextMenu({ x: clientX, y: clientY, layerId });
     }
 
     function handleActivateCanvas(canvasId?: string) {
@@ -3714,6 +3736,7 @@ export default function PhotoStudioModal({
                 ph <= 0
             ) continue;
             ctx.save();
+            ctx.filter = `brightness(${layer.brightness ?? 100}%)`;
             ctx.translate(px, py);
             ctx.rotate(layer.rotation * Math.PI / 180);
             ctx.drawImage(img!, -pw / 2, -ph / 2, pw, ph);
@@ -3888,36 +3911,21 @@ export default function PhotoStudioModal({
         pushHistory();
         
         const octx = oc.getContext('2d')!;
-        const scaledTolerance = 10 * Math.pow(magicWandTolerance / 100, 2);
+        const scaledTolerance = scaleMagicWandTolerance(magicWandTolerance);
         const visited = scanlineFloodFillErase(octx, Math.round(x), Math.round(y), scaledTolerance);
         if (!visited) return;
         
-        // Draw the current state with a temporary selection mask (bright red) on the visible canvas
-        const canvasElement = e.currentTarget;
-        const vctx = canvasElement.getContext('2d')!;
-        drawManualPreview(canvasElement, oc);
-        
-        const tempImgData = vctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-        const tempD = tempImgData.data;
-        for (let i = 0; i < visited.length; i++) {
-            if (visited[i] === 1) {
-                const p = i * 4;
-                tempD[p] = 239;
-                tempD[p + 1] = 68;
-                tempD[p + 2] = 68;
-                tempD[p + 3] = 160; // 0.6 opacity
-            }
-        }
-        vctx.putImageData(tempImgData, 0, 0);
-        
-        // Clear selection mask after 400ms to show the clean transparent output
+        // Draw the current state with a temporary bright-red selection mask.
+        const visibleCanvas = e.currentTarget;
+        const vctx = visibleCanvas.getContext('2d')!;
+        drawManualPreview(visibleCanvas, oc);
+        const preview = vctx.getImageData(0, 0, visibleCanvas.width, visibleCanvas.height);
+        paintSelectionMask(preview, visited);
+        vctx.putImageData(preview, 0, 0);
+
         setTimeout(() => {
-            if (offscreenCanvasRef.current === oc && canvasElement) {
-                const currentCtx = canvasElement.getContext('2d');
-                if (currentCtx) {
-                    drawManualPreview(canvasElement, oc);
-                }
-            }
+            if (offscreenCanvasRef.current !== oc) return;
+            drawManualPreview(visibleCanvas, oc);
         }, 400);
         
         oc.toBlob(blob => {
@@ -5117,6 +5125,20 @@ export default function PhotoStudioModal({
         }
         setSaving(mode);
         try {
+            // A flattened JPG/PNG is only the deliverable. Persist the layer document first
+            // so the same canvas can be reopened and adjusted later.
+            if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
+                const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+                const editableSave = await savePatientCanvasAction({
+                    id: activeCanvas.id,
+                    layers: activeCanvas.layers.map(layer => ({ ...layer, img: undefined })),
+                    ratio: activeCanvas.ratio,
+                    bgColor: activeCanvas.bgColor,
+                });
+                if (editableSave.error) {
+                    throw new Error(`No se pudo guardar el lienzo editable: ${editableSave.error}`);
+                }
+            }
             const rawBlob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
             // Un PNG con transparencia a resolución completa supera el límite de 20 MB
             // del server action y la subida fallaba sin guardar nada. Lo achicamos
@@ -5136,7 +5158,9 @@ export default function PhotoStudioModal({
                     toast.error(`Error al guardar en Selección: ${result.error}`);
                     return;
                 }
-                toast.success('Guardado en la carpeta de Selección');
+                toast.success(canvasActive
+                    ? 'Copia guardada; el lienzo editable queda disponible'
+                    : 'Guardado en la carpeta de Selección');
             } else if (mode === 'replace') {
                 // Update existing file content in-place (preserves file ID, no duplicate)
                 const formData = new FormData();
@@ -5201,7 +5225,9 @@ export default function PhotoStudioModal({
                     pendingCopyIdRef.current = result.fileId;
                     markAsEdited(result.fileId);
                 }
-                toast.success('Copia guardada en Drive');
+                toast.success(canvasActive
+                    ? 'Copia guardada; el lienzo editable queda disponible'
+                    : 'Copia guardada en Drive');
                 setCleanEditSignature(currentEditSignature);
             }
 
@@ -5264,6 +5290,7 @@ export default function PhotoStudioModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-50 bg-[#0D0D12] flex flex-col"
+                data-photo-studio-modal="true"
             >
                 {/* ── Header ─────────────────────────────────────────────── */}
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
@@ -5290,6 +5317,9 @@ export default function PhotoStudioModal({
                                 <span className="text-[10px] text-white/30 flex items-center gap-1">
                                     <Loader2 size={10} className="animate-spin" /> guardando…
                                 </span>
+                            )}
+                            {canvasActive && !canvasSaving && (
+                                <span className="text-[10px] text-emerald-300/60">proyecto editable</span>
                             )}
                         </p>
                     </div>
@@ -5573,7 +5603,7 @@ export default function PhotoStudioModal({
                                         onContextMenu={(e) => openThumbnailContextMenu(e, f)}
                                         onDragStart={(e) => {
                                             if (canvasActive) {
-                                                e.dataTransfer.setData('driveFileId', f.id);
+                                                preparePhotoStudioCanvasDrag(e.dataTransfer, f.id);
                                                 e.dataTransfer.effectAllowed = 'copy';
                                                 return;
                                             }
@@ -5615,7 +5645,7 @@ export default function PhotoStudioModal({
                                         } ${thumbnailDragId === f.id ? 'opacity-60 scale-95' : ''}`}
                                     >
                                         {f.thumbnailLink ? (
-                                            <img src={f.thumbnailLink} alt={f.name} referrerPolicy="no-referrer" className={`w-full h-full object-cover ${isDuplicating ? 'opacity-30' : ''}`} />
+                                            <img src={f.thumbnailLink} alt={f.name} referrerPolicy="no-referrer" className={`pointer-events-none w-full h-full object-cover ${isDuplicating ? 'opacity-30' : ''}`} />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-white/5">
                                                 <ImageIcon size={16} className="text-white/30" />
@@ -5642,52 +5672,10 @@ export default function PhotoStudioModal({
                                 );
                             })}
 
-                            {/* Multi-canvas thumbnails */}
-                            {canvases.map((cv) => (
-                                <div key={cv.id} className="relative flex-shrink-0 group">
-                                    <button
-                                        onClick={() => { handleActivateCanvas(cv.id); clearMultiSelection(); }}
-                                        className={`relative aspect-square w-[56px] rounded-lg overflow-hidden border-2 transition-all flex flex-col items-center justify-center p-1 ${
-                                            canvasActive && activeCanvasId === cv.id
-                                                ? 'border-[#C9A96E] bg-white shadow-[0_0_15px_rgba(201,169,110,0.3)]'
-                                                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
-                                        }`}
-                                        title={cv.name}
-                                    >
-                                        <CanvasThumbnailPreview
-                                            layers={cv.layers}
-                                            bgColor={cv.bgColor}
-                                            ratio={cv.ratio}
-                                        />
-                                        {cv.layers.length > 0 && (
-                                            <span className="absolute top-0.5 right-0.5 text-[7px] bg-[#C9A96E]/80 text-black rounded px-0.5 font-bold">
-                                                {cv.layers.length}
-                                            </span>
-                                        )}
-                                    </button>
-                                    {/* Delete button — always visible so it works on touch and with a single canvas */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteCanvas(cv.id); }}
-                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center z-10"
-                                        title="Eliminar lienzo"
-                                    >
-                                        <X size={8} />
-                                    </button>
-                                </div>
-                            ))}
-
-                            {/* Add new canvas button */}
-                            <button
-                                onClick={handleNewCanvas}
-                                className="flex-shrink-0 aspect-square w-[56px] rounded-lg border-2 border-dashed border-white/20 hover:border-[#C9A96E]/60 hover:bg-white/5 transition-all flex flex-col items-center justify-center gap-0.5"
-                                title="Nuevo lienzo"
-                            >
-                                <Plus size={14} className="text-white/40 group-hover:text-[#C9A96E]" />
-                                <span className="text-[8px] text-white/30 uppercase tracking-wider">Nuevo</span>
-                            </button>
                         </div>
                     </div>
 
+                    <div className="flex min-w-0 flex-1 flex-col">
                     {/* Canvas area */}
                     <div
                         ref={canvasContainerRef}
@@ -5797,23 +5785,40 @@ export default function PhotoStudioModal({
                                 <div className={`relative inline-block ${canvasBg}`}>
                                     {canvasActive ? (
                                         <>
-                                        <canvas
-                                            ref={canvasLayersRef}
-                                            tabIndex={0}
-                                            style={{
-                                                ...getCanvasRatioStyle(),
-                                                outline: 'none', // avoid focus ring on canvas
-                                                cursor: healMode ? 'crosshair' : 'default',
-                                            }}
-                                            onPointerDown={handleCanvasLayerPointerDown}
-                                            onPointerMove={handleCanvasLayerPointerMove}
-                                            onPointerUp={handleCanvasLayerPointerUp}
-                                            onPointerLeave={() => { handleCanvasLayerPointerUp(); hideHealCursor(); }}
-                                            onDoubleClick={handleCanvasLayerDoubleClick}
-                                            onDragOver={e => e.preventDefault()}
-                                            onDrop={handleCanvasLayerDrop}
-                                            onContextMenu={handleCanvasLayerContextMenu}
-                                        />
+                                        {healMode ? (
+                                            <canvas
+                                                ref={canvasLayersRef}
+                                                tabIndex={0}
+                                                style={{
+                                                    ...getCanvasRatioStyle(),
+                                                    outline: 'none',
+                                                    cursor: 'crosshair',
+                                                }}
+                                                onPointerDown={handleCanvasLayerPointerDown}
+                                                onPointerMove={handleCanvasLayerPointerMove}
+                                                onPointerUp={handleCanvasLayerPointerUp}
+                                                onPointerLeave={() => { handleCanvasLayerPointerUp(); hideHealCursor(); }}
+                                                onDoubleClick={handleCanvasLayerDoubleClick}
+                                                onDragOver={e => e.preventDefault()}
+                                                onDrop={handleCanvasLayerDrop}
+                                                onContextMenu={handleCanvasLayerContextMenu}
+                                            />
+                                        ) : (
+                                            <FabricCanvasStage
+                                                layers={canvasLayers}
+                                                ratio={canvasRatio}
+                                                bgColor={activeCanvas?.bgColor ?? '#ffffff'}
+                                                selectedId={canvasSelectedId}
+                                                showGrid={isAlignmentGridVisible}
+                                                toolsHidden={toolsHidden}
+                                                onSelectionChange={setCanvasSelectedId}
+                                                onLayerChange={handleFabricLayerChange}
+                                                onInteractionChange={setCanvasLayerInteracting}
+                                                onDrop={(event, x, y) => { void addDroppedCanvasLayer(event, x, y); }}
+                                                onDoubleClickLayer={openCanvasLayerCrop}
+                                                onContextMenuLayer={openCanvasLayerContextMenu}
+                                            />
+                                        )}
                                         {/* Layer crop overlay — activado con doble clic */}
                                         {canvasLayerCropId && (() => {
                                             const layer = canvasLayers.find(l => l.id === canvasLayerCropId);
@@ -5882,6 +5887,10 @@ export default function PhotoStudioModal({
                                                         <input
                                                             type="range" min={-180} max={180} step={0.5}
                                                             value={canvasLayerCropRotation}
+                                                            onPointerDown={() => setRotationGridAssist(true)}
+                                                            onPointerUp={() => setRotationGridAssist(false)}
+                                                            onPointerCancel={() => setRotationGridAssist(false)}
+                                                            onBlur={() => setRotationGridAssist(false)}
                                                             onChange={e => setCanvasLayerCropRotation(Number(e.target.value))}
                                                             className="flex-1 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
                                                         />
@@ -5929,7 +5938,7 @@ export default function PhotoStudioModal({
                                             ref={imgRef}
                                             src={imageLoadState?.displayUrl ?? imageUrl}
                                             alt={activeFile.name}
-                                            crossOrigin="anonymous"
+                                            crossOrigin={imageUrl.startsWith('blob:') || imageUrl.startsWith('data:') ? undefined : 'anonymous'}
                                             onLoad={(event) => {
                                                 const loadedUrl = event.currentTarget.getAttribute('src') || event.currentTarget.currentSrc || event.currentTarget.src;
                                                 setImageLoadState(prev => prev ? resolvePhotoStudioImageLoadSuccess(prev, loadedUrl) : prev);
@@ -5955,7 +5964,8 @@ export default function PhotoStudioModal({
                                                   : drawMode === 'selected' ? 'move'
                                                   : drawShapes.length > 0 ? 'pointer'
                                                   : 'default',
-                                            pointerEvents: (!healMode && (drawMode !== 'idle' || drawShapes.length > 0 || textToolActive || textAnnotations.length > 0)) ? 'auto' : 'none',
+                                            // Photo annotations must never intercept layer selection/resizing in canvas mode.
+                                            pointerEvents: (!canvasActive && !healMode && (drawMode !== 'idle' || drawShapes.length > 0 || textToolActive || textAnnotations.length > 0)) ? 'auto' : 'none',
                                         }}
                                         onClick={handleDrawClick}
                                         onDoubleClick={handleDrawDblClick}
@@ -6134,19 +6144,19 @@ export default function PhotoStudioModal({
                         )}
 
                         {/* Bipupillar grid overlay — full grid when rotating/toggled; center crosshair also during pan */}
-                        {(showGrid || rotation !== 0 || isDragging || zoom > 1) && (
+                        {isAlignmentGridVisible && (!canvasActive || healMode) && (
                             <svg
                                 className="absolute inset-0 w-full h-full pointer-events-none"
                                 xmlns="http://www.w3.org/2000/svg"
                             >
-                                {/* Rule-of-thirds — only when grid is explicitly active */}
-                                {(showGrid || rotation !== 0) && (<>
+                                {/* Rule-of-thirds — manual or temporarily while moving/rotating */}
+                                <>
                                     <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                     <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                     <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
                                     <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-                                </>)}
-                                {/* Center crosshair — always visible when zoomed/panning or grid active */}
+                                </>
+                                {/* Center crosshair */}
                                 <line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(255,255,255,0.75)" strokeWidth="1.5" strokeDasharray="8 4" />
                                 <line x1="50%" y1="0" x2="50%" y2="100%" stroke="rgba(255,255,255,0.45)" strokeWidth="1" strokeDasharray="8 4" />
                             </svg>
@@ -6167,6 +6177,10 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
+                                onPointerDown={() => setRotationGridAssist(true)}
+                                onPointerUp={() => setRotationGridAssist(false)}
+                                onPointerCancel={() => setRotationGridAssist(false)}
+                                onBlur={() => setRotationGridAssist(false)}
                                 onChange={e => setRotation(normalizeRotation(Number(e.target.value)))}
                                 className="w-48 md:w-64 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
                             />
@@ -6190,6 +6204,73 @@ export default function PhotoStudioModal({
                             )}
                         </div>
                     )}
+
+                    {/* Adobe Express-style project rail: editable canvases and edited outputs */}
+                    <div className="hidden md:flex h-[94px] flex-shrink-0 items-stretch border-t border-white/10 bg-[#111119]">
+                        <div className="flex w-36 flex-shrink-0 flex-col justify-center border-r border-white/10 px-4">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C9A96E]">Proyectos</span>
+                            <span className="mt-1 text-[10px] leading-tight text-white/35">Lienzos editables y resultados</span>
+                        </div>
+                        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto px-4 py-2 thin-scrollbar">
+                            {canvases.map((cv) => (
+                                <div key={cv.id} className="group relative flex flex-shrink-0 flex-col items-center gap-1">
+                                    <button
+                                        onClick={() => { handleActivateCanvas(cv.id); clearMultiSelection(); }}
+                                        className={`relative h-14 w-20 overflow-hidden rounded-lg border-2 p-0.5 transition-all ${
+                                            canvasActive && activeCanvasId === cv.id
+                                                ? 'border-[#C9A96E] bg-white shadow-[0_0_15px_rgba(201,169,110,0.3)]'
+                                                : 'border-white/10 bg-white/5 hover:border-white/30'
+                                        }`}
+                                        title={`Abrir ${cv.name}`}
+                                    >
+                                        <CanvasThumbnailPreview layers={cv.layers} bgColor={cv.bgColor} ratio={cv.ratio} />
+                                        <span className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 text-[8px] font-bold text-white">
+                                            {cv.layers.length} {cv.layers.length === 1 ? 'capa' : 'capas'}
+                                        </span>
+                                    </button>
+                                    <span className="max-w-20 truncate text-[9px] text-white/55">{cv.name}</span>
+                                    <button
+                                        onClick={(event) => { event.stopPropagation(); handleDeleteCanvas(cv.id); }}
+                                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                                        title={`Eliminar ${cv.name}`}
+                                    >
+                                        <X size={9} />
+                                    </button>
+                                </div>
+                            ))}
+                            {editedOutputFiles.map((editedFile) => (
+                                <button
+                                    key={`edited-${editedFile.id}`}
+                                    onClick={(event) => handleThumbnailSelect(editedFile, event)}
+                                    className={`relative flex flex-shrink-0 flex-col items-center gap-1 ${
+                                        !canvasActive && activeFile.id === editedFile.id ? 'text-[#C9A96E]' : 'text-white/55'
+                                    }`}
+                                    title={`Abrir resultado ${editedFile.name}`}
+                                >
+                                    <span className={`relative block h-14 w-20 overflow-hidden rounded-lg border-2 ${
+                                        !canvasActive && activeFile.id === editedFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
+                                    }`}>
+                                        {editedFile.thumbnailLink ? (
+                                            <img src={editedFile.thumbnailLink} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                                        ) : (
+                                            <span className="flex h-full w-full items-center justify-center bg-white/5"><ImageIcon size={16} /></span>
+                                        )}
+                                        <Sparkles size={10} className="absolute bottom-1 right-1 rounded-full bg-[#C9A96E] p-0.5 text-black" />
+                                    </span>
+                                    <span className="max-w-20 truncate text-[9px]">{editedFile.name}</span>
+                                </button>
+                            ))}
+                            <button
+                                onClick={handleNewCanvas}
+                                className="flex h-14 w-20 flex-shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-[#C9A96E]/40 bg-[#C9A96E]/5 text-[#C9A96E] transition-colors hover:bg-[#C9A96E]/15"
+                                title="Crear lienzo nuevo"
+                            >
+                                <Plus size={20} />
+                                <span className="text-[9px] font-bold uppercase">Nuevo</span>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
 
                     {/* Tab to restore panel when hidden */}
                     {toolsHidden && (
@@ -6421,10 +6502,10 @@ export default function PhotoStudioModal({
                                 canvasLayerCropPreBakeRef.current = null;
                                 setCanvasLayerCropId(null);
                             } : handleCancelCrop}
-                            bgProcessing={bgProcessing} bgDone={bgDone}
+                            bgProcessing={bgProcessing} bgDone={effectiveBgDone}
                             bgColor={bgColor} setBgColor={setBgColor}
                             onRemoveBg={handleRemoveBackground}
-                            onUndoBg={handleUndoBgRemoval}
+                            onUndoBg={selectedCanvasLayer ? handleUndo : handleUndoBgRemoval}
                             onCancelBg={handleCancelBgProcessing}
                             onMoveSubject={() => setSubjectTransformOpen(true)}
                             brushMode={brushMode}
@@ -6477,7 +6558,7 @@ export default function PhotoStudioModal({
                             onSetHealSize={setHealSize}
                             onReset={() => {
                                 resetEdits();
-                                setImageUrl(`/api/drive/file/${activeFile.id}?cors=1`);
+                                setImageUrl(driveImageUrl(activeFile));
                             }}
                             onUndo={handleUndo}
                             onRedo={handleRedo}
@@ -6486,7 +6567,10 @@ export default function PhotoStudioModal({
                             redoCount={redoStack.length}
                             showGrid={showGrid}
                             setShowGrid={setShowGrid}
-                            isGridVisible={showGrid || rotation !== 0}
+                            isGridVisible={isAlignmentGridVisible}
+                            onRotationInteractionStart={() => setRotationGridAssist(true)}
+                            onRotationInteractionEnd={() => setRotationGridAssist(false)}
+                            onConfirmBg={handleConfirmBg}
                             drawMode={drawMode}
                             onSetDrawMode={(mode) => {
                                 setDrawMode(mode);
@@ -6554,6 +6638,10 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
+                                onPointerDown={() => setRotationGridAssist(true)}
+                                onPointerUp={() => setRotationGridAssist(false)}
+                                onPointerCancel={() => setRotationGridAssist(false)}
+                                onBlur={() => setRotationGridAssist(false)}
                                 onChange={e => setRotation(normalizeRotation(Number(e.target.value)))}
                                 className="w-20 accent-white/70"
                             />
@@ -6621,10 +6709,10 @@ export default function PhotoStudioModal({
                         ) : (
                             <button
                                 onClick={handleRemoveBackground}
-                                disabled={bgDone}
+                                disabled={effectiveBgDone || (canvasActive && !canvasSelectedId)}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md bg-violet-600/30 text-violet-300 text-xs disabled:opacity-50"
                             >
-                                {bgDone ? <Check size={13} /> : <Wand2 size={13} />}
+                                {effectiveBgDone ? <Check size={13} /> : <Wand2 size={13} />}
                                 Sin fondo
                             </button>
                         )}
@@ -6640,13 +6728,13 @@ export default function PhotoStudioModal({
                         <button
                             onClick={() => setShowGrid(v => !v)}
                             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-                                (showGrid || rotation !== 0) ? 'bg-[#C9A96E]/30 text-[#C9A96E]' : 'bg-white/10 text-white/70'
+                                isAlignmentGridVisible ? 'bg-[#C9A96E]/30 text-[#C9A96E]' : 'bg-white/10 text-white/70'
                             }`}
                         >
                             <Grid size={13} /> Grilla
                         </button>
                         {/* Mover sujeto — mobile */}
-                        {bgDone && (
+                        {bgDone && !canvasActive && (
                             <button
                                 onClick={() => setSubjectTransformOpen(true)}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/70 transition-colors"
@@ -6654,8 +6742,8 @@ export default function PhotoStudioModal({
                                 <ArrowLeftRight size={13} /> Mover
                             </button>
                         )}
-                        {/* Revert bg removal — mobile */}
-                        {bgDone && (
+                        {/* Revertir fondo — solo en edición individual */}
+                        {bgDone && !canvasActive && (
                             <button
                                 onClick={handleUndoBgRemoval}
                                 className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white/50 transition-colors"
@@ -7292,6 +7380,9 @@ interface ToolsPanelProps {
     showGrid: boolean;
     setShowGrid: (v: boolean | ((prev: boolean) => boolean)) => void;
     isGridVisible: boolean;
+    onRotationInteractionStart: () => void;
+    onRotationInteractionEnd: () => void;
+    onConfirmBg: () => void;
     drawMode: 'idle' | 'drawing' | 'selected' | 'editing';
     onSetDrawMode: (mode: 'idle' | 'drawing' | 'selected' | 'editing') => void;
     drawVisible: boolean;
@@ -7360,8 +7451,12 @@ function ToolsPanel({
     onPushHistory,
     historyCount,
     redoCount,
-    showGrid, setShowGrid,
+    showGrid,
+    setShowGrid,
     isGridVisible,
+    onRotationInteractionStart,
+    onRotationInteractionEnd,
+    onConfirmBg,
     drawMode, onSetDrawMode,
     drawVisible, onToggleDrawVisible,
     drawColor, onSetDrawColor,
@@ -7424,7 +7519,10 @@ function ToolsPanel({
                         <input
                             type="range" min={-180} max={180} step={0.5}
                             value={rotation}
-                            onPointerDown={() => onPushHistory()}
+                            onPointerDown={() => { onPushHistory(); onRotationInteractionStart(); }}
+                            onPointerUp={onRotationInteractionEnd}
+                            onPointerCancel={onRotationInteractionEnd}
+                            onBlur={onRotationInteractionEnd}
                             onChange={(e) => setRotation(Number(e.target.value))}
                             className="w-full accent-white/70 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer"
                         />
@@ -7600,48 +7698,36 @@ function ToolsPanel({
                             </div>
                         )}
 
-                        {/* IA BG removal button - only if not done */}
-                        {!bgDone && (
-                            <div className="space-y-1">
+                        {/* Three equal, workflow-specific background tools */}
+                        <div className="grid grid-cols-3 gap-2">
                                 <button
                                     onClick={onRemoveBg}
-                                    disabled={canvasActive && !canvasSelectedId}
-                                    className="w-full py-3 rounded-xl bg-violet-600/30 text-violet-200 text-sm font-semibold hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    disabled={bgDone || (canvasActive && !canvasSelectedId)}
+                                    className="min-h-16 rounded-xl border border-violet-500/30 bg-violet-600/25 px-2 py-2 text-xs font-semibold text-violet-100 hover:bg-violet-600/45 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-1"
                                 >
-                                    <Wand2 size={18} /> Remoción de fondo facial (IA)
+                                    <Wand2 size={17} /> Facial
                                 </button>
-                                <p className="text-[10px] text-white/35 text-center leading-normal">
-                                    Recomendado únicamente para retratos y fotos de rostro.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Manual Clipping Tools Selector */}
-                        <div className="space-y-2">
-                            <p className="text-xs text-white/45 uppercase tracking-wider font-semibold">Recorte Manual</p>
-                            <div className="flex gap-2">
                                 <button
                                     onClick={() => onStartManualEraser('magic')}
-                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                    className={`min-h-16 rounded-xl border px-2 py-2 text-[11px] leading-tight font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
                                         magicWandActive
                                             ? 'bg-purple-600/20 border-purple-500 text-purple-200 shadow-md'
                                             : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
                                     }`}
                                 >
-                                    <Sparkles size={14} /> Varita Mágica
+                                    <Sparkles size={16} /> <span>Intraoral<br />Varita</span>
                                 </button>
                                 <button
-                                    onClick={() => onStartManualEraser(brushMode === 'erase' ? 'restore' : 'erase')}
-                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                    onClick={() => onStartManualEraser(DEFAULT_BACKGROUND_BRUSH_MODE)}
+                                    className={`min-h-16 rounded-xl border px-2 py-2 text-[11px] leading-tight font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
                                         brushMode !== null
-                                            ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-md'
+                                            ? 'bg-amber-500/20 border-[#C9A96E] text-[#F4D79D] shadow-md'
                                             : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
                                     }`}
                                 >
-                                    <Eraser size={14} /> Pincel
+                                    <Eraser size={16} /> <span>Intraoral<br />Pincel</span>
                                 </button>
                             </div>
-                        </div>
 
                         {/* Brush controls when active */}
                         {brushMode !== null && (
@@ -7722,7 +7808,7 @@ function ToolsPanel({
                 )}
 
                 {/* Move/scale subject (Canva-style) */}
-                {bgDone && !bgProcessing && (
+                {bgDone && !bgProcessing && !canvasActive && (
                     <button
                         onClick={onMoveSubject}
                         className="w-full py-3 rounded-xl bg-white/10 text-white/80 text-sm font-semibold hover:bg-white/15 transition-colors flex items-center justify-center gap-2"
@@ -7732,7 +7818,7 @@ function ToolsPanel({
                 )}
 
                 {/* Background color selector — only visible after bg removed */}
-                {bgDone && !bgProcessing && (
+                {bgDone && !bgProcessing && !canvasActive && (
                     <div className="space-y-1.5">
                         <p className="text-white/50 text-sm">Fondo:</p>
                         <div className="flex gap-2">
@@ -7762,7 +7848,27 @@ function ToolsPanel({
                             >
                                 <X size={18} /> Deshacer fondo
                             </button>
+                            <button
+                                onClick={onConfirmBg}
+                                className="w-full py-3 rounded-xl bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Check size={18} /> Confirmar
+                            </button>
                         </div>
+                    </div>
+                )}
+
+                {bgDone && !bgProcessing && canvasActive && canvasSelectedId && (
+                    <div className="space-y-2 rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
+                        <p className="text-sm text-violet-100">
+                            Fondo eliminado en esta foto. Podés moverla y agrandarla desde sus esquinas.
+                        </p>
+                        <button
+                            onClick={onUndoBg}
+                            className="w-full py-2 rounded-lg bg-white/10 text-white/70 text-sm font-semibold hover:bg-white/20 transition-colors"
+                        >
+                            Restaurar fondo de esta foto
+                        </button>
                     </div>
                 )}
             </div>

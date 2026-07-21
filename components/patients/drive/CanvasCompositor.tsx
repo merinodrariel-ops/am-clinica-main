@@ -20,6 +20,7 @@ export interface CanvasLayer {
     h: number;      // height, normalized 0–1
     rotation: number; // degrees
     brightness: number; // 0–200, default 100
+    backgroundRemoved?: boolean; // persisted per layer; never shared across the canvas
     img: HTMLImageElement;
 }
 

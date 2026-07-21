@@ -24,7 +24,7 @@ export function createPhotoStudioImageLoadState(input: {
 
 export function resolvePhotoStudioImageLoadSuccess(
     state: PhotoStudioImageLoadState,
-    loadedUrl: string
+    loadedUrl: string,
 ): PhotoStudioImageLoadState {
     if (loadedUrl !== state.displayUrl) return state;
     return { ...state, status: 'loaded' };
@@ -32,7 +32,7 @@ export function resolvePhotoStudioImageLoadSuccess(
 
 export function resolvePhotoStudioImageLoadFailure(
     state: PhotoStudioImageLoadState,
-    failedUrl: string
+    failedUrl: string,
 ): PhotoStudioImageLoadState {
     if (failedUrl !== state.displayUrl) return state;
     if (state.thumbnailUrl && state.displayUrl !== state.thumbnailUrl) {
