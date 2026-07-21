@@ -21,3 +21,10 @@ test('edited outputs in the bottom rail drag by Drive id instead of their thumbn
         /src=\{editedFile\.thumbnailLink\}[\s\S]*?draggable=\{false\}[\s\S]*?pointer-events-none/,
     );
 });
+
+test('canvas intraoral tools bind to the selected layer instead of the global photo', () => {
+    assert.match(source, /canvasManualSessionRef\.current = \{[\s\S]*?layerId: selectedLayer\.id/);
+    assert.match(source, /if \(canvasManualLayerId\) \{[\s\S]*?applyCanvasMagicWand\(e\)/);
+    assert.match(source, /layer\.id === session\.layerId[\s\S]*?backgroundRemoved: true/);
+    assert.match(source, /healMode \|\| canvasManualLayerId/);
+});

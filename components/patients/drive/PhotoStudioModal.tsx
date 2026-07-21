@@ -46,6 +46,7 @@ import {
     updateCanvasDocumentSelection,
 } from '@/lib/photo-studio/canvas-selection';
 import { buildDriveImageInfoTitle } from '@/lib/photo-studio/drive-image-info';
+import { mapCanvasLayerPointToPixel } from '@/lib/photo-studio/canvas-layer-point';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -935,6 +936,12 @@ export default function PhotoStudioModal({
     const canvasLayersRef = useRef<HTMLCanvasElement>(null);
     const canvasHealPreviewRef = useRef<{ layerId: string; canvas: HTMLCanvasElement } | null>(null);
     const canvasHealSessionRef = useRef<{ layerId: string; prevSrc: string; canvas: HTMLCanvasElement } | null>(null);
+    const canvasManualSessionRef = useRef<{
+        layerId: string;
+        currentSrc: string;
+        canvas: HTMLCanvasElement;
+        restoreImage: HTMLImageElement;
+    } | null>(null);
     const openCvRef = useRef<any>(null);
     const openCvLoadingRef = useRef<Promise<any> | null>(null);
     const healLastPointRef = useRef<{ x: number; y: number; target: string } | null>(null);
@@ -1031,6 +1038,7 @@ export default function PhotoStudioModal({
     const [brushFeather, setBrushFeather] = useState(80);
     const [magicWandActive, setMagicWandActive] = useState(false);
     const [magicWandTolerance, setMagicWandTolerance] = useState(DEFAULT_MAGIC_WAND_TOLERANCE);
+    const [canvasManualLayerId, setCanvasManualLayerId] = useState<string | null>(null);
     const [exportFileName, setExportFileName] = useState('');
     const [healMode, setHealMode] = useState(false);
     const [healSize, setHealSize] = useState(16);
@@ -2428,6 +2436,51 @@ export default function PhotoStudioModal({
     }
 
     async function startManualEraser(initialMode: 'restore' | 'erase' | 'magic') {
+        if (canvasActive) {
+            const selectedLayer = canvasSelectedId
+                ? canvasLayers.find(layer => layer.id === canvasSelectedId) ?? null
+                : null;
+            if (!selectedLayer) {
+                toast.error('Seleccioná una foto del lienzo para usar la herramienta intraoral');
+                return;
+            }
+
+            const toastId = toast.loading('Preparando la capa seleccionada...');
+            try {
+                const sourceImage = await loadCanvasImage(selectedLayer.src);
+                const editCanvas = document.createElement('canvas');
+                editCanvas.width = sourceImage.naturalWidth;
+                editCanvas.height = sourceImage.naturalHeight;
+                editCanvas.getContext('2d')!.drawImage(sourceImage, 0, 0);
+                canvasManualSessionRef.current = {
+                    layerId: selectedLayer.id,
+                    currentSrc: selectedLayer.src,
+                    canvas: editCanvas,
+                    restoreImage: sourceImage,
+                };
+                canvasHealPreviewRef.current = { layerId: selectedLayer.id, canvas: editCanvas };
+                setCanvasManualLayerId(selectedLayer.id);
+                setCanvasSelectedId(selectedLayer.id);
+                setHealPreviewNonce(value => value + 1);
+                toast.success('Herramienta intraoral lista en la foto seleccionada', { id: toastId });
+            } catch {
+                toast.error('No se pudo preparar la foto seleccionada', { id: toastId });
+                return;
+            }
+
+            if (initialMode === 'magic') {
+                setMagicWandActive(true);
+                setBrushMode(null);
+            } else {
+                setMagicWandActive(false);
+                setBrushMode(initialMode);
+            }
+            setHealMode(false);
+            setDrawMode('idle');
+            setMousePos(null);
+            return;
+        }
+
         if (!bgDone) {
             const toastId = toast.loading('Inicializando editor de fondo...');
             try {
@@ -2482,6 +2535,17 @@ export default function PhotoStudioModal({
         setDrawMode('idle');
         setMousePos(null);
     }
+
+    useEffect(() => {
+        if (!canvasManualLayerId || brushMode !== null || magicWandActive) return;
+        canvasManualSessionRef.current = null;
+        if (canvasHealPreviewRef.current?.layerId === canvasManualLayerId) {
+            canvasHealPreviewRef.current = null;
+        }
+        setCanvasManualLayerId(null);
+        hideHealCursor();
+        setHealPreviewNonce(value => value + 1);
+    }, [brushMode, canvasManualLayerId, magicWandActive]);
 
     function scanlineFloodFillErase(ctx: CanvasRenderingContext2D, startX: number, startY: number, tolerancePercent: number) {
         const width = ctx.canvas.width;
@@ -2648,27 +2712,20 @@ export default function PhotoStudioModal({
     }
 
     function mapCanvasPointToLayerPixel(layer: CanvasLayer, nx: number, ny: number, canvasW: number, canvasH: number, sizeCss: number) {
-        const cx = layer.x * canvasW;
-        const cy = layer.y * canvasH;
-        const px = nx * canvasW - cx;
-        const py = ny * canvasH - cy;
-        const rad = -layer.rotation * Math.PI / 180;
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
-        const localX = px * cos - py * sin;
-        const localY = px * sin + py * cos;
-        const layerW = layer.w * canvasW;
-        const layerH = layer.h * canvasH;
-        const u = (localX + layerW / 2) / layerW;
-        const v = (localY + layerH / 2) / layerH;
-        if (u < 0 || u > 1 || v < 0 || v > 1) return null;
-        const scaleX = layer.img.naturalWidth / layerW;
-        const scaleY = layer.img.naturalHeight / layerH;
-        return {
-            x: u * layer.img.naturalWidth,
-            y: v * layer.img.naturalHeight,
-            radius: Math.max(4, sizeCss * ((scaleX + scaleY) / 2)),
-        };
+        return mapCanvasLayerPointToPixel({
+            layerX: layer.x,
+            layerY: layer.y,
+            layerWidth: layer.w,
+            layerHeight: layer.h,
+            rotation: layer.rotation,
+            pointX: nx,
+            pointY: ny,
+            canvasWidth: canvasW,
+            canvasHeight: canvasH,
+            imageWidth: layer.img.naturalWidth,
+            imageHeight: layer.img.naturalHeight,
+            brushSizeCss: sizeCss,
+        });
     }
 
     async function handleConfirmBg() {
@@ -3158,7 +3215,151 @@ export default function PhotoStudioModal({
         ));
     }, [setCanvasLayers]);
 
+    function applyCanvasBackgroundBrush(
+        canvas: HTMLCanvasElement,
+        restoreImage: HTMLImageElement,
+        x: number,
+        y: number,
+        radius: number,
+    ) {
+        const ctx = canvas.getContext('2d')!;
+        const feather = Math.max(0, Math.min(1, brushFeather / 100));
+        const hardStop = Math.max(0, Math.min(0.95, 1 - feather));
+        const size = Math.max(1, Math.ceil(radius * 2));
+        const left = Math.floor(x - radius);
+        const top = Math.floor(y - radius);
+        const brushCanvas = document.createElement('canvas');
+        brushCanvas.width = size;
+        brushCanvas.height = size;
+        const brushCtx = brushCanvas.getContext('2d')!;
+        const gradient = brushCtx.createRadialGradient(radius, radius, 0, radius, radius, radius);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        gradient.addColorStop(hardStop, 'rgba(0, 0, 0, 1)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        brushCtx.fillStyle = gradient;
+        brushCtx.beginPath();
+        brushCtx.arc(radius, radius, radius, 0, Math.PI * 2);
+        brushCtx.fill();
+
+        if (brushMode === 'erase') {
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.drawImage(brushCanvas, left, top);
+            ctx.restore();
+            return;
+        }
+
+        brushCtx.globalCompositeOperation = 'source-in';
+        brushCtx.drawImage(restoreImage, -left, -top, canvas.width, canvas.height);
+        ctx.drawImage(brushCanvas, left, top);
+    }
+
+    function commitCanvasManualLayer(session: NonNullable<typeof canvasManualSessionRef.current>) {
+        session.canvas.toBlob(blob => {
+            if (!blob) return;
+            const nextUrl = URL.createObjectURL(blob);
+            createdBlobUrlsRef.current.push(nextUrl);
+            session.currentSrc = nextUrl;
+            void loadCanvasImage(nextUrl).then(img => {
+                setCanvasLayers(prev => prev.map(layer =>
+                    layer.id === session.layerId
+                        ? { ...layer, src: nextUrl, img, fileId: undefined, backgroundRemoved: true }
+                        : layer
+                ));
+            }).catch(() => {
+                toast.error('No se pudo aplicar la edición intraoral');
+            });
+        }, 'image/png');
+    }
+
+    function applyCanvasMagicWand(e: React.PointerEvent<HTMLCanvasElement>) {
+        const session = canvasManualSessionRef.current;
+        const layer = session
+            ? canvasLayers.find(item => item.id === session.layerId) ?? null
+            : null;
+        if (!session || !layer || !activeCanvasId) return;
+        const [nx, ny] = getCanvasLayerNorm(e);
+        const mapped = mapCanvasPointToLayerPixel(
+            layer,
+            nx,
+            ny,
+            e.currentTarget.clientWidth,
+            e.currentTarget.clientHeight,
+            brushSize,
+        );
+        if (!mapped) return;
+        pushHistory({
+            kind: 'canvas-layer',
+            canvasId: activeCanvasId,
+            layerId: session.layerId,
+            layerSrc: session.currentSrc,
+            backgroundRemoved: layer.backgroundRemoved,
+        });
+        const visited = scanlineFloodFillErase(
+            session.canvas.getContext('2d')!,
+            Math.round(mapped.x),
+            Math.round(mapped.y),
+            scaleMagicWandTolerance(magicWandTolerance),
+        );
+        if (!visited) return;
+
+        const selectionPreview = document.createElement('canvas');
+        selectionPreview.width = session.canvas.width;
+        selectionPreview.height = session.canvas.height;
+        const previewCtx = selectionPreview.getContext('2d')!;
+        previewCtx.drawImage(session.canvas, 0, 0);
+        const previewData = previewCtx.getImageData(0, 0, selectionPreview.width, selectionPreview.height);
+        paintSelectionMask(previewData, visited);
+        previewCtx.putImageData(previewData, 0, 0);
+        canvasHealPreviewRef.current = { layerId: session.layerId, canvas: selectionPreview };
+        setHealPreviewNonce(value => value + 1);
+        window.setTimeout(() => {
+            if (canvasManualSessionRef.current !== session) return;
+            canvasHealPreviewRef.current = { layerId: session.layerId, canvas: session.canvas };
+            setHealPreviewNonce(value => value + 1);
+        }, 400);
+        commitCanvasManualLayer(session);
+        toast.success('Fondo removido en la foto seleccionada');
+    }
+
     function handleCanvasLayerPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (canvasManualLayerId) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (magicWandActive) {
+                applyCanvasMagicWand(e);
+                return;
+            }
+            const session = canvasManualSessionRef.current;
+            const layer = session
+                ? canvasLayers.find(item => item.id === session.layerId) ?? null
+                : null;
+            if (!session || !layer || !activeCanvasId || brushMode === null) return;
+            const [nx, ny] = getCanvasLayerNorm(e);
+            const mapped = mapCanvasPointToLayerPixel(
+                layer,
+                nx,
+                ny,
+                e.currentTarget.clientWidth,
+                e.currentTarget.clientHeight,
+                brushSize,
+            );
+            if (!mapped) return;
+            pushHistory({
+                kind: 'canvas-layer',
+                canvasId: activeCanvasId,
+                layerId: session.layerId,
+                layerSrc: session.currentSrc,
+                backgroundRemoved: layer.backgroundRemoved,
+            });
+            updateHealCursor(e.clientX, e.clientY);
+            e.currentTarget.setPointerCapture(e.pointerId);
+            brushDrawingRef.current = true;
+            healLastPointRef.current = { x: mapped.x, y: mapped.y, target: session.layerId };
+            applyCanvasBackgroundBrush(session.canvas, session.restoreImage, mapped.x, mapped.y, mapped.radius);
+            setHealPreviewNonce(value => value + 1);
+            return;
+        }
         if (healMode) {
             updateHealCursor(e.clientX, e.clientY);
             if (!canvasSelectedId) {
@@ -3220,6 +3421,27 @@ export default function PhotoStudioModal({
     }
 
     function handleCanvasLayerPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+        if (canvasManualLayerId) {
+            updateHealCursor(e.clientX, e.clientY);
+            const session = canvasManualSessionRef.current;
+            const layer = session
+                ? canvasLayers.find(item => item.id === session.layerId) ?? null
+                : null;
+            if (!brushDrawingRef.current || !session || !layer || brushMode === null) return;
+            const [nx, ny] = getCanvasLayerNorm(e);
+            const mapped = mapCanvasPointToLayerPixel(
+                layer,
+                nx,
+                ny,
+                e.currentTarget.clientWidth,
+                e.currentTarget.clientHeight,
+                brushSize,
+            );
+            if (!mapped || !shouldApplyHealPoint(mapped.x, mapped.y, mapped.radius, session.layerId)) return;
+            applyCanvasBackgroundBrush(session.canvas, session.restoreImage, mapped.x, mapped.y, mapped.radius);
+            setHealPreviewNonce(value => value + 1);
+            return;
+        }
         if (healMode) {
             updateHealCursor(e.clientX, e.clientY);
             if (!brushDrawingRef.current || !canvasHealSessionRef.current) return;
@@ -3280,6 +3502,15 @@ export default function PhotoStudioModal({
     }
 
     function handleCanvasLayerPointerUp() {
+        if (canvasManualLayerId) {
+            if (!brushDrawingRef.current) return;
+            brushDrawingRef.current = false;
+            healLastPointRef.current = null;
+            hideHealCursor();
+            const session = canvasManualSessionRef.current;
+            if (session) commitCanvasManualLayer(session);
+            return;
+        }
         if (healMode) {
             if (!brushDrawingRef.current || !canvasHealSessionRef.current || !activeCanvasId) return;
             const session = canvasHealSessionRef.current;
@@ -6075,14 +6306,14 @@ export default function PhotoStudioModal({
                                 <div className={`relative inline-block ${canvasBg}`}>
                                     {canvasActive ? (
                                         <>
-                                        {healMode ? (
+                                        {healMode || canvasManualLayerId ? (
                                             <canvas
                                                 ref={canvasLayersRef}
                                                 tabIndex={0}
                                                 style={{
                                                     ...getCanvasRatioStyle(),
                                                     outline: 'none',
-                                                    cursor: 'crosshair',
+                                                    cursor: healMode || brushMode !== null || magicWandActive ? 'crosshair' : 'default',
                                                 }}
                                                 onPointerDown={handleCanvasLayerPointerDown}
                                                 onPointerMove={handleCanvasLayerPointerMove}
