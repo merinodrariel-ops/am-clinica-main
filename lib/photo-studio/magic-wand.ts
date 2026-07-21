@@ -5,6 +5,7 @@ export type EditablePixelBuffer = {
 };
 
 export const DEFAULT_BACKGROUND_BRUSH_MODE = 'erase' as const;
+export const DEFAULT_MAGIC_WAND_TOLERANCE = 65;
 
 export function scaleMagicWandTolerance(percent: number): number {
     const bounded = Math.max(1, Math.min(100, percent));

@@ -22,7 +22,13 @@ import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shou
 import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
-import { DEFAULT_BACKGROUND_BRUSH_MODE, eraseContiguousColor, paintSelectionMask, scaleMagicWandTolerance } from '@/lib/photo-studio/magic-wand';
+import {
+    DEFAULT_BACKGROUND_BRUSH_MODE,
+    DEFAULT_MAGIC_WAND_TOLERANCE,
+    eraseContiguousColor,
+    paintSelectionMask,
+    scaleMagicWandTolerance,
+} from '@/lib/photo-studio/magic-wand';
 import { shouldStartPhotoStudioInPresentation } from '@/lib/photo-studio/mobile-presentation';
 import {
     createPhotoStudioImageLoadState,
@@ -999,7 +1005,7 @@ export default function PhotoStudioModal({
     const [brushSize, setBrushSize] = useState(40);
     const [brushFeather, setBrushFeather] = useState(80);
     const [magicWandActive, setMagicWandActive] = useState(false);
-    const [magicWandTolerance, setMagicWandTolerance] = useState(50);
+    const [magicWandTolerance, setMagicWandTolerance] = useState(DEFAULT_MAGIC_WAND_TOLERANCE);
     const [exportFileName, setExportFileName] = useState('');
     const [healMode, setHealMode] = useState(false);
     const [healSize, setHealSize] = useState(16);
