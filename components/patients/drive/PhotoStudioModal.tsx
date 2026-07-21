@@ -14,7 +14,7 @@ import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
-import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction } from '@/app/actions/patient-files-drive';
+import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, deleteDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import FabricCanvasStage from './FabricCanvasStage';
@@ -40,6 +40,11 @@ import {
     getPhotoStudioCanvasDragId,
     preparePhotoStudioCanvasDrag,
 } from '@/lib/patient-drive-drop-routing';
+import {
+    getCanvasCopyName,
+    getCanvasDocumentContextTargets,
+    updateCanvasDocumentSelection,
+} from '@/lib/photo-studio/canvas-selection';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
@@ -788,6 +793,14 @@ export default function PhotoStudioModal({
     type CanvasDoc = { id: string; name: string; ratio: CanvasRatio; layers: CanvasLayer[]; bgColor: string };
     const [canvases, setCanvases] = useState<CanvasDoc[]>([]);
     const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
+    const [selectedCanvasIds, setSelectedCanvasIds] = useState<string[]>([]);
+    const [canvasSelectionAnchorId, setCanvasSelectionAnchorId] = useState<string | null>(null);
+    const [canvasThumbnailContextMenu, setCanvasThumbnailContextMenu] = useState<{
+        x: number;
+        y: number;
+        targetIds: string[];
+    } | null>(null);
+    const [canvasDocumentActionBusy, setCanvasDocumentActionBusy] = useState(false);
     const [canvasActive, setCanvasActive] = useState(false);
     const [canvasSaving, setCanvasSaving] = useState(false);
 
@@ -1566,7 +1579,7 @@ export default function PhotoStudioModal({
     const openThumbnailContextMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>, file: DriveFile) => {
         event.preventDefault();
         const MENU_WIDTH = 240;
-        const MENU_HEIGHT = 206;
+        const MENU_HEIGHT = 340;
         const PADDING = 12;
         const rect = event.currentTarget.getBoundingClientRect();
         const preferredLeft = rect.right + 12;
@@ -1575,6 +1588,7 @@ export default function PhotoStudioModal({
         const top = Math.max(PADDING, Math.min(preferredTop, window.innerHeight - MENU_HEIGHT - PADDING));
 
         setMenuView('main');
+        setSelectedCanvasIds([]);
         setThumbnailContextMenu({
             x: left,
             y: top,
@@ -1967,6 +1981,7 @@ export default function PhotoStudioModal({
     }
 
     function handleThumbnailSelect(file: DriveFile, e: React.MouseEvent<HTMLButtonElement>) {
+        setSelectedCanvasIds([]);
         const wantsMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey || multiSelectMode;
 
         if (!wantsMultiSelect) {
@@ -3452,6 +3467,171 @@ export default function PhotoStudioModal({
         setHealMode(false);
     }
 
+    function handleCanvasThumbnailSelect(canvasId: string, event: React.MouseEvent<HTMLButtonElement>) {
+        const additive = event.metaKey || event.ctrlKey;
+        const nextSelection = updateCanvasDocumentSelection({
+            selectedIds: selectedCanvasIds,
+            orderedIds: canvases.map(canvas => canvas.id),
+            clickedId: canvasId,
+            anchorId: canvasSelectionAnchorId,
+            additive,
+            range: event.shiftKey,
+        });
+        setSelectedCanvasIds(nextSelection);
+        setCanvasSelectionAnchorId(canvasId);
+        clearMultiSelection();
+        if (!additive || nextSelection.includes(canvasId)) handleActivateCanvas(canvasId);
+    }
+
+    function openCanvasThumbnailContextMenu(
+        event: React.MouseEvent<HTMLButtonElement>,
+        canvasId: string,
+    ) {
+        event.preventDefault();
+        event.stopPropagation();
+        const targetIds = getCanvasDocumentContextTargets(selectedCanvasIds, canvasId);
+        const { x, y } = clampMenuToViewport(event.clientX, event.clientY, 260, 360);
+        setSelectedCanvasIds(targetIds);
+        setCanvasSelectionAnchorId(canvasId);
+        setCanvasThumbnailContextMenu({ x, y, targetIds });
+        clearMultiSelection();
+        handleActivateCanvas(canvasId);
+    }
+
+    async function handleDuplicateCanvasDocuments(targetIds: string[]) {
+        if (canvasDocumentActionBusy) return;
+        setCanvasDocumentActionBusy(true);
+        setCanvasThumbnailContextMenu(null);
+        const copies: CanvasDoc[] = [];
+        try {
+            const { createPatientCanvasAction, deletePatientCanvasAction, savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+            for (const source of canvases.filter(canvas => targetIds.includes(canvas.id))) {
+                const name = getCanvasCopyName(source.name);
+                const { data, error } = await createPatientCanvasAction({ patientId, name, ratio: source.ratio });
+                if (error || !data) throw new Error(error || `No se pudo duplicar ${source.name}`);
+                const serializedLayers = source.layers.map(layer => ({ ...layer, img: undefined }));
+                const saveResult = await savePatientCanvasAction({
+                    id: data.id,
+                    layers: serializedLayers,
+                    ratio: source.ratio,
+                    name,
+                    bgColor: source.bgColor,
+                });
+                if (saveResult.error) {
+                    await deletePatientCanvasAction(data.id);
+                    throw new Error(saveResult.error);
+                }
+                copies.push({ ...source, id: data.id, name });
+            }
+            if (copies.length === 0) return;
+            setCanvases(prev => [...prev, ...copies]);
+            setSelectedCanvasIds(copies.map(copy => copy.id));
+            setActiveCanvasId(copies[0].id);
+            toast.success(copies.length === 1 ? 'Lienzo duplicado' : `${copies.length} lienzos duplicados`);
+        } catch (error) {
+            console.error('[handleDuplicateCanvasDocuments]', error);
+            if (copies.length > 0) {
+                setCanvases(prev => [...prev, ...copies]);
+                setSelectedCanvasIds(copies.map(copy => copy.id));
+                setActiveCanvasId(copies[0].id);
+                toast.warning(`Se duplicaron ${copies.length} lienzos antes de que ocurriera un error.`);
+            } else {
+                toast.error(error instanceof Error ? error.message : 'No se pudieron duplicar los lienzos');
+            }
+        } finally {
+            setCanvasDocumentActionBusy(false);
+        }
+    }
+
+    async function handleRenameCanvasDocument(canvasId: string) {
+        const canvasDocument = canvases.find(canvas => canvas.id === canvasId);
+        if (!canvasDocument) return;
+        const nextName = prompt('Nuevo nombre del lienzo:', canvasDocument.name)?.trim();
+        if (!nextName || nextName === canvasDocument.name) {
+            setCanvasThumbnailContextMenu(null);
+            return;
+        }
+        try {
+            const { renamePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+            const result = await renamePatientCanvasAction(canvasId, nextName);
+            if (result.error) throw new Error(result.error);
+            setCanvases(prev => prev.map(canvas => canvas.id === canvasId ? { ...canvas, name: nextName } : canvas));
+            toast.success('Lienzo renombrado');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo cambiar el nombre');
+        } finally {
+            setCanvasThumbnailContextMenu(null);
+        }
+    }
+
+    async function createCanvasDocumentFiles(targetIds: string[]): Promise<File[]> {
+        const files: File[] = [];
+        for (const canvasDocument of canvases.filter(canvas => targetIds.includes(canvas.id))) {
+            const blob = await exportCanvasDocumentToBlob(
+                canvasDocument,
+                canvasDocument.id === activeCanvasId,
+            );
+            const extension = blob.type === 'image/png' ? 'png' : 'jpg';
+            const safeName = canvasDocument.name.trim().replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]+/g, '_') || 'lienzo';
+            files.push(new File([blob], `${safeName}.${extension}`, { type: blob.type }));
+        }
+        return files;
+    }
+
+    async function handleShareCanvasDocuments(targetIds: string[]) {
+        setCanvasThumbnailContextMenu(null);
+        try {
+            const files = await createCanvasDocumentFiles(targetIds);
+            if (files.length === 0) return;
+            if (navigator.share && (!navigator.canShare || navigator.canShare({ files }))) {
+                await navigator.share({
+                    files,
+                    title: files.length === 1 ? files[0].name : `${files.length} lienzos de ${patientName}`,
+                });
+                return;
+            }
+            for (const file of files) await downloadBlob(file, file.name);
+            toast.info('El navegador no ofrece compartir: se descargaron los archivos para abrirlos en Instagram, TikTok u otra app.');
+        } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') return;
+            toast.error('No se pudieron preparar los lienzos para compartir');
+        }
+    }
+
+    async function handleDownloadCanvasDocuments(targetIds: string[]) {
+        setCanvasThumbnailContextMenu(null);
+        try {
+            const files = await createCanvasDocumentFiles(targetIds);
+            for (const file of files) await downloadBlob(file, file.name);
+            toast.success(files.length === 1 ? 'Lienzo descargado' : `${files.length} lienzos descargados`);
+        } catch {
+            toast.error('No se pudieron descargar los lienzos');
+        }
+    }
+
+    async function handleUploadCanvasDocumentsForWeb(targetIds: string[]) {
+        setCanvasThumbnailContextMenu(null);
+        setCanvasDocumentActionBusy(true);
+        try {
+            const files = await createCanvasDocumentFiles(targetIds);
+            for (const file of files) {
+                const optimizedBlob = await shrinkBlobForUpload(file);
+                const formData = new FormData();
+                formData.append('file', optimizedBlob, file.name);
+                const result = await uploadPhotoForSocialAction(folderId, file.name, formData);
+                if (result.error) throw new Error(result.error);
+            }
+            onSaved();
+            toast.success(files.length === 1
+                ? 'Lienzo guardado en Selección para web y redes'
+                : `${files.length} lienzos guardados en Selección para web y redes`);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudieron guardar los lienzos para web');
+        } finally {
+            setCanvasDocumentActionBusy(false);
+        }
+    }
+
     async function handleNewCanvas() {
         const name = `Lienzo ${canvases.length + 1}`;
         try {
@@ -3463,6 +3643,7 @@ export default function PhotoStudioModal({
             const newCanvas: CanvasDoc = { id: data.id, name: data.name, ratio: data.ratio as CanvasRatio, layers: [], bgColor: data.bg_color };
             setCanvases(prev => [...prev, newCanvas]);
             setActiveCanvasId(data.id);
+            setSelectedCanvasIds([data.id]);
         } catch (err) {
             console.error('[handleNewCanvas] error, falling back to local:', err);
             // Fallback: create locally with temp ID
@@ -3470,6 +3651,7 @@ export default function PhotoStudioModal({
             const newCanvas: CanvasDoc = { id: tempId, name, ratio: '1:1', layers: [], bgColor: '#ffffff' };
             setCanvases(prev => [...prev, newCanvas]);
             setActiveCanvasId(tempId);
+            setSelectedCanvasIds([tempId]);
         }
         setCanvasActive(true);
         setHasCanvas(true);
@@ -3481,26 +3663,59 @@ export default function PhotoStudioModal({
         setHealMode(false);
     }
 
-    async function handleDeleteCanvas(canvasId: string) {
+    async function handleDeleteCanvasDocuments(targetIds: string[]) {
+        if (canvasDocumentActionBusy || targetIds.length === 0) return;
+        const targets = canvases.filter(canvas => targetIds.includes(canvas.id));
+        const targetLabel = targets.map(canvas => `“${canvas.name}”`).join(', ');
+        if (!confirm(`¿Eliminar ${targets.length === 1 ? 'este lienzo' : `estos ${targets.length} lienzos`}?\n\n${targetLabel}\n\nEsta acción no se puede deshacer.`)) return;
+
+        setCanvasDocumentActionBusy(true);
+        setCanvasThumbnailContextMenu(null);
+        const deletedIds: string[] = [];
         try {
             const { deletePatientCanvasAction } = await import('@/app/actions/patient-canvases');
-            await deletePatientCanvasAction(canvasId);
-        } catch (err) {
-            console.error('[handleDeleteCanvas] error deleting from DB:', err);
-        }
-        // Legacy canvases live in localStorage — clear the key or the photo
-        // resurrects on the next mount via the localStorage fallback.
-        if (canvasId.startsWith('legacy-') && patientId) {
-            localStorage.removeItem(`am-clinica-canvas-${patientId}`);
-        }
-        setCanvases(prev => {
-            const next = prev.filter(c => c.id !== canvasId);
-            if (activeCanvasId === canvasId) {
+            for (const canvasDocument of targets) {
+                if (canvasDocument.id.startsWith('legacy-')) {
+                    localStorage.removeItem(`am-clinica-canvas-${patientId}`);
+                    deletedIds.push(canvasDocument.id);
+                    continue;
+                }
+                if (canvasDocument.id.startsWith('temp-')) {
+                    deletedIds.push(canvasDocument.id);
+                    continue;
+                }
+                const result = await deletePatientCanvasAction(canvasDocument.id);
+                if (result.error) throw new Error(result.error);
+                deletedIds.push(canvasDocument.id);
+            }
+
+            const next = canvases.filter(canvas => !deletedIds.includes(canvas.id));
+            setCanvases(next);
+            setSelectedCanvasIds([]);
+            if (activeCanvasId && deletedIds.includes(activeCanvasId)) {
                 setActiveCanvasId(next[0]?.id ?? null);
                 if (next.length === 0) { setCanvasActive(false); setHasCanvas(false); }
             }
-            return next;
-        });
+            toast.success(deletedIds.length === 1 ? 'Lienzo eliminado' : `${deletedIds.length} lienzos eliminados`);
+        } catch (error) {
+            console.error('[handleDeleteCanvasDocuments]', error);
+            if (deletedIds.length > 0) {
+                const remaining = canvases.filter(canvas => !deletedIds.includes(canvas.id));
+                setCanvases(remaining);
+                setSelectedCanvasIds([]);
+                if (activeCanvasId && deletedIds.includes(activeCanvasId)) {
+                    setActiveCanvasId(remaining[0]?.id ?? null);
+                    if (remaining.length === 0) { setCanvasActive(false); setHasCanvas(false); }
+                }
+            }
+            toast.error(error instanceof Error ? error.message : 'No se pudieron eliminar los lienzos');
+        } finally {
+            setCanvasDocumentActionBusy(false);
+        }
+    }
+
+    async function handleDeleteCanvas(canvasId: string) {
+        await handleDeleteCanvasDocuments([canvasId]);
     }
 
     async function handleCategorizeFile(file: DriveFile, category: string) {
@@ -3548,6 +3763,30 @@ export default function PhotoStudioModal({
             toast.error('Error inesperado al duplicar');
         } finally {
             setDuplicatingId(null);
+        }
+    }
+
+    async function handleDeleteDriveFiles(targetIds: string[]) {
+        const targets = imageFiles.filter(fileItem => targetIds.includes(fileItem.id));
+        if (targets.length === 0) return;
+        const targetLabel = targets.map(fileItem => `“${fileItem.name}”`).join(', ');
+        if (!confirm(`¿Eliminar ${targets.length === 1 ? 'esta foto' : `estas ${targets.length} fotos`} de Drive?\n\n${targetLabel}\n\nEsta acción no se puede deshacer.`)) return;
+
+        setThumbnailContextMenu(null);
+        const deletedIds: string[] = [];
+        try {
+            for (const target of targets) {
+                const result = await deleteDriveFileAction(target.id);
+                if (result.error) throw new Error(result.error);
+                deletedIds.push(target.id);
+            }
+            clearMultiSelection();
+            onSaved();
+            toast.success(deletedIds.length === 1 ? 'Foto eliminada' : `${deletedIds.length} fotos eliminadas`);
+            if (activeFile && deletedIds.includes(activeFile.id)) onClose();
+        } catch (error) {
+            if (deletedIds.length > 0) onSaved();
+            toast.error(error instanceof Error ? error.message : 'No se pudieron eliminar las fotos');
         }
     }
 
@@ -3689,15 +3928,15 @@ export default function PhotoStudioModal({
         }
     }
 
-    async function exportCanvasToBlob(): Promise<Blob> {
-        const r = CANVAS_RATIOS.find(r => r.value === canvasRatio)!;
+    async function exportCanvasDocumentToBlob(canvasDocument: CanvasDoc, includeActiveAnnotations = false): Promise<Blob> {
+        const r = CANVAS_RATIOS.find(r => r.value === canvasDocument.ratio)!;
         const shorter = Math.min(r.w, r.h);
         const expW = Math.round(1080 * r.w / shorter);
         const expH = Math.round(1080 * r.h / shorter);
         const off = document.createElement('canvas');
         off.width = expW; off.height = expH;
         const ctx = off.getContext('2d')!;
-        const effectiveBg = canvasActive ? (activeCanvas?.bgColor ?? '#ffffff') : (bgDone ? bgColor : '#ffffff');
+        const effectiveBg = canvasDocument.bgColor ?? '#ffffff';
         const isTransparent = effectiveBg === 'transparent';
         if (isTransparent) {
             ctx.clearRect(0, 0, expW, expH);
@@ -3708,7 +3947,7 @@ export default function PhotoStudioModal({
         // Asegurar que TODA capa tenga su imagen lista antes de dibujar. Antes se
         // salteaban en silencio las capas con la imagen no cargada, y el lienzo se
         // guardaba incompleto (ej. se perdía la foto del "después") sin ningún aviso.
-        const ready = await Promise.all(canvasLayers.map(async (layer) => {
+        const ready = await Promise.all(canvasDocument.layers.map(async (layer) => {
             const ok = (im: unknown): im is HTMLImageElement =>
                 im instanceof HTMLImageElement && im.complete && im.naturalWidth > 0;
             if (ok(layer.img)) return { layer, img: layer.img };
@@ -3749,12 +3988,17 @@ export default function PhotoStudioModal({
             ctx.restore();
         }
         // Bake draw annotations on top if visible
-        if (drawVisible && drawCanvasRef.current && drawCanvasRef.current.width > 0) {
+        if (includeActiveAnnotations && drawVisible && drawCanvasRef.current && drawCanvasRef.current.width > 0) {
             ctx.drawImage(drawCanvasRef.current, 0, 0, expW, expH);
         }
         return new Promise<Blob>((res, rej) =>
             off.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), isTransparent ? 'image/png' : 'image/jpeg', 0.92)
         );
+    }
+
+    async function exportCanvasToBlob(): Promise<Blob> {
+        if (!activeCanvas) throw new Error('No hay un lienzo activo para exportar');
+        return exportCanvasDocumentToBlob(activeCanvas, true);
     }
 
     function getCanvasRatioStyle(): React.CSSProperties {
@@ -6215,21 +6459,36 @@ export default function PhotoStudioModal({
                     <div className="hidden md:flex h-[94px] flex-shrink-0 items-stretch border-t border-white/10 bg-[#111119]">
                         <div className="flex w-36 flex-shrink-0 flex-col justify-center border-r border-white/10 px-4">
                             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C9A96E]">Proyectos</span>
-                            <span className="mt-1 text-[10px] leading-tight text-white/35">Lienzos editables y resultados</span>
+                            <span className="mt-1 text-[10px] leading-tight text-white/35">
+                                {selectedCanvasIds.length > 1
+                                    ? `${selectedCanvasIds.length} lienzos seleccionados`
+                                    : 'Lienzos editables y resultados'}
+                            </span>
                         </div>
                         <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto px-4 py-2 thin-scrollbar">
-                            {canvases.map((cv) => (
+                            {canvases.map((cv) => {
+                                const isCanvasSelected = selectedCanvasIds.includes(cv.id);
+                                return (
                                 <div key={cv.id} className="group relative flex flex-shrink-0 flex-col items-center gap-1">
                                     <button
-                                        onClick={() => { handleActivateCanvas(cv.id); clearMultiSelection(); }}
+                                        onClick={(event) => handleCanvasThumbnailSelect(cv.id, event)}
+                                        onContextMenu={(event) => openCanvasThumbnailContextMenu(event, cv.id)}
+                                        aria-pressed={isCanvasSelected}
                                         className={`relative h-14 w-20 overflow-hidden rounded-lg border-2 p-0.5 transition-all ${
-                                            canvasActive && activeCanvasId === cv.id
-                                                ? 'border-[#C9A96E] bg-white shadow-[0_0_15px_rgba(201,169,110,0.3)]'
+                                            isCanvasSelected
+                                                ? 'border-[#C9A96E] bg-[#C9A96E]/15 shadow-[0_0_0_2px_rgba(201,169,110,0.35),0_0_18px_rgba(201,169,110,0.35)]'
+                                                : canvasActive && activeCanvasId === cv.id
+                                                    ? 'border-[#C9A96E]/70 bg-white shadow-[0_0_12px_rgba(201,169,110,0.2)]'
                                                 : 'border-white/10 bg-white/5 hover:border-white/30'
                                         }`}
                                         title={`Abrir ${cv.name}`}
                                     >
                                         <CanvasThumbnailPreview layers={cv.layers} bgColor={cv.bgColor} ratio={cv.ratio} />
+                                        {isCanvasSelected && (
+                                            <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#C9A96E] text-black shadow">
+                                                <Check size={11} strokeWidth={3} />
+                                            </span>
+                                        )}
                                         <span className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 text-[8px] font-bold text-white">
                                             {cv.layers.length} {cv.layers.length === 1 ? 'capa' : 'capas'}
                                         </span>
@@ -6243,29 +6502,40 @@ export default function PhotoStudioModal({
                                         <X size={9} />
                                     </button>
                                 </div>
-                            ))}
-                            {editedOutputFiles.map((editedFile) => (
+                            )})}
+                            {editedOutputFiles.map((editedFile) => {
+                                const isEditedOutputSelected = selectedIds.has(editedFile.id);
+                                return (
                                 <button
                                     key={`edited-${editedFile.id}`}
                                     onClick={(event) => handleThumbnailSelect(editedFile, event)}
+                                    onContextMenu={(event) => openThumbnailContextMenu(event, editedFile)}
+                                    aria-pressed={isEditedOutputSelected}
                                     className={`relative flex flex-shrink-0 flex-col items-center gap-1 ${
-                                        !canvasActive && activeFile.id === editedFile.id ? 'text-[#C9A96E]' : 'text-white/55'
+                                        isEditedOutputSelected || (!canvasActive && activeFile.id === editedFile.id) ? 'text-[#C9A96E]' : 'text-white/55'
                                     }`}
                                     title={`Abrir resultado ${editedFile.name}`}
                                 >
                                     <span className={`relative block h-14 w-20 overflow-hidden rounded-lg border-2 ${
-                                        !canvasActive && activeFile.id === editedFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
+                                        isEditedOutputSelected
+                                            ? 'border-[#C9A96E] shadow-[0_0_0_2px_rgba(201,169,110,0.35),0_0_18px_rgba(201,169,110,0.35)]'
+                                            : !canvasActive && activeFile.id === editedFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
                                     }`}>
                                         {editedFile.thumbnailLink ? (
                                             <img src={editedFile.thumbnailLink} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                                         ) : (
                                             <span className="flex h-full w-full items-center justify-center bg-white/5"><ImageIcon size={16} /></span>
                                         )}
+                                        {isEditedOutputSelected && (
+                                            <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#C9A96E] text-black shadow">
+                                                <Check size={11} strokeWidth={3} />
+                                            </span>
+                                        )}
                                         <Sparkles size={10} className="absolute bottom-1 right-1 rounded-full bg-[#C9A96E] p-0.5 text-black" />
                                     </span>
                                     <span className="max-w-20 truncate text-[9px]">{editedFile.name}</span>
                                 </button>
-                            ))}
+                            )})}
                             <button
                                 onClick={handleNewCanvas}
                                 className="flex h-14 w-20 flex-shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-[#C9A96E]/40 bg-[#C9A96E]/5 text-[#C9A96E] transition-colors hover:bg-[#C9A96E]/15"
@@ -7139,6 +7409,81 @@ export default function PhotoStudioModal({
             </>
         )}
 
+        {/* ── Editable canvas thumbnail context menu ───────────────────── */}
+        {canvasThumbnailContextMenu && typeof document !== 'undefined' && createPortal(
+            <>
+                <div
+                    className="fixed inset-0 z-[92]"
+                    onClick={() => setCanvasThumbnailContextMenu(null)}
+                    onContextMenu={(event) => { event.preventDefault(); setCanvasThumbnailContextMenu(null); }}
+                />
+                <div
+                    className="fixed z-[93] w-[260px] rounded-xl border border-white/15 bg-[#1A1A24] py-1.5 shadow-2xl backdrop-blur-md"
+                    style={{ left: canvasThumbnailContextMenu.x, top: canvasThumbnailContextMenu.y }}
+                    role="menu"
+                    aria-label="Acciones de lienzos seleccionados"
+                >
+                    <div className="border-b border-white/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#C9A96E]">
+                        {canvasThumbnailContextMenu.targetIds.length === 1
+                            ? '1 lienzo seleccionado'
+                            : `${canvasThumbnailContextMenu.targetIds.length} lienzos seleccionados`}
+                    </div>
+                    <button
+                        onClick={() => void handleDuplicateCanvasDocuments(canvasThumbnailContextMenu.targetIds)}
+                        disabled={canvasDocumentActionBusy}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-white transition-colors hover:bg-[#C9A96E]/20 disabled:opacity-40"
+                    >
+                        <Copy size={16} className="text-[#C9A96E]" />
+                        Duplicar {canvasThumbnailContextMenu.targetIds.length > 1 ? 'lienzos' : 'lienzo'}
+                    </button>
+                    {canvasThumbnailContextMenu.targetIds.length === 1 && (
+                        <button
+                            onClick={() => void handleRenameCanvasDocument(canvasThumbnailContextMenu.targetIds[0])}
+                            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-white transition-colors hover:bg-[#C9A96E]/20"
+                        >
+                            <Edit2 size={16} className="text-[#C9A96E]" />
+                            Cambiar nombre
+                        </button>
+                    )}
+                    <div className="my-1 h-px bg-white/10" />
+                    <button
+                        onClick={() => void handleShareCanvasDocuments(canvasThumbnailContextMenu.targetIds)}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-white transition-colors hover:bg-white/10"
+                    >
+                        <Share2 size={16} className="text-sky-400" />
+                        Compartir · AirDrop · apps
+                    </button>
+                    <button
+                        onClick={() => void handleDownloadCanvasDocuments(canvasThumbnailContextMenu.targetIds)}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-white transition-colors hover:bg-white/10"
+                    >
+                        <Download size={16} className="text-emerald-400" />
+                        Descargar para web / redes
+                    </button>
+                    {canSave && (
+                        <button
+                            onClick={() => void handleUploadCanvasDocumentsForWeb(canvasThumbnailContextMenu.targetIds)}
+                            disabled={canvasDocumentActionBusy}
+                            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-white transition-colors hover:bg-white/10 disabled:opacity-40"
+                        >
+                            <Globe2 size={16} className="text-violet-400" />
+                            Guardar en Selección web
+                        </button>
+                    )}
+                    <div className="my-1 h-px bg-white/10" />
+                    <button
+                        onClick={() => void handleDeleteCanvasDocuments(canvasThumbnailContextMenu.targetIds)}
+                        disabled={canvasDocumentActionBusy}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-40"
+                    >
+                        <Trash2 size={16} />
+                        Eliminar {canvasThumbnailContextMenu.targetIds.length > 1 ? 'lienzos' : 'lienzo'}
+                    </button>
+                </div>
+            </>,
+            document.body,
+        )}
+
         {/* ── Thumbnail Context Menu ───────────────────────────────────── */}
         {thumbnailContextMenu && typeof document !== 'undefined' && createPortal(
             <>
@@ -7210,6 +7555,15 @@ export default function PhotoStudioModal({
                                 <MessageCircle size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
                                 <span>Compartir con paciente</span>
                             </button>
+                            {canSave && (
+                                <button
+                                    onClick={() => void handleDeleteDriveFiles(thumbnailContextMenu.targetIds)}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2.5 group whitespace-nowrap"
+                                >
+                                    <Trash2 size={16} />
+                                    <span>Eliminar {thumbnailContextMenu.targetIds.length > 1 ? 'fotos' : 'foto'}</span>
+                                </button>
+                            )}
                             <div className="h-px bg-white/5 my-1" />
                             <button
                                 onClick={() => setThumbnailContextMenu(null)}
