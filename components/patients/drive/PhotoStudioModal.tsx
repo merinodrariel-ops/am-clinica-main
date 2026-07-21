@@ -17,6 +17,7 @@ import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
+import FabricCanvasStage from './FabricCanvasStage';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
@@ -2861,7 +2862,7 @@ export default function PhotoStudioModal({
                 ctx.restore();
             }
         }
-    }, [canvasActive, canvasLayers, canvasSelectedId, canvasRatio, activeCanvas?.bgColor, healPreviewNonce]);
+    }, [canvasActive, canvasLayers, canvasSelectedId, canvasRatio, activeCanvas?.bgColor, healPreviewNonce, healMode]);
 
     // ── Canvas layer interaction ──────────────────────────────────────────────
     function getCanvasLayerNorm(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
@@ -2885,6 +2886,12 @@ export default function PhotoStudioModal({
             setSelectedTextId(null);
         }
     }, [canvasActive, canvasSelectedId, multiSelectedIds, selectedShapeId, selectedTextId]);
+
+    const handleFabricLayerChange = useCallback((layerId: string, patch: Partial<CanvasLayer>) => {
+        setCanvasLayers(prev => prev.map(layer =>
+            layer.id === layerId ? { ...layer, ...patch } : layer
+        ));
+    }, [setCanvasLayers]);
 
     function handleCanvasLayerPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
         if (healMode) {
@@ -3024,24 +3031,28 @@ export default function PhotoStudioModal({
         setCanvasLayerInteracting(false);
     }
 
+    function openCanvasLayerCrop(layerId: string) {
+        const layer = canvasLayers.find(item => item.id === layerId);
+        if (!layer) return;
+        const initialRot = layer.rotation ?? 0;
+        canvasLayerCropPreBakeRef.current = layer.src;
+        setCanvasLayerCropRotation(initialRot);
+        setCanvasLayerCropBakedSrc(initialRot === 0 ? layer.src : null);
+        setCanvasLayerCropId(layer.id);
+        setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
+        setCanvasLayerCompletedCrop(null);
+        setCanvasSelectedId(null);
+    }
+
     function handleCanvasLayerDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
         const rect = e.currentTarget.getBoundingClientRect();
         const nx = (e.clientX - rect.left) / rect.width;
         const ny = (e.clientY - rect.top) / rect.height;
         const W = e.currentTarget.clientWidth, H = e.currentTarget.clientHeight;
         for (let i = canvasLayers.length - 1; i >= 0; i--) {
-            if (hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) {
-                const layer = canvasLayers[i];
-                const initialRot = layer.rotation ?? 0;
-                canvasLayerCropPreBakeRef.current = layer.src;
-                setCanvasLayerCropRotation(initialRot);
-                setCanvasLayerCropBakedSrc(initialRot === 0 ? layer.src : null); // will bake via useEffect if != 0
-                setCanvasLayerCropId(layer.id);
-                setCanvasLayerCropSel({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
-                setCanvasLayerCompletedCrop(null);
-                setCanvasSelectedId(null);
-                return;
-            }
+            if (!hitTestLayerBody(canvasLayers[i], nx, ny, W, H)) continue;
+            openCanvasLayerCrop(canvasLayers[i].id);
+            return;
         }
     }
 
@@ -3091,11 +3102,12 @@ export default function PhotoStudioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canvasLayerCropId, canvasLayers, canvasLayerCompletedCrop]);
 
-    async function handleCanvasLayerDrop(e: React.DragEvent<HTMLCanvasElement>) {
+    async function addDroppedCanvasLayer(
+        e: React.DragEvent<HTMLElement>,
+        dropX: number,
+        dropY: number,
+    ) {
         e.preventDefault();
-        const rect = e.currentTarget.getBoundingClientRect();
-        const dropX = (e.clientX - rect.left) / rect.width;
-        const dropY = (e.clientY - rect.top) / rect.height;
         const fileId = e.dataTransfer.getData('driveFileId');
         if (fileId) {
             try {
@@ -3118,6 +3130,15 @@ export default function PhotoStudioModal({
         }
     }
 
+    function handleCanvasLayerDrop(e: React.DragEvent<HTMLCanvasElement>) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        void addDroppedCanvasLayer(
+            e,
+            (e.clientX - rect.left) / Math.max(rect.width, 1),
+            (e.clientY - rect.top) / Math.max(rect.height, 1),
+        );
+    }
+
     function handleCanvasLayerContextMenu(e: React.MouseEvent<HTMLCanvasElement>) {
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
@@ -3131,6 +3152,11 @@ export default function PhotoStudioModal({
                 return;
             }
         }
+    }
+
+    function openCanvasLayerContextMenu(layerId: string, clientX: number, clientY: number) {
+        setCanvasSelectedId(layerId);
+        setCanvasContextMenu({ x: clientX, y: clientY, layerId });
     }
 
     function handleActivateCanvas(canvasId?: string) {
@@ -5327,23 +5353,40 @@ export default function PhotoStudioModal({
                                 <div className={`relative inline-block ${canvasBg}`}>
                                     {canvasActive ? (
                                         <>
-                                        <canvas
-                                            ref={canvasLayersRef}
-                                            tabIndex={0}
-                                            style={{
-                                                ...getCanvasRatioStyle(),
-                                                outline: 'none', // avoid focus ring on canvas
-                                                cursor: healMode ? 'crosshair' : 'default',
-                                            }}
-                                            onPointerDown={handleCanvasLayerPointerDown}
-                                            onPointerMove={handleCanvasLayerPointerMove}
-                                            onPointerUp={handleCanvasLayerPointerUp}
-                                            onPointerLeave={() => { handleCanvasLayerPointerUp(); hideHealCursor(); }}
-                                            onDoubleClick={handleCanvasLayerDoubleClick}
-                                            onDragOver={e => e.preventDefault()}
-                                            onDrop={handleCanvasLayerDrop}
-                                            onContextMenu={handleCanvasLayerContextMenu}
-                                        />
+                                        {healMode ? (
+                                            <canvas
+                                                ref={canvasLayersRef}
+                                                tabIndex={0}
+                                                style={{
+                                                    ...getCanvasRatioStyle(),
+                                                    outline: 'none',
+                                                    cursor: 'crosshair',
+                                                }}
+                                                onPointerDown={handleCanvasLayerPointerDown}
+                                                onPointerMove={handleCanvasLayerPointerMove}
+                                                onPointerUp={handleCanvasLayerPointerUp}
+                                                onPointerLeave={() => { handleCanvasLayerPointerUp(); hideHealCursor(); }}
+                                                onDoubleClick={handleCanvasLayerDoubleClick}
+                                                onDragOver={e => e.preventDefault()}
+                                                onDrop={handleCanvasLayerDrop}
+                                                onContextMenu={handleCanvasLayerContextMenu}
+                                            />
+                                        ) : (
+                                            <FabricCanvasStage
+                                                layers={canvasLayers}
+                                                ratio={canvasRatio}
+                                                bgColor={activeCanvas?.bgColor ?? '#ffffff'}
+                                                selectedId={canvasSelectedId}
+                                                showGrid={isAlignmentGridVisible}
+                                                toolsHidden={toolsHidden}
+                                                onSelectionChange={setCanvasSelectedId}
+                                                onLayerChange={handleFabricLayerChange}
+                                                onInteractionChange={setCanvasLayerInteracting}
+                                                onDrop={(event, x, y) => { void addDroppedCanvasLayer(event, x, y); }}
+                                                onDoubleClickLayer={openCanvasLayerCrop}
+                                                onContextMenuLayer={openCanvasLayerContextMenu}
+                                            />
+                                        )}
                                         {/* Layer crop overlay — activado con doble clic */}
                                         {canvasLayerCropId && (() => {
                                             const layer = canvasLayers.find(l => l.id === canvasLayerCropId);
@@ -5662,7 +5705,7 @@ export default function PhotoStudioModal({
                         )}
 
                         {/* Bipupillar grid overlay — full grid when rotating/toggled; center crosshair also during pan */}
-                        {isAlignmentGridVisible && (
+                        {isAlignmentGridVisible && (!canvasActive || healMode) && (
                             <svg
                                 className="absolute inset-0 w-full h-full pointer-events-none"
                                 xmlns="http://www.w3.org/2000/svg"
