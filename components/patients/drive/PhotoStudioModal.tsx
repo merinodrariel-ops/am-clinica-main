@@ -21,6 +21,7 @@ import FabricCanvasStage from './FabricCanvasStage';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
 import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
+import { DEFAULT_BACKGROUND_BRUSH_MODE, eraseContiguousColor, paintSelectionMask, scaleMagicWandTolerance } from '@/lib/photo-studio/magic-wand';
 import { shouldStartPhotoStudioInPresentation } from '@/lib/photo-studio/mobile-presentation';
 import {
     createPhotoStudioImageLoadState,
@@ -970,7 +971,7 @@ export default function PhotoStudioModal({
     const [brushMode, setBrushMode] = useState<'restore' | 'erase' | null>(null);
     const [brushSize, setBrushSize] = useState(40);
     const [magicWandActive, setMagicWandActive] = useState(false);
-    const [magicWandTolerance, setMagicWandTolerance] = useState(8);
+    const [magicWandTolerance, setMagicWandTolerance] = useState(50);
     const [exportFileName, setExportFileName] = useState('');
     const [exportDestination, setExportDestination] = useState<'patient' | 'social'>('social');
     const [healMode, setHealMode] = useState(false);
@@ -1406,6 +1407,10 @@ export default function PhotoStudioModal({
 
         return [...ordered, ...byId.values()];
     }, [baseImageFiles, imageOrderIds]);
+    const editedOutputFiles = useMemo(
+        () => imageFiles.filter(item => editedFileIds.has(item.id) || item.name.toLowerCase().includes('_editada')),
+        [editedFileIds, imageFiles],
+    );
 
     useEffect(() => {
         setImageOrderIds((prev) => {
@@ -2203,86 +2208,10 @@ export default function PhotoStudioModal({
         const width = ctx.canvas.width;
         const height = ctx.canvas.height;
         const imgData = ctx.getImageData(0, 0, width, height);
-        const data = imgData.data;
-        
-        const tolerance = (tolerancePercent / 100) * 441.67;
-        const startIdx = (startY * width + startX) * 4;
-        const targetR = data[startIdx];
-        const targetG = data[startIdx + 1];
-        const targetB = data[startIdx + 2];
-        const targetA = data[startIdx + 3];
-        
-        if (targetA === 0) return;
-        
-        const visited = new Uint8Array(width * height);
-        
-        function match(x: number, y: number): boolean {
-            const idx = (y * width + x) * 4;
-            if (data[idx + 3] === 0) return false;
-            const r = data[idx];
-            const g = data[idx + 1];
-            const b = data[idx + 2];
-            const dist = Math.sqrt((r - targetR) ** 2 + (g - targetG) ** 2 + (b - targetB) ** 2);
-            return dist <= tolerance;
-        }
-        
-        const queueX: number[] = [startX];
-        const queueY: number[] = [startY];
-        
-        while (queueX.length > 0) {
-            const cx = queueX.pop()!;
-            const cy = queueY.pop()!;
-            
-            let lx = cx;
-            while (lx > 0 && match(lx - 1, cy) && !visited[cy * width + (lx - 1)]) {
-                lx--;
-            }
-            
-            let rx = cx;
-            while (rx < width - 1 && match(rx + 1, cy) && !visited[cy * width + (rx + 1)]) {
-                rx++;
-            }
-            
-            for (let x = lx; x <= rx; x++) {
-                const idx = cy * width + x;
-                visited[idx] = 1;
-                const pIdx = idx * 4;
-                data[pIdx + 3] = 0;
-            }
-            
-            let scanUp = false;
-            let scanDown = false;
-            for (let x = lx; x <= rx; x++) {
-                if (cy > 0) {
-                    const isMatch = match(x, cy - 1);
-                    const isVisited = visited[(cy - 1) * width + x];
-                    if (isMatch && !isVisited) {
-                        if (!scanUp) {
-                            queueX.push(x);
-                            queueY.push(cy - 1);
-                            scanUp = true;
-                        }
-                    } else {
-                        scanUp = false;
-                    }
-                }
-                if (cy < height - 1) {
-                    const isMatch = match(x, cy + 1);
-                    const isVisited = visited[(cy + 1) * width + x];
-                    if (isMatch && !isVisited) {
-                        if (!scanDown) {
-                            queueX.push(x);
-                            queueY.push(cy + 1);
-                            scanDown = true;
-                        }
-                    } else {
-                        scanDown = false;
-                    }
-                }
-            }
-        }
-        
+        const visited = eraseContiguousColor(imgData, startX, startY, tolerancePercent);
+        if (!visited) return null;
         ctx.putImageData(imgData, 0, 0);
+        return visited;
     }
 
     async function createEditableCanvasFromSource(src: string) {
@@ -3592,12 +3521,26 @@ export default function PhotoStudioModal({
         pushHistory();
         
         const octx = oc.getContext('2d')!;
-        scanlineFloodFillErase(octx, Math.round(x), Math.round(y), magicWandTolerance);
+        const scaledTolerance = scaleMagicWandTolerance(magicWandTolerance);
+        const visited = scanlineFloodFillErase(octx, Math.round(x), Math.round(y), scaledTolerance);
+        if (!visited) return;
         
         // Redraw on the visible canvas
         const vctx = e.currentTarget.getContext('2d')!;
         vctx.clearRect(0, 0, e.currentTarget.width, e.currentTarget.height);
         vctx.drawImage(oc, 0, 0);
+        const preview = vctx.getImageData(0, 0, e.currentTarget.width, e.currentTarget.height);
+        paintSelectionMask(preview, visited);
+        vctx.putImageData(preview, 0, 0);
+
+        const visibleCanvas = e.currentTarget;
+        setTimeout(() => {
+            if (offscreenCanvasRef.current !== oc) return;
+            const currentCtx = visibleCanvas.getContext('2d');
+            if (!currentCtx) return;
+            currentCtx.clearRect(0, 0, visibleCanvas.width, visibleCanvas.height);
+            currentCtx.drawImage(oc, 0, 0);
+        }, 500);
         
         // Commit changes to imageUrl
         oc.toBlob(blob => {
@@ -5237,52 +5180,10 @@ export default function PhotoStudioModal({
                                 );
                             })}
 
-                            {/* Multi-canvas thumbnails */}
-                            {canvases.map((cv) => (
-                                <div key={cv.id} className="relative flex-shrink-0 group">
-                                    <button
-                                        onClick={() => { handleActivateCanvas(cv.id); clearMultiSelection(); }}
-                                        className={`relative aspect-square w-[56px] rounded-lg overflow-hidden border-2 transition-all flex flex-col items-center justify-center p-1 ${
-                                            canvasActive && activeCanvasId === cv.id
-                                                ? 'border-[#C9A96E] bg-white shadow-[0_0_15px_rgba(201,169,110,0.3)]'
-                                                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
-                                        }`}
-                                        title={cv.name}
-                                    >
-                                        <CanvasThumbnailPreview
-                                            layers={cv.layers}
-                                            bgColor={cv.bgColor}
-                                            ratio={cv.ratio}
-                                        />
-                                        {cv.layers.length > 0 && (
-                                            <span className="absolute top-0.5 right-0.5 text-[7px] bg-[#C9A96E]/80 text-black rounded px-0.5 font-bold">
-                                                {cv.layers.length}
-                                            </span>
-                                        )}
-                                    </button>
-                                    {/* Delete button — always visible so it works on touch and with a single canvas */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteCanvas(cv.id); }}
-                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center z-10"
-                                        title="Eliminar lienzo"
-                                    >
-                                        <X size={8} />
-                                    </button>
-                                </div>
-                            ))}
-
-                            {/* Add new canvas button */}
-                            <button
-                                onClick={handleNewCanvas}
-                                className="flex-shrink-0 aspect-square w-[56px] rounded-lg border-2 border-dashed border-white/20 hover:border-[#C9A96E]/60 hover:bg-white/5 transition-all flex flex-col items-center justify-center gap-0.5"
-                                title="Nuevo lienzo"
-                            >
-                                <Plus size={14} className="text-white/40 group-hover:text-[#C9A96E]" />
-                                <span className="text-[8px] text-white/30 uppercase tracking-wider">Nuevo</span>
-                            </button>
                         </div>
                     </div>
 
+                    <div className="flex min-w-0 flex-1 flex-col">
                     {/* Canvas area */}
                     <div
                         ref={canvasContainerRef}
@@ -5810,6 +5711,73 @@ export default function PhotoStudioModal({
                             )}
                         </div>
                     )}
+
+                    {/* Adobe Express-style project rail: editable canvases and edited outputs */}
+                    <div className="hidden md:flex h-[94px] flex-shrink-0 items-stretch border-t border-white/10 bg-[#111119]">
+                        <div className="flex w-36 flex-shrink-0 flex-col justify-center border-r border-white/10 px-4">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C9A96E]">Proyectos</span>
+                            <span className="mt-1 text-[10px] leading-tight text-white/35">Lienzos editables y resultados</span>
+                        </div>
+                        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto px-4 py-2 thin-scrollbar">
+                            {canvases.map((cv) => (
+                                <div key={cv.id} className="group relative flex flex-shrink-0 flex-col items-center gap-1">
+                                    <button
+                                        onClick={() => { handleActivateCanvas(cv.id); clearMultiSelection(); }}
+                                        className={`relative h-14 w-20 overflow-hidden rounded-lg border-2 p-0.5 transition-all ${
+                                            canvasActive && activeCanvasId === cv.id
+                                                ? 'border-[#C9A96E] bg-white shadow-[0_0_15px_rgba(201,169,110,0.3)]'
+                                                : 'border-white/10 bg-white/5 hover:border-white/30'
+                                        }`}
+                                        title={`Abrir ${cv.name}`}
+                                    >
+                                        <CanvasThumbnailPreview layers={cv.layers} bgColor={cv.bgColor} ratio={cv.ratio} />
+                                        <span className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 text-[8px] font-bold text-white">
+                                            {cv.layers.length} {cv.layers.length === 1 ? 'capa' : 'capas'}
+                                        </span>
+                                    </button>
+                                    <span className="max-w-20 truncate text-[9px] text-white/55">{cv.name}</span>
+                                    <button
+                                        onClick={(event) => { event.stopPropagation(); handleDeleteCanvas(cv.id); }}
+                                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                                        title={`Eliminar ${cv.name}`}
+                                    >
+                                        <X size={9} />
+                                    </button>
+                                </div>
+                            ))}
+                            {editedOutputFiles.map((editedFile) => (
+                                <button
+                                    key={`edited-${editedFile.id}`}
+                                    onClick={(event) => handleThumbnailSelect(editedFile, event)}
+                                    className={`relative flex flex-shrink-0 flex-col items-center gap-1 ${
+                                        !canvasActive && activeFile.id === editedFile.id ? 'text-[#C9A96E]' : 'text-white/55'
+                                    }`}
+                                    title={`Abrir resultado ${editedFile.name}`}
+                                >
+                                    <span className={`relative block h-14 w-20 overflow-hidden rounded-lg border-2 ${
+                                        !canvasActive && activeFile.id === editedFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
+                                    }`}>
+                                        {editedFile.thumbnailLink ? (
+                                            <img src={editedFile.thumbnailLink} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                                        ) : (
+                                            <span className="flex h-full w-full items-center justify-center bg-white/5"><ImageIcon size={16} /></span>
+                                        )}
+                                        <Sparkles size={10} className="absolute bottom-1 right-1 rounded-full bg-[#C9A96E] p-0.5 text-black" />
+                                    </span>
+                                    <span className="max-w-20 truncate text-[9px]">{editedFile.name}</span>
+                                </button>
+                            ))}
+                            <button
+                                onClick={handleNewCanvas}
+                                className="flex h-14 w-20 flex-shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-[#C9A96E]/40 bg-[#C9A96E]/5 text-[#C9A96E] transition-colors hover:bg-[#C9A96E]/15"
+                                title="Crear lienzo nuevo"
+                            >
+                                <Plus size={20} />
+                                <span className="text-[9px] font-bold uppercase">Nuevo</span>
+                            </button>
+                        </div>
+                    </div>
+                    </div>
 
                     {/* Tab to restore panel when hidden */}
                     {toolsHidden && (
@@ -7163,63 +7131,56 @@ function ToolsPanel({
                     </>
                 ) : (
                     <div className="space-y-3 bg-white/5 p-4 rounded-xl border border-white/5">
-                        {/* IA BG removal button - only if not done */}
-                        {!bgDone && (
-                            <button
-                                onClick={onRemoveBg}
-                                disabled={canvasActive && !canvasSelectedId}
-                                className="w-full py-3 rounded-xl bg-violet-600/30 text-violet-200 text-sm font-semibold hover:bg-violet-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                <Wand2 size={18} /> Remover fondo por IA
-                            </button>
-                        )}
-
-                        {/* Manual Clipping Tools Selector */}
-                        <div className="space-y-2">
-                            <p className="text-xs text-white/45 uppercase tracking-wider font-semibold">Recorte Manual</p>
-                            <div className="flex gap-2">
+                        {/* Three equal, workflow-specific background tools */}
+                        <div className="grid grid-cols-3 gap-2">
                                 <button
-                                    onClick={() => onStartManualEraser(brushMode === 'restore' ? 'erase' : 'restore')}
-                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                                        brushMode !== null
-                                            ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-md'
-                                            : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
-                                    }`}
+                                    onClick={onRemoveBg}
+                                    disabled={bgDone || (canvasActive && !canvasSelectedId)}
+                                    className="min-h-16 rounded-xl border border-violet-500/30 bg-violet-600/25 px-2 py-2 text-xs font-semibold text-violet-100 hover:bg-violet-600/45 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-1"
                                 >
-                                    <Eraser size={14} /> Pincel
+                                    <Wand2 size={17} /> Facial
                                 </button>
                                 <button
                                     onClick={() => onStartManualEraser('magic')}
-                                    className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                    className={`min-h-16 rounded-xl border px-2 py-2 text-[11px] leading-tight font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
                                         magicWandActive
                                             ? 'bg-purple-600/20 border-purple-500 text-purple-200 shadow-md'
                                             : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
                                     }`}
                                 >
-                                    <Sparkles size={14} /> Varita Mágica
+                                    <Sparkles size={16} /> <span>Intraoral<br />Varita</span>
+                                </button>
+                                <button
+                                    onClick={() => onStartManualEraser(DEFAULT_BACKGROUND_BRUSH_MODE)}
+                                    className={`min-h-16 rounded-xl border px-2 py-2 text-[11px] leading-tight font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
+                                        brushMode !== null
+                                            ? 'bg-amber-500/20 border-[#C9A96E] text-[#F4D79D] shadow-md'
+                                            : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:border-white/10'
+                                    }`}
+                                >
+                                    <Eraser size={16} /> <span>Intraoral<br />Pincel</span>
                                 </button>
                             </div>
-                        </div>
 
                         {/* Brush controls when active */}
                         {brushMode !== null && (
                             <div className="space-y-2 pt-2 border-t border-white/5">
                                 <div className="flex gap-2">
                                     <button
+                                        onClick={() => onSetBrushMode('erase')}
+                                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                            brushMode === 'erase' ? 'bg-[#C9A96E] text-black' : 'bg-white/10 text-white/70 hover:bg-white/15'
+                                        }`}
+                                    >
+                                        Borrar fondo
+                                    </button>
+                                    <button
                                         onClick={() => onSetBrushMode('restore')}
                                         className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                                             brushMode === 'restore' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'
                                         }`}
                                     >
-                                        Restaurar
-                                    </button>
-                                    <button
-                                        onClick={() => onSetBrushMode('erase')}
-                                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                                            brushMode === 'erase' ? 'bg-red-600 text-white' : 'bg-white/10 text-white/70 hover:bg-white/15'
-                                        }`}
-                                    >
-                                        Borrar más
+                                        Restaurar original
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-2 pt-1">
@@ -7241,7 +7202,7 @@ function ToolsPanel({
                                 <div className="flex items-center gap-2">
                                     <span className="text-white/50 text-xs w-16">Tolerancia</span>
                                     <input
-                                        type="range" min={1} max={25} step={1}
+                                        type="range" min={1} max={100} step={1}
                                         value={magicWandTolerance}
                                         onChange={e => onSetMagicWandTolerance(Number(e.target.value))}
                                         className="flex-1 accent-purple-500"
