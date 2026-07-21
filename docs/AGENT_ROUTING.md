@@ -51,6 +51,7 @@
 | Caja admin | `app/caja-admin/**`, `components/caja-admin/**`, `lib/caja-admin/**` | fullstack |
 | Agenda | `app/agenda/**`, `components/agenda/**`, `lib/am-scheduler/**` | fullstack |
 | Pacientes | `app/patients/**`, `components/patients/**`, `lib/patients.ts` | fullstack |
+| Fotos / Drive / Photo Studio | `components/patients/drive/**`, `app/actions/patient-files-drive.ts` | frontend/fullstack coordinado |
 | Inventario (clásico) | `app/inventario/**`, `components/inventario/**` | frontend/fullstack |
 | Inventario (productos) | `app/inventario/productos/**`, `components/inventario-products/**` | frontend/fullstack |
 | Portal profesional | `app/portal/**`, `app/portal-profesional/**`, `components/portal/**` | frontend |
@@ -67,7 +68,8 @@
 1. **Un módulo, un agente a la vez.** Ver `docs/OWNERSHIP.md` antes de comenzar.
 2. **Si tocás SQL/RLS, coordiná** con el agente DB — no hacer migraciones ad-hoc.
 3. **Si tocás `AuthContext` o middleware,** pedir aprobación humana explícita.
-4. **Handoff obligatorio al terminar** — usar el formato de `docs/AGENT_GUARDRAILS.md §10`.
+4. **Si tocás Fotos / Drive / Photo Studio,** revisar commits recientes de `PatientDriveTab`, `DriveFileCard`, `PhotoStudioModal`/módulos derivados y `patient-files-drive`; preservar el contrato portada → Selección → resto.
+5. **Handoff obligatorio al terminar** — usar el formato de `docs/AGENT_GUARDRAILS.md §10`.
 
 ---
 

@@ -30,6 +30,12 @@
 
 **Módulo owner:** ver docs/OWNERSHIP.md — ¿está libre?
 
+**Recent-work check:**
+- [ ] `git fetch` ejecutado
+- [ ] `origin/main` revisado
+- [ ] `git log --oneline -- <archivos probables>` revisado
+- [ ] Contratos compartidos del dominio identificados
+
 **Constraints:**
 - No romper módulos adyacentes: [listar]
 - Sin migraciones destructivas
@@ -48,6 +54,7 @@
 
 **Definition of Done:**
 - [ ] Funcionalidad implementada
+- [ ] Diff final no revierte commits recientes de otros agentes
 - [ ] Build pasa (`npm run build`)
 - [ ] Sin violaciones de guardrails (categoria, cliente Supabase, timezone)
 - [ ] Probado en UI o con query SQL
@@ -71,6 +78,9 @@
 
 **Risks encontrados:**
 [ninguno / descripción + mitigación aplicada]
+
+**Trabajo reciente preservado:**
+[commits/contratos revisados, o "no aplicaba"]
 
 **Por qué es seguro:**
 [razón]

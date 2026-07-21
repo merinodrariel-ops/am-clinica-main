@@ -70,9 +70,7 @@ export function TreatmentCard({ treatment, daysInStage, timeLimit, progressPerce
             try {
                 const resolved = await resolvePatientPresentationLinkAction(treatment.patient.id_paciente);
                 if (resolved.success && resolved.url) {
-                    if (resolved.source !== 'folder') {
-                        setResolvedPresentationUrl(resolved.url);
-                    }
+                    setResolvedPresentationUrl(resolved.url);
                     window.open(resolved.url, '_blank', 'noopener,noreferrer');
                     return;
                 }

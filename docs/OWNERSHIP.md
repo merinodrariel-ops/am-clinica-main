@@ -69,6 +69,48 @@ Handoff: [link o descripción]
 
 Esto previene que dos agentes editen el mismo archivo en paralelo y generen conflictos de merge.
 
+## Protocolo anti-regresión multi-agente
+
+El lock por archivo no alcanza cuando dos tareas distintas comparten un contrato funcional. Antes de editar, el agente debe identificar el dominio real, no solo el archivo.
+
+Regla:
+- Si dos tareas afectan el mismo dominio funcional, se coordinan como si tocaran el mismo módulo.
+- El agente que llega después debe preservar explícitamente los commits recientes del agente anterior.
+- Si Git no marca conflicto pero el diff reintroduce comportamiento viejo, es regresión igual.
+
+Checklist obligatorio antes de commit:
+- [ ] `git fetch` ejecutado.
+- [ ] `git status --short` revisado.
+- [ ] `git log --oneline -- <archivos tocados>` revisado.
+- [ ] Diff final comparado contra la tarea pedida.
+- [ ] Contratos compartidos del dominio preservados.
+
+### Zona caliente: Fotos / Drive / Photo Studio
+
+Dominio funcional compartido:
+- Grilla principal de fotos
+- Portada
+- Fotos de Selección / Redes
+- Guardado de foto editada
+- Orden manual por drag
+- Photo Studio modal y herramientas de edición
+- Thumbnails, cache y prefetch
+
+Contrato vigente:
+- La grilla debe mostrar **portada → Selección → resto**.
+- La portada se define por el primer elemento del orden guardado.
+- Las fotos de Selección se muestran dentro de la grilla principal, no como sección relegada al final.
+- Cambios en herramientas del editor no deben modificar orden/portada/Selección.
+- Cambios en orden/portada/Selección no deben modificar herramientas del editor.
+
+Archivos típicos del dominio:
+- `components/patients/drive/PatientDriveTab.tsx`
+- `components/patients/drive/DriveFileCard.tsx`
+- `components/patients/drive/PhotoStudioModal.tsx` y módulos derivados
+- `app/actions/patient-files-drive.ts`
+
+Si Cloud Code, Codex u otro agente toca cualquiera de esos archivos, debe revisar commits recientes de todos los archivos del dominio que puedan compartir contrato.
+
 ---
 
 ## Módulos de alta sensibilidad (doble revisión antes de push)
@@ -85,6 +127,7 @@ Aunque el owner rote, estos módulos siempre requieren:
 | Liquidaciones | Cálculo de honorarios — dato sensible |
 | Prestaciones | Privacidad inter-profesional |
 | RLS / migrations | Seguridad de datos |
+| Fotos / Drive / Photo Studio | Flujo grande y multi-agente; fácil revertir portada, Selección, guardado o editor sin conflicto textual |
 
 ---
 

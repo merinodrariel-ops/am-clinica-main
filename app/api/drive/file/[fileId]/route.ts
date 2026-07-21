@@ -6,6 +6,8 @@ export async function GET(
     { params }: { params: Promise<{ fileId: string }> }
 ) {
     const { fileId } = await params;
+    const searchParams = new URL(request.url).searchParams;
+    const forceFresh = searchParams.has('t') || searchParams.get('fresh') === '1';
 
     if (!fileId) {
         return NextResponse.json({ error: 'File ID required' }, { status: 400 });
@@ -31,8 +33,13 @@ export async function GET(
 
         const headers = new Headers();
         headers.set('Content-Type', contentType);
-        // Cache in the browser for 10 minutes — avoids re-fetching when navigating between photos
-        headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=60');
+        // Serve through Vercel's shared edge/CDN cache, not just the browser: after the
+        // first hit per region the file is served without touching the Drive API again.
+        // Display URLs are versioned with `?v=modifiedTime`, so an in-place "replace
+        // original" (same fileId, new bytes) yields a fresh URL and never serves stale.
+        headers.set('Cache-Control', forceFresh
+            ? 'no-store, max-age=0'
+            : 'public, max-age=600, s-maxage=604800, stale-while-revalidate=86400');
         // Allow canvas drawImage() without tainting (needed for PhotoStudio export)
         headers.set('Access-Control-Allow-Origin', '*');
 

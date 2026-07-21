@@ -69,7 +69,7 @@ async function syncPatientPresentationsForPatient(patient: PatientBase): Promise
         motherFolderId || undefined
     );
 
-    if (folderSetup.error || !folderSetup.presentationFolderId || !folderSetup.motherFolderId) {
+    if (folderSetup.error || !folderSetup.motherFolderId) {
         return {
             success: false,
             syncedCount: 0,
@@ -83,6 +83,14 @@ async function syncPatientPresentationsForPatient(patient: PatientBase): Promise
             .from('pacientes')
             .update({ link_historia_clinica: folderSetup.motherFolderUrl })
             .eq('id_paciente', patientId);
+    }
+
+    if (!folderSetup.presentationFolderId) {
+        return {
+            success: true,
+            syncedCount: 0,
+            manualReview: [],
+        };
     }
 
     const manualReview: Array<{ reason: string; fileName?: string; fileId?: string }> = [];
@@ -133,7 +141,7 @@ async function syncPatientPresentationsForPatient(patient: PatientBase): Promise
     }
 
     const files = (filesResult.files || []).filter(
-        (file) => file.mimeType !== 'application/vnd.google-apps.folder'
+        (file) => PRESENTATION_MIME_TYPES.includes(file.mimeType)
     );
 
     let syncedCount = 0;
@@ -271,7 +279,7 @@ export async function syncPatientPresentationsAction(patientId: string): Promise
 export async function resolvePatientPresentationLinkAction(patientId: string): Promise<{
     success: boolean;
     url?: string;
-    source?: 'paciente' | 'sync' | 'folder';
+    source?: 'paciente' | 'sync';
     error?: string;
 }> {
     try {
@@ -314,10 +322,6 @@ export async function resolvePatientPresentationLinkAction(patientId: string): P
                 .eq('id_paciente', patientId);
 
             return { success: true, url: resolvedSlidesUrl, source: 'sync' };
-        }
-
-        if (syncResult.folderUrl) {
-            return { success: true, url: syncResult.folderUrl, source: 'folder' };
         }
 
         return {

@@ -1,22 +1,36 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AgendaCalendar from '@/components/agenda/AgendaCalendar';
-import MonthlyAgendaDashboard from '@/components/agenda/MonthlyAgendaDashboard';
+import dynamic from 'next/dynamic';
 import TodaySchedulePanel from '@/components/agenda/TodaySchedulePanel';
-import DoctorScheduleConfig from '@/components/agenda/DoctorScheduleConfig';
-import CsvImportWizard from '@/components/agenda/CsvImportWizard';
-import DoctorReassignmentPanel from '@/components/agenda/DoctorReassignmentPanel';
-import AgendaBlocksManager from '@/components/agenda/AgendaBlocksManager';
-import { Calendar, Settings, Upload, X } from 'lucide-react';
+import { Calendar, Settings, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-type Tab = 'calendar' | 'config' | 'import';
+const AgendaCalendar = dynamic(() => import('@/components/agenda/AgendaCalendar'), {
+    ssr: false,
+    loading: () => (
+        <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+            <div className="h-8 w-48 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            <div className="mt-4 grid h-[calc(100%-3rem)] grid-cols-1 gap-2 md:grid-cols-7">
+                {Array.from({ length: 7 }).map((_, index) => (
+                    <div
+                        key={index}
+                        className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 animate-pulse"
+                    />
+                ))}
+            </div>
+        </div>
+    ),
+});
+const MonthlyAgendaDashboard = dynamic(() => import('@/components/agenda/MonthlyAgendaDashboard'), { ssr: false });
+const DoctorScheduleConfig = dynamic(() => import('@/components/agenda/DoctorScheduleConfig'), { ssr: false });
+const AgendaBlocksManager = dynamic(() => import('@/components/agenda/AgendaBlocksManager'), { ssr: false });
+
+type Tab = 'calendar' | 'config';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'calendar', label: 'Agenda 360', icon: <Calendar size={15} /> },
+    { id: 'calendar', label: 'Agenda AM', icon: <Calendar size={15} /> },
     { id: 'config', label: 'Configuración', icon: <Settings size={15} /> },
-    { id: 'import', label: 'Importar Histórico', icon: <Upload size={15} /> },
 ];
 
 export default function AgendaPage() {
@@ -24,10 +38,11 @@ export default function AgendaPage() {
     const [activeTab, setActiveTab] = useState<Tab>('calendar');
     const [showPanel, setShowPanel] = useState(false);
     const [doctors, setDoctors] = useState<{ id: string; full_name: string }[]>([]);
+    const [isDesktop, setIsDesktop] = useState(false);
 
     const isAdminOrOwner = ['owner', 'admin', 'developer'].includes(categoria || '');
     const visibleTabs = TABS.filter(tab => {
-        if (tab.id === 'config' || tab.id === 'import') {
+        if (tab.id === 'config') {
             return isAdminOrOwner;
         }
         return true;
@@ -40,10 +55,20 @@ export default function AgendaPage() {
     }, [activeTab, authLoading, isAdminOrOwner]);
 
     useEffect(() => {
+        const mediaQuery = window.matchMedia('(min-width: 768px)');
+        const syncDesktop = () => setIsDesktop(mediaQuery.matches);
+        syncDesktop();
+        mediaQuery.addEventListener('change', syncDesktop);
+        return () => mediaQuery.removeEventListener('change', syncDesktop);
+    }, []);
+
+    useEffect(() => {
+        if (activeTab !== 'config' || !isAdminOrOwner || doctors.length > 0) return;
+
         import('@/app/actions/agenda').then(({ getDoctors }) => {
             getDoctors().then(setDoctors);
         });
-    }, []);
+    }, [activeTab, doctors.length, isAdminOrOwner]);
 
     return (
         <div className="h-screen flex flex-col px-2 pb-2 pt-2 md:px-4 md:pb-4 md:pt-4">
@@ -51,10 +76,10 @@ export default function AgendaPage() {
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-                        AM·Scheduler
+                        Agenda AM
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                        Sistema de agenda propietario · Reemplaza Google Calendar y Calendly
+                        Agenda clínica central · Turnos, doctores y seguimiento operativo
                     </p>
                 </div>
 
@@ -79,7 +104,7 @@ export default function AgendaPage() {
             {/* Tab Content */}
             {activeTab === 'calendar' && (
                 <div className="flex-1 min-h-0 flex flex-col gap-2 md:gap-3">
-                    {!authLoading && categoria && ['owner', 'admin', 'reception', 'recaptacion'].includes(categoria) && (
+                    {isDesktop && !authLoading && categoria && ['owner', 'admin', 'reception', 'recaptacion'].includes(categoria) && (
                         <MonthlyAgendaDashboard />
                     )}
 
@@ -136,14 +161,6 @@ export default function AgendaPage() {
                 </div>
             )}
 
-            {activeTab === 'import' && (
-                <div className="flex-1 min-h-0 overflow-y-auto p-4 xl:p-8">
-                    <div className="max-w-4xl mx-auto space-y-8">
-                        <CsvImportWizard />
-                        <DoctorReassignmentPanel />
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

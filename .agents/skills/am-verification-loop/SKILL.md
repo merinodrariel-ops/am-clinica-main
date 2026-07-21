@@ -23,10 +23,19 @@ If a command is unavailable or too broad for the task, say exactly what you ran 
 ## Focused Checks
 
 - Agenda/date work: test or inspect Argentina-local day/week/month/year boundaries.
+- Agenda data work: before commit/push, run the exact query/action shape used by the UI for the affected date range against the target Supabase environment, and confirm it returns no error and expected rows when production data exists. A build or unauthenticated redirect check is not enough.
 - Supabase work: inspect RLS/auth assumptions, query filters, and sensitive fields.
 - Email work: verify Resend/template/action path and, when requested, send a real test.
-- Portal work: verify `/portal`, `/portal/agenda`, and `/portal/liquidation` paths as applicable.
+- Portal work: verify `/portal`, `/portal/agenda`, and `/portal/liquidation` paths as applicable, plus the effective role/override data that controls navigation or access.
 - UI work: verify the route in browser when a dev server or production URL is available.
+
+## Pre-Push Gate
+
+For production-visible changes, do not commit/push until:
+
+1. The focused functional check for the touched workflow has passed.
+2. A local build or focused type/lint check has passed.
+3. Any broad suite failures have been classified as related or unrelated with evidence.
 
 ## Production Checks
 

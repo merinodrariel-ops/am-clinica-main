@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
-import { getFinanciacionMensualResumen } from '@/lib/dashboard';
+import { getExpenseCategoryComparisons, getFinanciacionMensualResumen } from '@/lib/dashboard';
 import type { DashboardStats, OwnerDashboardStats, PlanFinanciacionDashboard, ReferralStat } from '@/lib/dashboard';
 
 type PrimeraConsultaRow = {
@@ -14,6 +14,12 @@ type PrimeraConsultaRow = {
 
 type PrimeraConsultaReciente = PrimeraConsultaRow & {
     monthKey: string;
+};
+
+type ExpenseDashboardRow = {
+    subtipo: string | null;
+    usd_equivalente_total: number | null;
+    fecha_movimiento: string;
 };
 
 async function verifyAccess(allowedRoles: string[]) {
@@ -154,6 +160,18 @@ export async function getOwnerDashboardStatsAction(
         const monthsToCompare = 6;
         const monthStart = new Date(year, month, 1).toISOString().split('T')[0];
         const nextMonthStart = new Date(year, month + 1, 1).toISOString().split('T')[0];
+        const previousMonthStart = new Date(year, month - 1, 1).toISOString().split('T')[0];
+        const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+        const previousMonthLastDay = new Date(year, month, 0).getDate();
+        const previousComparisonDay = Math.min(now.getDate(), previousMonthLastDay);
+        const previousComparisonEnd = isCurrentMonth
+            ? new Date(year, month - 1, previousComparisonDay + 1).toISOString().split('T')[0]
+            : monthStart;
+        const previousMonthLabel = new Date(year, month - 1, 1)
+            .toLocaleDateString('es-AR', { month: 'long' });
+        const egresosComparacionLabel = isCurrentMonth
+            ? `vs. mismo corte de ${previousMonthLabel}`
+            : `vs. ${previousMonthLabel}`;
         const comparisonMonthStart = new Date(year, month - (monthsToCompare - 1), 1).toISOString().split('T')[0];
         const rawMonthWindows = Array.from({ length: monthsToCompare }, (_, index) => {
             const date = new Date(year, month - (monthsToCompare - 1) + index, 1);
@@ -229,14 +247,28 @@ export async function getOwnerDashboardStatsAction(
 
         const { data: expenseData } = await supabase
             .from('caja_admin_movimientos')
-            .select('usd_equivalente_total')
+            .select('subtipo, usd_equivalente_total, fecha_movimiento')
             .eq('is_deleted', false)
             .eq('tipo_movimiento', 'EGRESO')
             .neq('estado', 'Anulado')
-            .gte('fecha_movimiento', monthStart)
+            .gte('fecha_movimiento', previousMonthStart)
             .lt('fecha_movimiento', nextMonthStart);
 
-        const egresosMesUsd = expenseData?.reduce((sum: number, m: { usd_equivalente_total: unknown }) => sum + (Number(m.usd_equivalente_total) || 0), 0) || 0;
+        const allExpenseRows = (expenseData || []) as ExpenseDashboardRow[];
+        const currentExpenseRows = allExpenseRows.filter((row) =>
+            row.fecha_movimiento >= monthStart && row.fecha_movimiento < nextMonthStart
+        );
+        const previousExpenseRows = allExpenseRows.filter((row) =>
+            row.fecha_movimiento >= previousMonthStart && row.fecha_movimiento < previousComparisonEnd
+        );
+        const egresosMesUsd = currentExpenseRows.reduce(
+            (sum, movement) => sum + (Number(movement.usd_equivalente_total) || 0),
+            0,
+        );
+        const egresosPorCategoria = getExpenseCategoryComparisons(
+            currentExpenseRows,
+            previousExpenseRows,
+        );
 
         const { data: financData } = await supabase
             .from('planes_financiacion')
@@ -265,6 +297,8 @@ export async function getOwnerDashboardStatsAction(
             limpiezasMensual,
             ingresosMesUsd: Math.round(ingresosMesUsd),
             egresosMesUsd: Math.round(egresosMesUsd),
+            egresosPorCategoria,
+            egresosComparacionLabel,
             personasEnFinanciacion: planesFinanciacion.length,
             cobroMensualFinanciacionUsd: Math.round(financiacionMensual.programadoUsd),
             financiacionMensualCobradoUsd: Math.round(financiacionMensual.cobradoUsd),
@@ -274,6 +308,6 @@ export async function getOwnerDashboardStatsAction(
         };
     } catch (error) {
         console.error('getOwnerDashboardStatsAction:', error);
-        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], limpiezasMensual: [], ingresosMesUsd: 0, egresosMesUsd: 0, personasEnFinanciacion: 0, cobroMensualFinanciacionUsd: 0, financiacionMensualCobradoUsd: 0, financiacionMensualPendienteUsd: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
+        return { totalPacientes: 0, primeraVezMes: 0, listaPrimeraVez: [], primeraVezMensual: [], primerasConsultasRecientes: [], limpiezasMensual: [], ingresosMesUsd: 0, egresosMesUsd: 0, egresosPorCategoria: [], egresosComparacionLabel: '', personasEnFinanciacion: 0, cobroMensualFinanciacionUsd: 0, financiacionMensualCobradoUsd: 0, financiacionMensualPendienteUsd: 0, deudaTotalUsd: 0, planesFinanciacion: [] };
     }
 }

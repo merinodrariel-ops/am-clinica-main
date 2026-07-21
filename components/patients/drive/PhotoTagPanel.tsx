@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Check, Tag, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { X, Check, Tag, Trash2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { PHOTO_TAG_TAXONOMY, type PhotoTagCategory } from '@/lib/photo-tag-taxonomy';
+import { getTagLabel } from '@/lib/photo-tag-taxonomy';
+import { inferPhotoTagFromDescription } from '@/lib/photo-tag-inference';
 import { savePhotoTagAction, removePhotoTagAction, type PhotoTag } from '@/app/actions/photo-tags';
 
 interface Props {
@@ -20,21 +22,22 @@ export default function PhotoTagPanel({ file, patientId, currentTag, onClose, on
         (currentTag?.category as PhotoTagCategory) ?? null
     );
     const [selectedSub, setSelectedSub] = useState<string | null>(currentTag?.subcategory ?? null);
+    const [description, setDescription] = useState(currentTag?.description ?? '');
     const [saving, setSaving] = useState(false);
 
-    const categoryDef = PHOTO_TAG_TAXONOMY.find(c => c.key === selectedCategory);
+    const inferredTag = useMemo(() => inferPhotoTagFromDescription(description), [description]);
 
     async function handleSave() {
         if (!selectedCategory) return;
         setSaving(true);
-        const result = await savePhotoTagAction(file.id, patientId, selectedCategory, selectedSub);
+        const result = await savePhotoTagAction(file.id, patientId, selectedCategory, selectedSub, description);
         setSaving(false);
         if (result.error) {
             toast.error(result.error);
             return;
         }
         toast.success('Tag guardado');
-        onTagSaved({ file_id: file.id, category: selectedCategory, subcategory: selectedSub });
+        onTagSaved({ file_id: file.id, category: selectedCategory, subcategory: selectedSub, description: description.trim() || null });
         onClose();
     }
 
@@ -58,6 +61,14 @@ export default function PhotoTagPanel({ file, patientId, currentTag, onClose, on
         setSelectedSub(null);
     }
 
+    function handleDescriptionChange(value: string) {
+        setDescription(value);
+        const nextTag = inferPhotoTagFromDescription(value);
+        if (!nextTag) return;
+        setSelectedCategory(nextTag.category);
+        setSelectedSub(nextTag.subcategory);
+    }
+
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-white/10 w-64 shrink-0">
             {/* Header */}
@@ -65,7 +76,7 @@ export default function PhotoTagPanel({ file, patientId, currentTag, onClose, on
                 <div className="flex items-center gap-2 min-w-0">
                     <Tag size={14} className="text-gray-400 shrink-0" />
                     <span className="text-sm font-semibold text-gray-700 dark:text-white truncate">
-                        Clasificar foto
+                        Describir foto
                     </span>
                 </div>
                 <button
@@ -83,8 +94,33 @@ export default function PhotoTagPanel({ file, patientId, currentTag, onClose, on
                 </p>
             </div>
 
-            {/* Taxonomy */}
+            {/* Description-driven tagging */}
             <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+                <div className="rounded-xl border border-indigo-200 dark:border-indigo-500/20 bg-indigo-50/70 dark:bg-indigo-500/10 p-3 space-y-2">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-200">
+                        <Wand2 size={13} />
+                        Descripción clínica
+                    </label>
+                    <textarea
+                        value={description}
+                        onChange={(event) => handleDescriptionChange(event.target.value)}
+                        placeholder="Ej: foto intraoral oclusal superior, sonrisa frontal, perfil derecho de labios..."
+                        rows={5}
+                        className="w-full resize-none rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white dark:placeholder:text-white/35"
+                    />
+                    <div className="min-h-5 text-xs">
+                        {inferredTag ? (
+                            <span className="text-indigo-700 dark:text-indigo-200">
+                                Interpretado como: <strong>{getTagLabel(inferredTag.category, inferredTag.subcategory)}</strong>
+                            </span>
+                        ) : (
+                            <span className="text-gray-500 dark:text-white/45">
+                                Escribí una descripción y se completa el tag.
+                            </span>
+                        )}
+                    </div>
+                </div>
+
                 {PHOTO_TAG_TAXONOMY.map(cat => (
                     <div key={cat.key}>
                         {/* Category button */}
@@ -130,7 +166,7 @@ export default function PhotoTagPanel({ file, patientId, currentTag, onClose, on
                     disabled={!selectedCategory || saving}
                     className="w-full py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                    {saving ? 'Guardando…' : 'Guardar tag'}
+                    {saving ? 'Guardando…' : 'Guardar descripción'}
                 </button>
                 {currentTag && (
                     <button

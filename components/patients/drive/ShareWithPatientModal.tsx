@@ -123,9 +123,9 @@ export default function ShareWithPatientModal({ files, patientId, patientName, f
 
     return (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 overflow-hidden">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 overflow-hidden max-h-[90vh] md:max-h-[85vh] flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 flex-shrink-0">
                     <div>
                         <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Compartir con el paciente</h2>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-xs">
@@ -137,7 +137,7 @@ export default function ShareWithPatientModal({ files, patientId, patientName, f
                     </button>
                 </div>
 
-                <div className="p-5 space-y-4">
+                <div className="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
                     {/* Channel */}
                     <div className="flex gap-2">
                         <button
@@ -224,7 +224,7 @@ export default function ShareWithPatientModal({ files, patientId, patientName, f
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 pb-5">
+                <div className="px-5 pb-5 flex-shrink-0">
                     <button
                         onClick={handleSchedule}
                         disabled={saving || loadingContact}

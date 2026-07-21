@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 import { normalizeCategoriaAlias } from '@/lib/categoria-normalizer';
 
 const supabase = createClient();
+const PROFILE_SELECT = 'id,email,full_name,categoria,is_active,access_overrides';
 
 import { WorkerCategory } from '@/types/worker-portal';
 import { AccessOverrides, getCategoryDefault } from '@/lib/access-overrides';
@@ -68,10 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchProfile = async (userId: string) => {
         try {
-            console.log('Fetching profile for userId:', userId);
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select(PROFILE_SELECT)
                 .eq('id', userId)
                 .single();
 
@@ -89,7 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     });
                 }
             } else if (data) {
-                console.log('Profile fetched successfully:', data);
                 if (data.is_active === false) {
                     await signOut();
                     window.location.href = '/login?error=account_disabled';
@@ -113,13 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (savedCategoria) setImpersonatedCategoria(savedCategoria);
 
         // Check active session
-        console.log('AuthContext: Checking session...');
         supabase.auth.getSession().then((response: { data: { session: Session | null } }) => {
             const session = response.data.session;
-            console.log('AuthContext: Session response:', {
-                hasSession: !!session,
-                userEmail: session?.user?.email
-            });
             setSession(session);
             const currentUser = session?.user ?? null;
             setUser(currentUser);

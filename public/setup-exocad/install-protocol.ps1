@@ -8,6 +8,7 @@ $sourceScript = Join-Path $setupDir "open-exocad.ps1"
 $targetDir = Join-Path $env:USERPROFILE ".am-clinica-exocad"
 $targetScript = Join-Path $targetDir "open-exocad.ps1"
 $configFile = Join-Path $targetDir "exocad-config.json"
+$launcherVersion = "2.0.0"
 
 # Check if open-exocad.ps1 exists in the same folder as this installer
 if (-not (Test-Path $sourceScript)) {
@@ -44,8 +45,11 @@ if (-not (Test-Path $configFile)) {
     $configObj = @{
         googleDrivePath = $detectedPath
         exocadAppPath = "C:\exocad-DentalCAD3.2-FR-2024-09-27\DentalCADApp\bin\DentalCADApp.exe"
+        localWorkspaceRoot = (Join-Path $env:LOCALAPPDATA "AMClinica\ExocadWork")
+        backupRoot = (Join-Path $env:USERPROFILE ".am-clinica-exocad\backups")
+        syncGraceSeconds = 10
     }
-    $configObj | ConvertTo-Json | Out-File $configFile
+    $configObj | ConvertTo-Json | Out-File $configFile -Encoding utf8
 }
 
 # Registry paths under HKEY_CURRENT_USER\Software\Classes
@@ -72,7 +76,7 @@ try {
     $commandValue = "`"$psPath`" -NoProfile -ExecutionPolicy Bypass -File `"$targetScript`" `"%1`""
     New-ItemProperty -Path $commandPath.PsPath -Name "(Default)" -Value $commandValue -PropertyType String -Force | Out-Null
 
-    $msg = "¡Protocolo registrado con éxito!`n`nEl script se ha instalado en: $targetScript`n`nAhora la aplicación web de AM Clínica podrá abrir directamente archivos .project en Exocad.`n`nRuta configurada de Google Drive: $((Get-Content $configFile | ConvertFrom-Json).googleDrivePath)`n`nSi necesitas cambiar esta ruta, edita el archivo:`n$configFile"
+    $msg = "¡Guardado seguro de Exocad instalado!`n`nVersión del lanzador: $launcherVersion`n`nEl script se actualizó en: $targetScript`n`nLos proyectos se abrirán en una copia local protegida y, al cerrar Exocad, los cambios verificados volverán a Google Drive con respaldo automático.`n`nRuta configurada de Google Drive: $((Get-Content $configFile | ConvertFrom-Json).googleDrivePath)`n`nSi necesitas cambiar esta ruta, edita el archivo:`n$configFile"
     [System.Windows.MessageBox]::Show($msg, "Registro Exitoso", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
 } catch {
     [System.Windows.MessageBox]::Show("Error al registrar el protocolo: $_", "Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)

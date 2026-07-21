@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { awardAchievement, updateGoalProgressByCode } from './worker-portal';
 import { calculateAdjustedEarnings, type PayrollLog } from '@/lib/payroll-rules';
 import { getLiquidacionMonthEndISODate } from '@/lib/caja-admin/liquidacion-period';
+import { assertRole, assertAuthenticated, MANAGE_ROLES, ADMIN_VIEW_ROLES } from '@/lib/server-role-guard';
 
 function getAdminClient() {
     return createAdminClient(
@@ -247,6 +248,7 @@ export async function generateLiquidacion(
     personalId: string,
     mes: string // 'YYYY-MM'
 ): Promise<LiquidacionResult> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
 
     const { data: worker, error: workerError } = await admin
@@ -407,6 +409,7 @@ export async function generateLiquidacion(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function approveLiquidacion(id: string): Promise<void> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
 
     let lastError: { message?: string } | null = null;
@@ -431,6 +434,7 @@ export async function approveLiquidacion(id: string): Promise<void> {
 }
 
 export async function markLiquidacionPaid(id: string, fechaPago: string): Promise<void> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
 
     let lastError: { message?: string } | null = null;
@@ -455,6 +459,7 @@ export async function markLiquidacionPaid(id: string, fechaPago: string): Promis
 }
 
 export async function registrarMensualidadFija(formData: FormData): Promise<{ success: boolean; error?: string }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     try {
         const admin = getAdminClient();
         const personalId = String(formData.get('personalId') || '');
@@ -579,6 +584,7 @@ export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
     personalId?: string;
     liquidacionId?: string;
 }): Promise<{ success: boolean; error?: string }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     try {
         const admin = getAdminClient();
         const { movimientoId, personalId, liquidacionId } = input;
@@ -783,6 +789,7 @@ export async function sincronizarLiquidacionDesdeMovimientoCaja(input: {
 }
 
 export async function getLiquidacionesPendientesParaCaja(): Promise<LiquidacionPagoCajaSuggestion[]> {
+    await assertRole(ADMIN_VIEW_ROLES, 'ver liquidaciones');
     const admin = getAdminClient();
 
     const { data, error } = await admin
@@ -814,6 +821,7 @@ export async function getLiquidacionesPendientesParaCaja(): Promise<LiquidacionP
 }
 
 export async function rejectLiquidacion(id: string, motivo?: string): Promise<void> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
 
     let lastError: { message?: string } | null = null;
@@ -838,6 +846,7 @@ export async function rejectLiquidacion(id: string, motivo?: string): Promise<vo
 }
 
 export async function updateLiquidacionManual(input: UpdateLiquidacionManualInput): Promise<void> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
 
     const precioUnitario = Number(input.precio_unitario);
@@ -917,6 +926,7 @@ export async function updateLiquidacionManual(input: UpdateLiquidacionManualInpu
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAdminRow[]> {
+    await assertRole(ADMIN_VIEW_ROLES, 'ver liquidaciones');
     const admin = getAdminClient();
 
     const mesDate = mes
@@ -1067,6 +1077,7 @@ export async function getLiquidacionesAdmin(mes?: string): Promise<LiquidacionAd
 }
 
 export async function generateLiquidacionesEmpresa(empresaId: string, mes: string): Promise<{ generated: number; skipped: number }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
 
     const { data: workers, error } = await admin
@@ -1095,6 +1106,7 @@ export async function generateLiquidacionesEmpresa(empresaId: string, mes: strin
 }
 
 export async function markLiquidacionesEmpresaPaid(empresaId: string, mes: string, fechaPago: string): Promise<{ updated: number; skipped: number }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
     const mesDate = `${mes}-01`;
 
@@ -1128,6 +1140,7 @@ export async function markLiquidacionesEmpresaPaid(empresaId: string, mes: strin
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function checkAndAwardBadges(personalId: string): Promise<void> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     const admin = getAdminClient();
 
     const { data: worker } = await admin
@@ -1213,6 +1226,7 @@ export interface LeaderboardEntry {
 }
 
 export async function getMonthlyLeaderboard(limit = 10): Promise<LeaderboardEntry[]> {
+    await assertAuthenticated('ver el ranking mensual');
     const admin = getAdminClient();
 
     const { data, error } = await admin
@@ -1267,6 +1281,7 @@ export async function getPrestacionesDelMes(
     personalId: string,
     mes: string   // 'YYYY-MM'
 ): Promise<PrestacionRealizada[]> {
+    await assertRole(ADMIN_VIEW_ROLES, 'ver liquidaciones');
     const admin = getAdminClient();
     const [y, m] = mes.split('-').map(Number);
     const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
@@ -1288,6 +1303,7 @@ export async function getPrestacionesDelMes(
 export async function upsertPrestacion(
     input: UpsertPrestacionInput
 ): Promise<{ success: boolean; error?: string }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     try {
         const admin = getAdminClient();
         if (input.id) {
@@ -1325,6 +1341,7 @@ export async function upsertPrestacion(
 export async function deletePrestacion(
     id: string
 ): Promise<{ success: boolean; error?: string }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     try {
         const admin = getAdminClient();
         const { error } = await admin
@@ -1344,6 +1361,7 @@ export async function recalcularTotalesLiquidacion(
     personalId: string,
     mes: string  // 'YYYY-MM'
 ): Promise<{ success: boolean; error?: string }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     try {
         const admin = getAdminClient();
         const tcBnaVenta = await fetchBnaVenta();
@@ -1400,6 +1418,7 @@ export async function recalcularTotalesLiquidacion(
 // Admin utility: reset a paid/approved liquidación back to pending.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function revertLiquidacionToPending(personalId: string, mes: string): Promise<{ success: boolean; error?: string }> {
+    await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
     try {
         const admin = getAdminClient();
         const mesDate = mes.length === 7 ? `${mes}-01` : mes;

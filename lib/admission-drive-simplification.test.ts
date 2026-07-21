@@ -15,6 +15,10 @@ const clinicalWorkflowsSource = readFileSync(
     join(process.cwd(), 'app/actions/clinical-workflows.ts'),
     'utf8'
 );
+const presentationsActionSource = readFileSync(
+    join(process.cwd(), 'app/actions/presentaciones.ts'),
+    'utf8'
+);
 
 test('admission only prepares the patient root Drive folder', () => {
     assert.doesNotMatch(
@@ -57,5 +61,26 @@ test('clinical workflows only create ExoCAD folders on demand', () => {
         clinicalWorkflowsSource,
         /ensureExocadHtmlFolder/,
         'ExoCAD folder creation should remain available for digital design workflows'
+    );
+});
+
+test('presentation resolver does not treat patient root folder as a presentation', () => {
+    assert.doesNotMatch(
+        googleDriveSource,
+        /let presentationFolderId = resolvedMotherFolderId/,
+        'presentation folder resolution must not fall back to the patient root folder'
+    );
+    assert.doesNotMatch(
+        presentationsActionSource,
+        /source:\s*'folder'/,
+        'presentation link resolution must not return a Drive folder as a presentation link'
+    );
+});
+
+test('presentation sync only stores actual presentation files', () => {
+    assert.match(
+        presentationsActionSource,
+        /PRESENTATION_MIME_TYPES\.includes\(file\.mimeType\)/,
+        'presentation sync should filter out non-presentation files before saving records'
     );
 });

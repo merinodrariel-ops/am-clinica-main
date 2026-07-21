@@ -15,6 +15,7 @@ import {
     formatUsd,
 } from '@/lib/financial-engine';
 import { formatIsoDateEsAr, getContractSchedule } from '@/lib/contract-dates';
+import { assertAuthenticated } from '@/lib/server-role-guard';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -255,6 +256,7 @@ function buildFintechTemplatePlaceholders(
  * Currently a mock implementation for "Situation 1" check
  */
 export async function checkCreditStatusAction(cuit: string): Promise<{ success: boolean; situation: number; message: string }> {
+    await assertAuthenticated('usar herramientas de financiación');
     try {
         if (!cuit) throw new Error('CUIT is required');
 
@@ -278,6 +280,7 @@ export async function checkCreditStatusAction(cuit: string): Promise<{ success: 
  * Generates the contract document in the patient's Drive folder
  */
 export async function generateContractAction(patientId: string, sim: SimulationData) {
+    await assertAuthenticated('usar herramientas de financiación');
     try {
         // 1. Fetch patient data
         const { data: patient, error: fetchError } = await supabase
@@ -341,6 +344,7 @@ export async function generateAutomatedContractToDriveAction(input: AutomatedCon
     fileId?: string;
     error?: string;
 }> {
+    await assertAuthenticated('usar herramientas de financiación');
     try {
         if (!input.patientId) throw new Error('patientId es requerido');
         if (!input.tratamiento?.trim()) throw new Error('El tratamiento es requerido');
@@ -479,6 +483,7 @@ export async function createFinancingSimulationAction(input: CreateFinancingSimu
     simulation?: FinancingSimulationRecord;
     error?: string;
 }> {
+    await assertAuthenticated('usar herramientas de financiación');
     try {
         if (!input.patientId) {
             throw new Error('Falta seleccionar paciente');
@@ -568,6 +573,7 @@ export async function listFinancingSimulationsByPatientAction(patientId: string)
     simulations: FinancingSimulationRecord[];
     error?: string;
 }> {
+    await assertAuthenticated('usar herramientas de financiación');
     try {
         if (!patientId) {
             return { success: true, simulations: [] };
@@ -605,6 +611,7 @@ export async function listRecentFinancingSelectionsAction(input?: {
     items: RecentFinancingSelectionRecord[];
     error?: string;
 }> {
+    await assertAuthenticated('usar herramientas de financiación');
     try {
         const hours = Math.max(1, Math.min(168, Math.floor(Number(input?.hours || 24))));
         const limit = Math.max(1, Math.min(30, Math.floor(Number(input?.limit || 12))));
@@ -692,6 +699,7 @@ export async function getFinancingSimulationPresetAction(
     preset?: FinancingSimulationPreset;
     error?: string;
 }> {
+    await assertAuthenticated('usar herramientas de financiación');
     try {
         if (!patientId || !simulationId) {
             throw new Error('Faltan datos para cargar simulación');
@@ -737,6 +745,7 @@ export async function getFinancingSimulationPresetAction(
 export async function checkContractMakerReadinessAction(
     input: ContractMakerReadinessInput
 ): Promise<ContractMakerReadinessResult> {
+    await assertAuthenticated('usar herramientas de financiación');
     const fail = (message: string): ContractMakerReadinessResult => ({
         success: false,
         ready: false,

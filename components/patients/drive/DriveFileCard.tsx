@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
     Image as ImageIcon,
@@ -15,8 +16,9 @@ import {
     Share2,
     Mail,
     Tag,
-    Star,
     Sparkles,
+    Instagram,
+    Music2,
     Check,
 } from 'lucide-react';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
@@ -37,20 +39,22 @@ interface DriveFileCardProps {
     file: DriveFile;
     onPreview: (file: DriveFile) => void;
     onDelete?: (file: DriveFile) => void;
-    onShare?: (file: DriveFile) => void;
+    onShare?: (file: DriveFile, target?: 'native' | 'instagram' | 'tiktok') => void;
     onShareWithPatient?: (file: DriveFile) => void;
     onShareEmail?: (file: DriveFile) => void;
     onTag?: (file: DriveFile) => void;
     photoTag?: PhotoTag | null;
     isPortada?: boolean;
-    onSetPortada?: (file: DriveFile) => void;
     patientFolder?: string;
+    isSeleccion?: boolean;
     selectionEnabled?: boolean;
     isSelected?: boolean;
+    hideInlineActions?: boolean;
     onSelectionClick?: (
         file: DriveFile,
         event: { additive: boolean; range: boolean; checkbox: boolean }
     ) => void;
+    onContextMenuRequest?: (file: DriveFile, event: React.MouseEvent<HTMLDivElement>) => void;
 }
 
 function getFileCategory(file: DriveFile): 'image' | 'video' | '3d' | 'pdf' | 'google-doc' | 'exocad' | 'other' {
@@ -110,6 +114,10 @@ const COLOR_MAP = {
     other: 'text-gray-400 bg-gray-400/10',
 };
 
+const SHARE_MENU_WIDTH = 196;
+const SHARE_MENU_ESTIMATED_HEIGHT = 260;
+const SHARE_MENU_EDGE_GAP = 8;
+
 export default function DriveFileCard({
     file,
     onPreview,
@@ -120,13 +128,71 @@ export default function DriveFileCard({
     onTag,
     photoTag,
     isPortada,
-    onSetPortada,
     patientFolder,
+    isSeleccion,
     selectionEnabled,
     isSelected,
+    hideInlineActions,
     onSelectionClick,
+    onContextMenuRequest,
 }: DriveFileCardProps) {
     const [showShare, setShowShare] = useState(false);
+    const [shareMenuPosition, setShareMenuPosition] = useState<{ top: number; left: number } | null>(null);
+    const shareButtonRef = useRef<HTMLButtonElement | null>(null);
+    const shareMenuRef = useRef<HTMLDivElement | null>(null);
+
+    // Position the share dropdown via a portal so it escapes the card's overflow
+    // clipping and always stays fully inside the viewport (desktop + mobile).
+    useEffect(() => {
+        if (!showShare) return;
+
+        function updateShareMenuPosition() {
+            const button = shareButtonRef.current;
+            if (!button) return;
+
+            const rect = button.getBoundingClientRect();
+            const menu = shareMenuRef.current;
+            const menuWidth = menu?.offsetWidth || SHARE_MENU_WIDTH;
+            const menuHeight = menu?.offsetHeight || SHARE_MENU_ESTIMATED_HEIGHT;
+            const viewportW = window.innerWidth;
+            const viewportH = window.innerHeight;
+
+            // Horizontal: align menu's right edge to the button, clamped to the viewport.
+            const preferredLeft = rect.right - menuWidth;
+            const maxLeft = viewportW - menuWidth - SHARE_MENU_EDGE_GAP;
+            const left = Math.max(SHARE_MENU_EDGE_GAP, Math.min(preferredLeft, maxLeft));
+
+            // Vertical: prefer above the button, fall back to below, then clamp.
+            const spaceAbove = rect.top - SHARE_MENU_EDGE_GAP;
+            const spaceBelow = viewportH - rect.bottom - SHARE_MENU_EDGE_GAP;
+            let top: number;
+            if (spaceAbove >= menuHeight) {
+                top = rect.top - menuHeight - SHARE_MENU_EDGE_GAP;
+            } else if (spaceBelow >= menuHeight) {
+                top = rect.bottom + SHARE_MENU_EDGE_GAP;
+            } else {
+                top = spaceBelow >= spaceAbove
+                    ? rect.bottom + SHARE_MENU_EDGE_GAP
+                    : rect.top - menuHeight - SHARE_MENU_EDGE_GAP;
+            }
+            const maxTop = viewportH - menuHeight - SHARE_MENU_EDGE_GAP;
+            top = Math.max(SHARE_MENU_EDGE_GAP, Math.min(top, maxTop));
+
+            setShareMenuPosition({ top, left });
+        }
+
+        // First pass uses estimates; the rAF pass re-measures the mounted menu.
+        updateShareMenuPosition();
+        const raf = requestAnimationFrame(updateShareMenuPosition);
+        window.addEventListener('resize', updateShareMenuPosition);
+        window.addEventListener('scroll', updateShareMenuPosition, true);
+
+        return () => {
+            cancelAnimationFrame(raf);
+            window.removeEventListener('resize', updateShareMenuPosition);
+            window.removeEventListener('scroll', updateShareMenuPosition, true);
+        };
+    }, [showShare]);
     const category = getFileCategory(file);
     const Icon = ICON_MAP[category];
     const colorClass = COLOR_MAP[category];
@@ -134,7 +200,25 @@ export default function DriveFileCard({
     // google-docs are served by Google directly; the proxy can't download them
     const canDownload = category !== 'google-doc';
     const size = formatFileSize(file.size);
-    const hasShare = onShare || onShareWithPatient || onShareEmail;
+    const hasShare = onShare || onShareWithPatient || onShareEmail || canDownload;
+
+    // Serve grid thumbnails through our cached proxy (small, reliable, 1-week edge cache)
+    // instead of Google's raw thumbnailLink. `v=modifiedTime` busts the cache when a
+    // photo's content is replaced in place (same fileId, new bytes).
+    const thumbnailSrc = file.thumbnailLink
+        ? `/api/drive/thumbnail/${encodeURIComponent(file.id)}?s=400${file.modifiedTime ? `&v=${encodeURIComponent(file.modifiedTime)}` : ''}`
+        : undefined;
+
+    const openFile = () => {
+        if (category === 'exocad') {
+            const protocolUrl = `am-clinica-exocad://open?patientFolder=${encodeURIComponent(patientFolder || '')}&path=${encodeURIComponent(file.relativePath || '')}`;
+            window.location.href = protocolUrl;
+        } else if (canPreview) {
+            onPreview(file);
+        } else {
+            window.open(file.webViewLink, '_blank', 'noopener,noreferrer');
+        }
+    };
 
     const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
         if (selectionEnabled && onSelectionClick && (event.metaKey || event.ctrlKey || event.shiftKey)) {
@@ -146,14 +230,7 @@ export default function DriveFileCard({
             return;
         }
 
-        if (category === 'exocad') {
-            const protocolUrl = `am-clinica-exocad://open?patientFolder=${encodeURIComponent(patientFolder || '')}&path=${encodeURIComponent(file.relativePath || '')}`;
-            window.location.href = protocolUrl;
-        } else if (canPreview) {
-            onPreview(file);
-        } else {
-            window.open(file.webViewLink, '_blank', 'noopener,noreferrer');
-        }
+        openFile();
     };
 
     return (
@@ -161,12 +238,17 @@ export default function DriveFileCard({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleClick}
+            onContextMenu={(event) => {
+                if (onContextMenuRequest) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onContextMenuRequest(file, event);
+                }
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(e: React.KeyboardEvent) => {
-                if ((e.key === 'Enter' || e.key === ' ') && !selectionEnabled) {
-                    onPreview(file);
-                }
+                if (e.key === 'Enter' || e.key === ' ') openFile();
             }}
             className={`text-left rounded-xl bg-white dark:bg-white/5 border p-3 hover:shadow-sm transition-all group w-full cursor-pointer ${
                 isSelected
@@ -189,7 +271,7 @@ export default function DriveFileCard({
                         className={`absolute top-1.5 right-1.5 z-30 h-6 w-6 rounded-md border flex items-center justify-center transition-all ${
                             isSelected
                                 ? 'border-[#C9A96E] bg-[#C9A96E] text-black opacity-100'
-                                : 'border-white/80 bg-black/55 text-white opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/75'
+                                : 'border-white/80 bg-black/55 text-white opacity-90 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/75'
                         }`}
                         title={isSelected ? 'Quitar de selección' : 'Seleccionar foto'}
                         aria-pressed={Boolean(isSelected)}
@@ -198,9 +280,14 @@ export default function DriveFileCard({
                         {isSelected && <Check size={15} strokeWidth={3} />}
                     </button>
                 )}
+                {isSeleccion && !isPortada && (
+                    <div className="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-purple-500 text-white text-[10px] font-bold leading-tight pointer-events-none select-none flex items-center gap-0.5">
+                        <Sparkles size={9} /> Selección
+                    </div>
+                )}
                 {(category === 'image' || category === 'pdf' || category === 'google-doc') && file.thumbnailLink ? (
                     <img
-                        src={file.thumbnailLink}
+                        src={thumbnailSrc}
                         alt={file.name}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
@@ -210,7 +297,7 @@ export default function DriveFileCard({
                     <div className="relative flex items-center justify-center w-full h-full">
                         {file.thumbnailLink ? (
                             <img
-                                src={file.thumbnailLink}
+                                src={thumbnailSrc}
                                 alt={file.name}
                                 referrerPolicy="no-referrer"
                                 className="w-full h-full object-cover"
@@ -249,21 +336,11 @@ export default function DriveFileCard({
                     </div>
                 )}
 
-                {canDownload && (
-                    <a
-                        href={`/api/drive/file/${file.id}`}
-                        download={file.name}
-                        onClick={e => e.stopPropagation()}
-                        className="absolute bottom-1.5 right-1.5 p-1.5 rounded-lg bg-black/60 text-white/80 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/80 hover:text-white z-10"
-                        title="Descargar"
-                    >
-                        <Download size={13} />
-                    </a>
-                )}
-                {/* Unified share button + dropdown — next to download (bottom-right) */}
+                {/* Unified share button + dropdown */}
                 {hasShare && (
-                    <div className="absolute bottom-1.5 right-8 z-20">
+                    <div className="absolute bottom-1.5 right-1.5 z-20">
                         <button
+                            ref={shareButtonRef}
                             onClick={e => { e.stopPropagation(); setShowShare(s => !s); }}
                             className="p-1.5 rounded-lg bg-black/60 text-white/70 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/80 hover:text-white"
                             title="Compartir"
@@ -271,23 +348,49 @@ export default function DriveFileCard({
                             <Share2 size={13} />
                         </button>
 
-                        {showShare && (
+                        {showShare && typeof document !== 'undefined' && createPortal(
                             <>
                                 {/* Backdrop */}
                                 <div
-                                    className="fixed inset-0 z-10"
+                                    className="fixed inset-0 z-[9998]"
                                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); setShowShare(false); }}
                                 />
-                                {/* Dropdown opens upward */}
-                                <div className="absolute bottom-full right-0 mb-1 w-44 bg-gray-900/95 backdrop-blur-sm border border-white/15 rounded-xl shadow-2xl z-20 overflow-hidden py-1">
+                                {/* Dropdown — portaled out of the card so it never gets clipped, clamped to the viewport */}
+                                <div
+                                    ref={shareMenuRef}
+                                    className="fixed w-48 bg-gray-900/95 backdrop-blur-sm border border-white/15 rounded-xl shadow-2xl z-[9999] overflow-hidden py-1"
+                                    style={{
+                                        top: shareMenuPosition?.top ?? SHARE_MENU_EDGE_GAP,
+                                        left: shareMenuPosition?.left ?? SHARE_MENU_EDGE_GAP,
+                                    }}
+                                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                >
                                     {onShare && (
                                         <button
-                                            onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file); }}
+                                            onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file, 'native'); }}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
                                         >
                                             <Share2 size={13} className="text-blue-400 flex-shrink-0" />
-                                            AirDrop
+                                            Compartir
                                         </button>
+                                    )}
+                                    {onShare && category === 'image' && (
+                                        <>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file, 'instagram'); }}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Instagram size={13} className="text-pink-400 flex-shrink-0" />
+                                                Instagram
+                                            </button>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); setShowShare(false); onShare(file, 'tiktok'); }}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Music2 size={13} className="text-cyan-300 flex-shrink-0" />
+                                                TikTok
+                                            </button>
+                                        </>
                                     )}
                                     {onShareWithPatient && (
                                         <button
@@ -307,36 +410,43 @@ export default function DriveFileCard({
                                             Email
                                         </button>
                                     )}
+                                    {canDownload && (
+                                        <>
+                                            <div className="my-1 border-t border-white/10" />
+                                            <a
+                                                href={`/api/drive/file/${file.id}`}
+                                                download={file.name}
+                                                onClick={e => { e.stopPropagation(); setShowShare(false); }}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-white/70 text-xs hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Download size={13} className="text-white/55 flex-shrink-0" />
+                                                Descargar
+                                            </a>
+                                        </>
+                                    )}
                                 </div>
-                            </>
+                            </>,
+                            document.body
                         )}
                     </div>
                 )}
-                {onDelete && (
+                {!hideInlineActions && onDelete && (
                     <button
                         onClick={e => { e.stopPropagation(); onDelete(file); }}
-                        className="absolute bottom-1.5 left-1.5 p-1.5 rounded-lg bg-black/60 text-white/60 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-red-600 hover:text-white z-10"
+                        className="absolute bottom-1.5 left-1.5 p-1.5 rounded-lg bg-black/75 text-white/85 opacity-100 transition-all hover:bg-red-600 hover:text-white z-10"
                         title="Eliminar"
+                        aria-label={`Eliminar ${file.name}`}
                     >
                         <Trash2 size={13} />
                     </button>
                 )}
-                {onTag && (
+                {!hideInlineActions && onTag && (
                     <button
                         onClick={e => { e.stopPropagation(); onTag(file); }}
                         className={`absolute top-1.5 left-1.5 p-1.5 rounded-lg bg-black/60 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all z-10 ${photoTag ? 'text-emerald-400 hover:bg-emerald-600' : 'text-white/60 hover:bg-indigo-600 hover:text-white'}`}
                         title="Clasificar foto"
                     >
                         <Tag size={13} />
-                    </button>
-                )}
-                {onSetPortada && category === 'image' && !isPortada && (
-                    <button
-                        onClick={e => { e.stopPropagation(); onSetPortada(file); }}
-                        className="absolute top-8 left-1.5 p-1.5 rounded-lg bg-black/60 text-[#C9A96E]/80 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-[#C9A96E] hover:text-black z-10"
-                        title="Usar como portada"
-                    >
-                        <Star size={13} />
                     </button>
                 )}
             </div>

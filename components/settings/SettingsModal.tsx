@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Moon, Sun, Monitor, Settings, LaptopMinimalCheck } from 'lucide-react';
+import { X, Moon, Sun, Monitor, Settings, LaptopMinimalCheck, Github, ExternalLink, GitCommitHorizontal } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import ExocadWindowsGuide from './ExocadWindowsGuide';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,21 @@ interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
+
+const IMPORTANT_REPOSITORIES = [
+    {
+        name: 'AM Clínica',
+        description: 'Repositorio principal de la aplicación interna.',
+        url: 'https://github.com/merinodrariel-ops/am-clinica-main',
+        updatesUrl: 'https://github.com/merinodrariel-ops/am-clinica-main/commits/main',
+    },
+    {
+        name: 'Cal DIY',
+        description: 'Agenda open source para tomar ideas de arquitectura y booking.',
+        url: 'https://github.com/calcom/cal.diy',
+        updatesUrl: 'https://github.com/calcom/cal.diy/commits/main',
+    },
+];
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const [activeTab, setActiveTab] = useState<'general' | 'software'>('general');
@@ -154,6 +169,54 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                         <p className="text-sm text-gray-500 dark:text-gray-400">
                                             Más opciones de personalización estarán disponibles próximamente para las pestañas de Pacientes, Agenda y Caja.
                                         </p>
+                                    </div>
+                                </section>
+
+                                <section className="pt-8 border-t border-gray-200 dark:border-gray-800">
+                                    <div className="mb-4 flex items-center justify-between gap-3">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Repos importantes</h3>
+                                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                Accesos rápidos a código y novedades que conviene seguir.
+                                            </p>
+                                        </div>
+                                        <Github className="h-5 w-5 text-gray-400" />
+                                    </div>
+
+                                    <div className="grid gap-3">
+                                        {IMPORTANT_REPOSITORIES.map(repo => (
+                                            <div
+                                                key={repo.url}
+                                                className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50"
+                                            >
+                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-gray-900 dark:text-white">{repo.name}</p>
+                                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{repo.description}</p>
+                                                    </div>
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        <a
+                                                            href={repo.updatesUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:border-blue-300 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-blue-700 dark:hover:text-blue-300"
+                                                        >
+                                                            <GitCommitHorizontal size={14} />
+                                                            Novedades
+                                                        </a>
+                                                        <a
+                                                            href={repo.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:border-blue-300 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-blue-700 dark:hover:text-blue-300"
+                                                            aria-label={`Abrir ${repo.name}`}
+                                                        >
+                                                            <ExternalLink size={15} />
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </section>
                             </div>

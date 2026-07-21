@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Send, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import CategoriaGuard from '@/components/auth/CategoriaGuard';
+import { ASSISTANT_ALLOWED_CATEGORIES } from '@/lib/asistente-access';
 
 interface ChatTurn {
     role: 'user' | 'assistant';
@@ -11,13 +12,13 @@ interface ChatTurn {
 }
 
 const SUGGESTIONS = [
-    '¿Cómo está la agenda de mañana?',
-    'Buscá a la paciente González',
-    'Agendá un turno de limpieza',
+    'Dame un resumen administrativo de hoy',
+    '¿Cómo viene la caja este mes?',
+    '¿Cuántos emails se enviaron esta semana?',
 ];
 
 const WELCOME =
-    '¡Hola! Soy el asistente de agenda 🦷\n\nPuedo buscar pacientes, mostrarte la agenda de un día y agendar turnos. Contame qué necesitás.';
+    'Soy el asistente interno de administración.\n\nPuedo consultar agenda, pacientes, caja y emails enviados con datos reales del sistema. También puedo ayudarte a agendar turnos si lo confirmás antes.';
 
 export default function AsistentePage() {
     const [messages, setMessages] = useState<ChatTurn[]>([]);
@@ -60,7 +61,7 @@ export default function AsistentePage() {
     }
 
     return (
-        <CategoriaGuard allowedCategorias={['reception', 'admin', 'dr', 'developer', 'recaptacion']}>
+        <CategoriaGuard allowedCategorias={[...ASSISTANT_ALLOWED_CATEGORIES]}>
             <div className="mx-auto flex h-[calc(100dvh-4rem)] max-w-2xl flex-col p-3 sm:p-6">
                 {/* Header */}
                 <div className="mb-3 flex items-center gap-3">
@@ -68,8 +69,8 @@ export default function AsistentePage() {
                         <Sparkles size={20} className="text-white" />
                     </div>
                     <div>
-                        <h1 className="text-lg font-bold text-white">Asistente de agenda</h1>
-                        <p className="text-xs text-slate-400">Buscar pacientes · ver agenda · agendar turnos</p>
+                        <h1 className="text-lg font-bold text-white">Asistente interno</h1>
+                        <p className="text-xs text-slate-400">Agenda · pacientes · caja · emails</p>
                     </div>
                 </div>
 
