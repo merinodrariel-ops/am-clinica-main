@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
+import { healSpotPixels } from '@/lib/photo-studio-spot-heal';
 import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
@@ -942,8 +943,6 @@ export default function PhotoStudioModal({
         canvas: HTMLCanvasElement;
         restoreImage: HTMLImageElement;
     } | null>(null);
-    const openCvRef = useRef<any>(null);
-    const openCvLoadingRef = useRef<Promise<any> | null>(null);
     const healLastPointRef = useRef<{ x: number; y: number; target: string } | null>(null);
     const canvasLayerDragRef = useRef<{
         layerId: string;
@@ -2566,52 +2565,6 @@ export default function PhotoStudioModal({
         return canvas;
     }
 
-    async function getOpenCv() {
-        if (openCvRef.current) return openCvRef.current;
-        if (!openCvLoadingRef.current) {
-            openCvLoadingRef.current = new Promise((resolve, reject) => {
-                const win = window as any;
-                if (win.cv?.Mat) {
-                    openCvRef.current = win.cv;
-                    resolve(win.cv);
-                    return;
-                }
-
-                const attachRuntimeReady = () => {
-                    const cv = (window as any).cv;
-                    if (!cv) {
-                        reject(new Error('OpenCV no disponible en window'));
-                        return;
-                    }
-                    if (cv.Mat) {
-                        openCvRef.current = cv;
-                        resolve(cv);
-                        return;
-                    }
-                    cv.onRuntimeInitialized = () => {
-                        openCvRef.current = cv;
-                        resolve(cv);
-                    };
-                };
-
-                const existing = document.querySelector('script[data-opencv-runtime="true"]') as HTMLScriptElement | null;
-                if (existing) {
-                    attachRuntimeReady();
-                    return;
-                }
-
-                const script = document.createElement('script');
-                script.src = 'https://docs.opencv.org/4.x/opencv.js';
-                script.async = true;
-                script.dataset.opencvRuntime = 'true';
-                script.onload = attachRuntimeReady;
-                script.onerror = () => reject(new Error('No se pudo cargar OpenCV.js'));
-                document.body.appendChild(script);
-            });
-        }
-        return openCvLoadingRef.current;
-    }
-
     function updateHealCursor(clientX: number, clientY: number) {
         const rect = canvasContainerRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -2642,73 +2595,20 @@ export default function PhotoStudioModal({
     }
 
     function applySpotHealAt(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
-        const cv = openCvRef.current;
-        if (!cv) return false;
-
-        const maskRadius = Math.max(2, radius * 0.5);
-        const blendRadius = maskRadius * 1.35;
-        const inpaintRadius = Math.max(1, Math.min(8, Math.round(maskRadius * 0.25)));
-        const margin = Math.max(12, Math.ceil(blendRadius + inpaintRadius * 3));
+        // Deterministic local healing. The OpenCV.js build previously loaded
+        // from docs.opencv.org does not include cv.inpaint reliably and its
+        // runtime exceptions used to tear down the editor mid-stroke.
+        const margin = Math.max(8, Math.ceil(radius * 1.6));
         const sx = Math.max(0, Math.floor(x - margin));
         const sy = Math.max(0, Math.floor(y - margin));
         const sw = Math.min(ctx.canvas.width - sx, Math.ceil(margin * 2));
         const sh = Math.min(ctx.canvas.height - sy, Math.ceil(margin * 2));
         if (sw <= 4 || sh <= 4) return false;
 
-        const sourceCanvas = document.createElement('canvas');
-        sourceCanvas.width = sw;
-        sourceCanvas.height = sh;
-        sourceCanvas.getContext('2d')!.drawImage(ctx.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-
-        const maskCanvas = document.createElement('canvas');
-        maskCanvas.width = sw;
-        maskCanvas.height = sh;
-        const maskCtx = maskCanvas.getContext('2d')!;
-        maskCtx.fillStyle = '#000';
-        maskCtx.fillRect(0, 0, sw, sh);
-        maskCtx.fillStyle = '#fff';
-        maskCtx.beginPath();
-        maskCtx.arc(x - sx, y - sy, maskRadius, 0, Math.PI * 2);
-        maskCtx.fill();
-
-        const src = cv.imread(sourceCanvas);
-        const maskRgba = cv.imread(maskCanvas);
-        const mask = new cv.Mat();
-        const dst = new cv.Mat();
-
-        try {
-            cv.cvtColor(maskRgba, mask, cv.COLOR_RGBA2GRAY, 0);
-            cv.threshold(mask, mask, 1, 255, cv.THRESH_BINARY);
-            cv.inpaint(src, mask, dst, inpaintRadius, cv.INPAINT_TELEA);
-
-            const outCanvas = document.createElement('canvas');
-            outCanvas.width = sw;
-            outCanvas.height = sh;
-            cv.imshow(outCanvas, dst);
-
-            const patchCanvas = document.createElement('canvas');
-            patchCanvas.width = sw;
-            patchCanvas.height = sh;
-            const patchCtx = patchCanvas.getContext('2d')!;
-            patchCtx.drawImage(outCanvas, 0, 0);
-            patchCtx.globalCompositeOperation = 'destination-in';
-            const blend = patchCtx.createRadialGradient(x - sx, y - sy, 0, x - sx, y - sy, blendRadius);
-            blend.addColorStop(0, 'rgba(0, 0, 0, 1)');
-            blend.addColorStop(0.65, 'rgba(0, 0, 0, 0.95)');
-            blend.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            patchCtx.fillStyle = blend;
-            patchCtx.beginPath();
-            patchCtx.arc(x - sx, y - sy, blendRadius, 0, Math.PI * 2);
-            patchCtx.fill();
-
-            ctx.drawImage(patchCanvas, sx, sy);
-            return true;
-        } finally {
-            src.delete();
-            maskRgba.delete();
-            mask.delete();
-            dst.delete();
-        }
+        const imageData = ctx.getImageData(sx, sy, sw, sh);
+        imageData.data.set(healSpotPixels(imageData.data, sw, sh, x - sx, y - sy, radius));
+        ctx.putImageData(imageData, sx, sy);
+        return true;
     }
 
     function mapCanvasPointToLayerPixel(layer: CanvasLayer, nx: number, ny: number, canvasW: number, canvasH: number, sizeCss: number) {
@@ -2798,7 +2698,7 @@ export default function PhotoStudioModal({
     useEffect(() => {
         if (!healMode || canvasActive) return;
         let cancelled = false;
-        void Promise.all([getOpenCv(), createEditableCanvasFromSource(imageUrl)]).then(([, canvas]) => {
+        void createEditableCanvasFromSource(imageUrl).then(canvas => {
             if (cancelled) return;
             offscreenCanvasRef.current = canvas;
             const vc = brushCanvasRef.current;
@@ -4374,6 +4274,8 @@ export default function PhotoStudioModal({
         preCropImageRef.current = null; // brush stroke changed the image — crop reference must be refreshed
         offscreenCanvasRef.current?.toBlob(blob => {
             if (!blob) return;
+            // Keep the previous URL alive because pushHistory() references it
+            // for Undo.
             const newUrl = URL.createObjectURL(blob);
             createdBlobUrlsRef.current.push(newUrl);
             objectUrlRef.current = newUrl;
@@ -7100,10 +7002,6 @@ export default function PhotoStudioModal({
                                     setMagicWandActive(false);
                                     setDrawMode('idle');
                                     setMousePos(null);
-                                    void getOpenCv().catch(() => {
-                                        toast.error('No se pudo cargar el corrector');
-                                        setHealMode(false);
-                                    });
                                 }
                             }}
                             healSize={healSize}
