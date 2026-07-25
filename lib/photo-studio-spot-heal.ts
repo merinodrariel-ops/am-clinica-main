@@ -1,4 +1,10 @@
-type Point = { x: number; y: number };
+type SamplePair = {
+    firstOffset: number;
+    secondOffset: number;
+    firstDistance: number;
+    secondDistance: number;
+    score: number;
+};
 
 function colorDistance(
     pixels: Uint8ClampedArray,
@@ -11,61 +17,70 @@ function colorDistance(
     return red * red * 0.25 + green * green * 0.55 + blue * blue * 0.2;
 }
 
-function findTextureSource(
+function findDirectionalPair(
     pixels: Uint8ClampedArray,
     width: number,
     height: number,
     centerX: number,
     centerY: number,
+    px: number,
+    py: number,
     radius: number,
-): Point | null {
-    const boundarySamples = 32;
-    const comparisonRadii = [radius * 1.04, radius * 1.28];
-    const searchRadius = Math.max(radius * 5, radius + 12);
-    const searchStep = Math.max(2, Math.round(radius / 3));
-    let best: Point | null = null;
-    let bestScore = Number.POSITIVE_INFINITY;
+): SamplePair | null {
+    const directions = [
+        [1, 0],
+        [0, 1],
+        [Math.SQRT1_2, Math.SQRT1_2],
+        [Math.SQRT1_2, -Math.SQRT1_2],
+    ] as const;
+    const maxSteps = Math.ceil(radius * 2.2) + 3;
+    let best: SamplePair | null = null;
 
-    for (let candidateY = Math.max(radius, centerY - searchRadius); candidateY <= Math.min(height - radius - 1, centerY + searchRadius); candidateY += searchStep) {
-        for (let candidateX = Math.max(radius, centerX - searchRadius); candidateX <= Math.min(width - radius - 1, centerX + searchRadius); candidateX += searchStep) {
-            const displacement = Math.hypot(candidateX - centerX, candidateY - centerY);
-            if (displacement < radius * 2.15 || displacement > searchRadius) continue;
+    for (const [dx, dy] of directions) {
+        let first: { x: number; y: number; distance: number } | null = null;
+        let second: { x: number; y: number; distance: number } | null = null;
 
-            let score = 0;
-            let compared = 0;
-            for (const comparisonRadius of comparisonRadii) {
-                for (let index = 0; index < boundarySamples; index += 1) {
-                    const angle = (index / boundarySamples) * Math.PI * 2;
-                    const dx = Math.cos(angle) * comparisonRadius;
-                    const dy = Math.sin(angle) * comparisonRadius;
-                    const targetX = Math.round(centerX + dx);
-                    const targetY = Math.round(centerY + dy);
-                    const sourceX = Math.round(candidateX + dx);
-                    const sourceY = Math.round(candidateY + dy);
-                    if (
-                        targetX < 0 || targetX >= width || targetY < 0 || targetY >= height ||
-                        sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height
-                    ) continue;
-                    score += colorDistance(
-                        pixels,
-                        (targetY * width + targetX) * 4,
-                        (sourceY * width + sourceX) * 4,
-                    );
-                    compared += 1;
+        for (let step = 1; step <= maxSteps && (!first || !second); step += 1) {
+            if (!first) {
+                const x = Math.round(px + dx * step);
+                const y = Math.round(py + dy * step);
+                if (x < 0 || x >= width || y < 0 || y >= height) break;
+                if (Math.hypot(x - centerX, y - centerY) > radius + 0.75) {
+                    first = { x, y, distance: step };
                 }
             }
-
-            if (compared === 0) continue;
-            // Prefer a nearby matching patch when two candidates have similar borders.
-            const normalizedScore = score / compared + displacement * 0.08;
-            if (normalizedScore < bestScore) {
-                bestScore = normalizedScore;
-                best = { x: candidateX, y: candidateY };
+            if (!second) {
+                const x = Math.round(px - dx * step);
+                const y = Math.round(py - dy * step);
+                if (x < 0 || x >= width || y < 0 || y >= height) break;
+                if (Math.hypot(x - centerX, y - centerY) > radius + 0.75) {
+                    second = { x, y, distance: step };
+                }
             }
         }
+
+        if (!first || !second) continue;
+        const firstOffset = (first.y * width + first.x) * 4;
+        const secondOffset = (second.y * width + second.x) * 4;
+        const pair: SamplePair = {
+            firstOffset,
+            secondOffset,
+            firstDistance: first.distance,
+            secondDistance: second.distance,
+            score: colorDistance(pixels, firstOffset, secondOffset),
+        };
+        if (!best || pair.score < best.score) best = pair;
     }
 
     return best;
+}
+
+export function getHealingBrushMetrics(size: number, imageScale = 1) {
+    const diameterCss = Math.max(1, size);
+    return {
+        diameterCss,
+        radiusPixels: Math.max(1, diameterCss * Math.max(0, imageScale) / 2),
+    };
 }
 
 export function healSpotPixels(
@@ -82,33 +97,31 @@ export function healSpotPixels(
 
     const output = new Uint8ClampedArray(pixels);
     const source = new Uint8ClampedArray(pixels);
-    const textureSource = findTextureSource(source, width, height, centerX, centerY, radius);
-    if (!textureSource) return output;
-
-    const sourceDeltaX = textureSource.x - centerX;
-    const sourceDeltaY = textureSource.y - centerY;
-    const featherStart = radius * 0.68;
+    const featherStart = radius * 0.82;
 
     for (let py = Math.max(0, Math.floor(centerY - radius)); py <= Math.min(height - 1, Math.ceil(centerY + radius)); py += 1) {
         for (let px = Math.max(0, Math.floor(centerX - radius)); px <= Math.min(width - 1, Math.ceil(centerX + radius)); px += 1) {
             const distance = Math.hypot(px - centerX, py - centerY);
             if (distance > radius) continue;
 
-            const sampleX = Math.round(px + sourceDeltaX);
-            const sampleY = Math.round(py + sourceDeltaY);
-            if (sampleX < 0 || sampleX >= width || sampleY < 0 || sampleY >= height) continue;
+            const pair = findDirectionalPair(source, width, height, centerX, centerY, px, py, radius);
+            if (!pair) continue;
 
             const offset = (py * width + px) * 4;
-            const sampleOffset = (sampleY * width + sampleX) * 4;
+            const totalDistance = pair.firstDistance + pair.secondDistance;
+            const firstWeight = pair.secondDistance / totalDistance;
+            const secondWeight = pair.firstDistance / totalDistance;
             const feather = distance <= featherStart
                 ? 1
                 : Math.max(0, Math.min(1, (radius - distance) / Math.max(1, radius - featherStart)));
             const blend = feather * feather * (3 - 2 * feather);
 
-            output[offset] = source[offset] * (1 - blend) + source[sampleOffset] * blend;
-            output[offset + 1] = source[offset + 1] * (1 - blend) + source[sampleOffset + 1] * blend;
-            output[offset + 2] = source[offset + 2] * (1 - blend) + source[sampleOffset + 2] * blend;
-            output[offset + 3] = source[offset + 3] * (1 - blend) + source[sampleOffset + 3] * blend;
+            for (let channel = 0; channel < 4; channel += 1) {
+                const reconstructed =
+                    source[pair.firstOffset + channel] * firstWeight +
+                    source[pair.secondOffset + channel] * secondWeight;
+                output[offset + channel] = source[offset + channel] * (1 - blend) + reconstructed * blend;
+            }
         }
     }
 

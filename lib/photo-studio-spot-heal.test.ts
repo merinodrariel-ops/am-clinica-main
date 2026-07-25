@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { healSpotPixels } from './photo-studio-spot-heal';
+import { getHealingBrushMetrics, healSpotPixels } from './photo-studio-spot-heal';
 
 function uniformImage(width: number, height: number, value = 210) {
     const pixels = new Uint8ClampedArray(width * height * 4);
@@ -89,4 +89,47 @@ test('preserves a gum-tooth boundary instead of creating a flat pink blur', () =
     assert.ok(gumPixel[1] < 170, `gum texture became too white: ${gumPixel}`);
     assert.ok(toothPixel[1] > 205, `tooth texture became pink/blurred: ${toothPixel}`);
     assert.ok(Math.abs(gumPixel[1] - toothPixel[1]) > 45, 'the anatomical color boundary was flattened');
+});
+
+test('uses the selected size as the visible and applied diameter', () => {
+    assert.deepEqual(getHealingBrushMetrics(16, 3), {
+        diameterCss: 16,
+        radiusPixels: 24,
+    });
+});
+
+test('follows a curved cervical boundary without importing a foreign gum shape', () => {
+    const width = 160;
+    const height = 100;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const boundaryAt = (x: number) => 38 + Math.round(((x - 80) ** 2) / 420);
+
+    for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+            const gum = y < boundaryAt(x);
+            const offset = (y * width + x) * 4;
+            pixels[offset] = gum ? 218 : 239;
+            pixels[offset + 1] = gum ? 128 : 232;
+            pixels[offset + 2] = gum ? 140 : 216;
+            pixels[offset + 3] = 255;
+        }
+    }
+
+    const centerX = 80;
+    const centerY = boundaryAt(centerX);
+    for (let y = centerY - 3; y <= centerY + 3; y += 1) {
+        for (let x = centerX - 3; x <= centerX + 3; x += 1) {
+            if (Math.hypot(x - centerX, y - centerY) > 3.5) continue;
+            const offset = (y * width + x) * 4;
+            pixels[offset] = 8;
+            pixels[offset + 1] = 8;
+            pixels[offset + 2] = 8;
+        }
+    }
+
+    const healed = healSpotPixels(pixels, width, height, centerX, centerY, 7);
+    assert.ok(pixelAt(healed, width, centerX, centerY - 2)[1] < 175);
+    assert.ok(pixelAt(healed, width, centerX, centerY + 2)[1] > 205);
+    assert.ok(pixelAt(healed, width, centerX - 4, centerY)[1] > 205);
+    assert.ok(pixelAt(healed, width, centerX + 4, centerY)[1] > 205);
 });
