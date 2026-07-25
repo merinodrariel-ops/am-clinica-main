@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { healSpotPixels } from '@/lib/photo-studio-spot-heal';
+import { getHealingBrushMetrics, healSpotPixels } from '@/lib/photo-studio-spot-heal';
 import {
     X, Download, RotateCcw, Sun, Crop as CropIcon, Wand2, Loader2, Check,
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
@@ -2588,7 +2588,7 @@ export default function PhotoStudioModal({
     function updateHealCursor(clientX: number, clientY: number) {
         const rect = canvasContainerRef.current?.getBoundingClientRect();
         if (!rect) return;
-        const size = brushMode !== null ? brushSize * 2 : healSize * 2;
+        const size = brushMode !== null ? brushSize * 2 : getHealingBrushMetrics(healSize).diameterCss;
         setHealCursor({
             x: clientX - rect.left,
             y: clientY - rect.top,
@@ -2618,9 +2618,7 @@ export default function PhotoStudioModal({
         // Deterministic local healing. The OpenCV.js build previously loaded
         // from docs.opencv.org does not include cv.inpaint reliably and its
         // runtime exceptions used to tear down the editor mid-stroke.
-        // Texture-aware healing needs enough surrounding tissue to find a
-        // genuinely similar patch along the same anatomical boundary.
-        const margin = Math.max(16, Math.ceil(radius * 6.2));
+        const margin = Math.max(12, Math.ceil(radius * 1.8));
         const sx = Math.max(0, Math.floor(x - margin));
         const sy = Math.max(0, Math.floor(y - margin));
         const sw = Math.min(ctx.canvas.width - sx, Math.ceil(margin * 2));
@@ -3299,7 +3297,7 @@ export default function PhotoStudioModal({
             const [nx, ny] = getCanvasLayerNorm(e);
             const W = e.currentTarget.clientWidth;
             const H = e.currentTarget.clientHeight;
-            const mapped = mapCanvasPointToLayerPixel(layer, nx, ny, W, H, healSize);
+            const mapped = mapCanvasPointToLayerPixel(layer, nx, ny, W, H, healSize / 2);
             if (!mapped) return;
             const editCanvas = document.createElement('canvas');
             editCanvas.width = layer.img.naturalWidth;
@@ -3376,7 +3374,7 @@ export default function PhotoStudioModal({
             const layer = canvasLayers.find(item => item.id === canvasHealSessionRef.current?.layerId);
             if (!layer) return;
             const [nx, ny] = getCanvasLayerNorm(e);
-            const mapped = mapCanvasPointToLayerPixel(layer, nx, ny, e.currentTarget.clientWidth, e.currentTarget.clientHeight, healSize);
+            const mapped = mapCanvasPointToLayerPixel(layer, nx, ny, e.currentTarget.clientWidth, e.currentTarget.clientHeight, healSize / 2);
             if (!mapped) return;
             if (!shouldApplyHealPoint(mapped.x, mapped.y, mapped.radius, layer.id)) return;
             if (!applySpotHealAt(canvasHealSessionRef.current.canvas.getContext('2d')!, mapped.x, mapped.y, mapped.radius)) return;
@@ -4256,7 +4254,7 @@ export default function PhotoStudioModal({
         const oc = offscreenCanvasRef.current;
         if (!oc || oc.width === 0) return;
         const scaleX = oc.width / canvasEl.getBoundingClientRect().width;
-        const radius = healSize * scaleX;
+        const radius = getHealingBrushMetrics(healSize, scaleX).radiusPixels;
         if (!shouldApplyHealPoint(x, y, radius, 'photo')) return;
         const octx = oc.getContext('2d')!;
         if (!applySpotHealAt(octx, x, y, radius)) return;
@@ -8740,7 +8738,7 @@ function ToolsPanel({
                     <Zap size={20} /> {healMode ? 'Corrector activo' : 'Activar corrector'}
                 </button>
                 <div className={`space-y-2 rounded-xl border border-white/5 bg-white/[0.03] p-3 ${healMode ? '' : 'opacity-60'}`}>
-                    <p className="text-white/35 text-xs uppercase tracking-wider">Tamaño del pincel</p>
+                    <p className="text-white/35 text-xs uppercase tracking-wider">Diámetro del corrector</p>
                     <div className="flex items-center gap-2">
                         <input
                             type="range" min={4} max={48} step={2}
@@ -8749,7 +8747,7 @@ function ToolsPanel({
                             disabled={!healMode}
                             className="flex-1 accent-[#C9A96E]"
                         />
-                        <span className="text-white/35 text-sm w-8">{healSize}</span>
+                        <span className="text-white/35 text-sm w-10">{healSize}px</span>
                     </div>
                     <p className="text-white/35 text-xs">
                         Pintá sobre puntos chicos para mimetizarlos con piel, mucosa o diente.
