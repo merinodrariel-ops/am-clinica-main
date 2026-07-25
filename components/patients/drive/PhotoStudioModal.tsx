@@ -1045,7 +1045,18 @@ export default function PhotoStudioModal({
     const [healCursor, setHealCursor] = useState<{ x: number; y: number; size: number; visible: boolean }>({ x: 0, y: 0, size: 28, visible: false });
     const manualBackgroundToolActive = brushMode !== null || magicWandActive || healMode;
 
-    type PhotoSnapshot = { kind: 'photo'; imageUrl: string; rotation: number; brightness: number; bgDone: boolean; bgColor: BgColor; hasTransparentBg?: boolean };
+    type PhotoSnapshot = {
+        kind: 'photo';
+        imageUrl: string;
+        rotation: number;
+        brightness: number;
+        bgDone: boolean;
+        bgColor: BgColor;
+        hasTransparentBg?: boolean;
+        drawShapes: DrawShape[];
+        currentPoints: DrawPoint[];
+        textAnnotations: TextAnnotation[];
+    };
     type CanvasLayerSnapshot = {
         kind: 'canvas-layer';
         canvasId: string;
@@ -1851,7 +1862,7 @@ export default function PhotoStudioModal({
         };
     }, []);
 
-    // Keyboard shortcut: Cmd/Ctrl+Z → undo draw step first, then photo history.
+    // Keyboard shortcut: Cmd/Ctrl+Z → undo the latest editor action globally.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             const tag = (e.target as HTMLElement)?.tagName;
@@ -1862,10 +1873,6 @@ export default function PhotoStudioModal({
                     handleRedo();
                 } else if (e.key.toLowerCase() === 'z') {
                     e.preventDefault();
-                    if (drawMode !== 'idle' && (currentPoints.length > 0 || drawShapes.length > 0)) {
-                        handleUndoLastDrawPoint();
-                        return;
-                    }
                     handleUndo();
                 } else if (e.key.toLowerCase() === 'y') {
                     e.preventDefault();
@@ -1876,7 +1883,7 @@ export default function PhotoStudioModal({
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [history, redoStack, drawMode, currentPoints.length, drawShapes.length]);
+    }, [history, redoStack]);
 
     // Keyboard shortcut: Cmd+C / Cmd+V for selected text annotations or draw shapes
     useEffect(() => {
@@ -1896,6 +1903,7 @@ export default function PhotoStudioModal({
                 }
             }
             if (key === 'v' && textClipboardRef.current) {
+                pushHistory();
                 const newText = cloneTextAnnotationForPaste(textClipboardRef.current, `text-${Date.now()}`);
                 textClipboardRef.current = newText;
                 setTextAnnotations(prev => [...prev, newText]);
@@ -1915,6 +1923,7 @@ export default function PhotoStudioModal({
                 }
             }
             if (key === 'v' && drawClipboard) {
+                pushHistory();
                 const OFFSET = 0.02;
                 const newShape: DrawShape = {
                     ...drawClipboard,
@@ -2118,8 +2127,23 @@ export default function PhotoStudioModal({
         touchRef.current = null;
     }
 
+    function capturePhotoSnapshot(): PhotoSnapshot {
+        return {
+            kind: 'photo',
+            imageUrl,
+            rotation,
+            brightness,
+            bgDone,
+            bgColor,
+            hasTransparentBg,
+            drawShapes: structuredClone(drawShapes),
+            currentPoints: structuredClone(currentPoints),
+            textAnnotations: structuredClone(textAnnotations),
+        };
+    }
+
     function pushHistory(snap?: Snapshot) {
-        const entry: Snapshot = snap ?? { kind: 'photo', imageUrl, rotation, brightness, bgDone, bgColor, hasTransparentBg };
+        const entry: Snapshot = snap ?? capturePhotoSnapshot();
         setHistory(prev => [...prev.slice(-19), entry]);
         setRedoStack([]); // Clear redo stack on new action
     }
@@ -2149,15 +2173,7 @@ export default function PhotoStudioModal({
                 layerId: selectedLayer.id,
                 layerSrc: selectedLayer.src,
               }
-            : {
-                kind: 'photo',
-                imageUrl,
-                rotation,
-                brightness,
-                bgDone,
-                bgColor,
-                hasTransparentBg,
-              };
+            : capturePhotoSnapshot();
 
         setRedoStack(prev => [...prev, currentEntry]);
         setHistory(prev => prev.slice(0, -1));
@@ -2193,6 +2209,12 @@ export default function PhotoStudioModal({
         setBgDone(snap.bgDone);
         setBgColor(snap.bgColor);
         setHasTransparentBg(snap.hasTransparentBg ?? false);
+        setDrawShapes(structuredClone(snap.drawShapes));
+        setCurrentPoints(structuredClone(snap.currentPoints));
+        setTextAnnotations(structuredClone(snap.textAnnotations));
+        setSelectedShapeId(null);
+        setSelectedTextId(null);
+        setEditingTextId(null);
         setCropActive(false);
         setCompletedCrop(null);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
@@ -2250,15 +2272,7 @@ export default function PhotoStudioModal({
                 layerId: selectedLayer.id,
                 layerSrc: selectedLayer.src,
               }
-            : {
-                kind: 'photo',
-                imageUrl,
-                rotation,
-                brightness,
-                bgDone,
-                bgColor,
-                hasTransparentBg,
-              };
+            : capturePhotoSnapshot();
 
         setHistory(prev => [...prev, currentEntry]);
         setRedoStack(prev => prev.slice(0, -1));
@@ -2289,6 +2303,12 @@ export default function PhotoStudioModal({
         setBgDone(snap.bgDone);
         setBgColor(snap.bgColor);
         setHasTransparentBg(snap.hasTransparentBg ?? false);
+        setDrawShapes(structuredClone(snap.drawShapes));
+        setCurrentPoints(structuredClone(snap.currentPoints));
+        setTextAnnotations(structuredClone(snap.textAnnotations));
+        setSelectedShapeId(null);
+        setSelectedTextId(null);
+        setEditingTextId(null);
         setCropActive(false);
         setCompletedCrop(null);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
@@ -2637,6 +2657,9 @@ export default function PhotoStudioModal({
             bgDone: false,
             bgColor: 'transparent',
             hasTransparentBg,
+            drawShapes: structuredClone(drawShapes),
+            currentPoints: structuredClone(currentPoints),
+            textAnnotations: structuredClone(textAnnotations),
         });
         const img = await loadCanvasImage(imageUrl);
         const canvas = document.createElement('canvas');
@@ -3092,22 +3115,25 @@ export default function PhotoStudioModal({
         return [(e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height];
     }
 
-    const handleDeleteSelection = useCallback(() => {
+    function handleDeleteSelection() {
         if (canvasActive && canvasSelectedId) {
             setCanvasLayers(prev => prev.filter(l => l.id !== canvasSelectedId));
             setCanvasSelectedId(null);
         } else if (multiSelectedIds.length > 0) {
+            pushHistory();
             setDrawShapes(prev => prev.filter(s => !multiSelectedIds.includes(s.id)));
             setMultiSelectedIds([]);
         } else if (selectedShapeId) {
+            pushHistory();
             setDrawShapes(prev => prev.filter(s => s.id !== selectedShapeId));
             setSelectedShapeId(null);
             setDrawMode('idle');
         } else if (selectedTextId) {
+            pushHistory();
             setTextAnnotations(prev => prev.filter(t => t.id !== selectedTextId));
             setSelectedTextId(null);
         }
-    }, [canvasActive, canvasSelectedId, multiSelectedIds, selectedShapeId, selectedTextId]);
+    }
 
     const handleFabricLayerChange = useCallback((layerId: string, patch: Partial<CanvasLayer>) => {
         setCanvasLayers(prev => prev.map(layer =>
@@ -4424,6 +4450,7 @@ export default function PhotoStudioModal({
 
     function finishDrawingPath(points: DrawPoint[]) {
         if (points.length >= 2) {
+            pushHistory({ ...capturePhotoSnapshot(), currentPoints: [] });
             const newId = `shape-${Date.now()}`;
             setDrawShapes(shapes => [...shapes, { id: newId, points, closed: false, color: drawColor, strokeStyle }]);
             setSelectedShapeId(newId);
@@ -4469,6 +4496,7 @@ export default function PhotoStudioModal({
             if (hit) {
                 setSelectedTextId(hit.id);
             } else {
+                pushHistory();
                 setSelectedTextId(null);
                 const newId = `text-${Date.now()}`;
                 const newTA: TextAnnotation = {
@@ -4504,6 +4532,7 @@ export default function PhotoStudioModal({
                 const first = currentPoints[0];
                 if (Math.abs(x - first.x) < 14 / (rect.width || 1) &&
                     Math.abs(y - first.y) < 14 / (rect.height || 1)) {
+                    pushHistory({ ...capturePhotoSnapshot(), currentPoints: [] });
                     const newId = `shape-${Date.now()}`;
                     setDrawShapes(shapes => [...shapes, { id: newId, points: currentPoints, closed: true, color: drawColor, strokeStyle }]);
                     setCurrentPoints([]);
@@ -4605,6 +4634,7 @@ export default function PhotoStudioModal({
             if (selectedTextId) {
                 const selText = textAnnotations.find(t => t.id === selectedTextId);
                 if (selText && hitTestTextResizeHandle(selText, nx, ny)) {
+                    pushHistory();
                     e.stopPropagation();
                     e.preventDefault();
                     e.currentTarget.setPointerCapture(e.pointerId);
@@ -4615,6 +4645,7 @@ export default function PhotoStudioModal({
             // Then check body drag
             const textHit = hitTestTextAnnotation(textAnnotations, nx, ny);
             if (textHit) {
+                pushHistory();
                 e.stopPropagation();
                 e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -4632,6 +4663,7 @@ export default function PhotoStudioModal({
             if (shape) {
                 const idx = hitTestPoint(shape, nx, ny, canvas);
                 if (idx >= 0) {
+                    pushHistory();
                     e.stopPropagation();
                     e.preventDefault();
                     e.currentTarget.setPointerCapture(e.pointerId);
@@ -4647,6 +4679,7 @@ export default function PhotoStudioModal({
             if (shape) {
                 const ci = hitTestCorner(shape, nx, ny, canvas);
                 if (ci >= 0) {
+                    pushHistory();
                     e.stopPropagation();
                     e.preventDefault();
                     e.currentTarget.setPointerCapture(e.pointerId);
@@ -4690,6 +4723,7 @@ export default function PhotoStudioModal({
             // Try to grab a shape for whole-shape drag
             const hit = hitTestAnyShape(drawShapes, nx, ny, canvas);
             if (hit) {
+                pushHistory();
                 e.stopPropagation();
                 e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -4870,6 +4904,8 @@ export default function PhotoStudioModal({
     }
 
     function handleClearDraw() {
+        if (drawShapes.length === 0 && textAnnotations.length === 0 && currentPoints.length === 0) return;
+        pushHistory();
         setDrawShapes([]);
         setCurrentPoints([]);
         setSelectedShapeId(null);
@@ -4885,6 +4921,7 @@ export default function PhotoStudioModal({
     function handleGroupShapes() {
         const toGroup = drawShapes.filter(s => multiSelectedIds.includes(s.id));
         if (toGroup.length < 2) return;
+        pushHistory();
         const groupId = `group-${Date.now()}`;
         setDrawShapes(prev => [
             ...prev.filter(s => !multiSelectedIds.includes(s.id)),
@@ -4899,6 +4936,7 @@ export default function PhotoStudioModal({
         if (!selectedShapeId) return;
         const group = drawShapes.find(s => s.id === selectedShapeId);
         if (!group?.children) return;
+        pushHistory();
         setDrawShapes(prev => [
             ...prev.filter(s => s.id !== selectedShapeId),
             ...group.children!,
@@ -4935,6 +4973,7 @@ export default function PhotoStudioModal({
 
     function handleFlipHorizontal() {
         if (!selectedShapeId) return;
+        pushHistory();
         setDrawShapes(shapes => shapes.map(s => {
             if (s.id !== selectedShapeId) return s;
             const xs = s.points.map(p => p.x);
@@ -6117,7 +6156,10 @@ export default function PhotoStudioModal({
                         {!canvasActive && selectedText && (
                             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-[#12121A]/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
                                 <button
-                                    onClick={() => setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, fontSize: Math.max(14, t.fontSize - 2) } : t))}
+                                    onClick={() => {
+                                        pushHistory();
+                                        setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, fontSize: Math.max(14, t.fontSize - 2) } : t));
+                                    }}
                                     className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
                                     title="Reducir tamaño"
                                 >
@@ -6125,7 +6167,10 @@ export default function PhotoStudioModal({
                                 </button>
                                 <span className="min-w-10 text-center text-xs font-semibold text-white/80">{selectedText.fontSize}px</span>
                                 <button
-                                    onClick={() => setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, fontSize: Math.min(72, t.fontSize + 2) } : t))}
+                                    onClick={() => {
+                                        pushHistory();
+                                        setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, fontSize: Math.min(72, t.fontSize + 2) } : t));
+                                    }}
                                     className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
                                     title="Aumentar tamaño"
                                 >
@@ -6141,7 +6186,10 @@ export default function PhotoStudioModal({
                                     return (
                                         <button
                                             key={opt.id}
-                                            onClick={() => setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, align: opt.id } : t))}
+                                            onClick={() => {
+                                                pushHistory();
+                                                setTextAnnotations(prev => prev.map(t => t.id === selectedText.id ? { ...t, align: opt.id } : t));
+                                            }}
                                             className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
                                                 selectedText.align === opt.id
                                                     ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
@@ -6591,7 +6639,7 @@ export default function PhotoStudioModal({
                     {cropActive && (
                         <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center gap-3 px-4 py-2.5 bg-black/70 backdrop-blur-sm border-t border-white/10">
                             <button
-                                onClick={() => setRotation((r: number) => normalizeRotation(r - 0.5))}
+                                onClick={() => { pushHistory(); setRotation((r: number) => normalizeRotation(r - 0.5)); }}
                                 className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
                                 title="-0.5°"
                             >
@@ -6600,7 +6648,7 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
-                                onPointerDown={() => setRotationGridAssist(true)}
+                                onPointerDown={() => { pushHistory(); setRotationGridAssist(true); }}
                                 onPointerUp={() => setRotationGridAssist(false)}
                                 onPointerCancel={() => setRotationGridAssist(false)}
                                 onBlur={() => setRotationGridAssist(false)}
@@ -6608,7 +6656,7 @@ export default function PhotoStudioModal({
                                 className="w-48 md:w-64 accent-white/70 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
                             />
                             <button
-                                onClick={() => setRotation((r: number) => normalizeRotation(r + 0.5))}
+                                onClick={() => { pushHistory(); setRotation((r: number) => normalizeRotation(r + 0.5)); }}
                                 className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-all flex-shrink-0"
                                 title="+0.5°"
                             >
@@ -6619,7 +6667,7 @@ export default function PhotoStudioModal({
                             </span>
                             {rotation !== 0 && (
                                 <button
-                                    onClick={() => setRotation(0)}
+                                    onClick={() => { pushHistory(); setRotation(0); }}
                                     className="text-[10px] text-[#C9A96E] hover:text-[#C9A96E]/80 transition-colors font-bold uppercase flex-shrink-0"
                                 >
                                     Reset
@@ -7088,7 +7136,7 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={-180} max={180} step={0.5}
                                 value={rotation}
-                                onPointerDown={() => setRotationGridAssist(true)}
+                                onPointerDown={() => { pushHistory(); setRotationGridAssist(true); }}
                                 onPointerUp={() => setRotationGridAssist(false)}
                                 onPointerCancel={() => setRotationGridAssist(false)}
                                 onBlur={() => setRotationGridAssist(false)}
@@ -7105,6 +7153,7 @@ export default function PhotoStudioModal({
                             <input
                                 type="range" min={0} max={200} step={1}
                                 value={brightness}
+                                onPointerDown={() => pushHistory()}
                                 onChange={e => setBrightness(Number(e.target.value))}
                                 className="w-20 accent-yellow-400"
                             />
@@ -7211,7 +7260,7 @@ export default function PhotoStudioModal({
                                 ] as const).map(opt => (
                                     <button
                                         key={opt.value}
-                                        onClick={() => setBgColor(opt.value)}
+                                        onClick={() => { pushHistory(); setBgColor(opt.value); }}
                                         title={opt.title}
                                         className={`px-2 py-1 rounded text-xs border transition-all ${
                                             bgColor === opt.value ? 'border-[#C9A96E]' : 'border-white/10'
@@ -8043,7 +8092,7 @@ function ToolsPanel({
                             <p className="text-xs text-white/45 uppercase tracking-wide font-semibold">Ajuste fino</p>
                             {rotation !== 0 && (
                                 <button
-                                    onClick={() => setRotation(0)}
+                                    onClick={() => { onPushHistory(); setRotation(0); }}
                                     className="text-xs text-[#C9A96E] hover:text-[#C9A96E]/80 transition-colors font-bold uppercase"
                                 >
                                     Reset
@@ -8121,6 +8170,7 @@ function ToolsPanel({
                 <input
                     type="range" min={0} max={200} step={1}
                     value={brightness}
+                    onPointerDown={onPushHistory}
                     onChange={e => setBrightness(Number(e.target.value))}
                     className="w-full accent-yellow-400"
                 />
@@ -8363,7 +8413,7 @@ function ToolsPanel({
                             ] as const).map(opt => (
                                 <button
                                     key={opt.value}
-                                    onClick={() => setBgColor(opt.value)}
+                                    onClick={() => { onPushHistory(); setBgColor(opt.value); }}
                                     title={opt.title}
                                     className={`flex-1 py-3 rounded-lg text-base border-2 transition-all ${opt.cls} ${
                                         bgColor === opt.value
