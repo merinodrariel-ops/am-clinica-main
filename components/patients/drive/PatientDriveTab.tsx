@@ -988,6 +988,16 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                     {selectedPhotoFiles.length} seleccionada{selectedPhotoFiles.length !== 1 ? 's' : ''}
                                                 </span>
                                                 <button
+                                                    onClick={() => {
+                                                        setSelectedPhotoIds(photoIds);
+                                                        setPhotoSelectionAnchorId(photoIds.at(-1) ?? null);
+                                                    }}
+                                                    disabled={selectedPhotoFiles.length === photoIds.length}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-slate-300 text-xs font-semibold hover:bg-white/15 disabled:opacity-40"
+                                                >
+                                                    Seleccionar todas
+                                                </button>
+                                                <button
                                                     onClick={() => handlePrepareCloudinaryUpload()}
                                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-xs font-bold hover:bg-[#d9bb7d] transition-colors"
                                                 >
@@ -1272,6 +1282,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                 {canManageDrive && publicCaseFiles.length > 0 && (
                     <PublicCasePublishModal
                         files={publicCaseFiles}
+                        patientId={patientId}
                         patientName={patientName}
                         onClose={() => setPublicCaseFiles([])}
                     />

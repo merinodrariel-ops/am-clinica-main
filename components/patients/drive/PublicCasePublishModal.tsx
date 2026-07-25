@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Check, Clipboard, CloudUpload, FileText, Wand2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, Clipboard, CloudUpload, ExternalLink, FileText, Loader2, Wand2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { renameDriveFileAction } from '@/app/actions/patient-files-drive';
 import Modal from '@/components/ui/Modal';
@@ -10,22 +10,24 @@ import type { DriveFile } from '@/app/actions/patient-files-drive';
 import {
     buildDrivePhotoFileName,
     buildPublicCaseDraft,
+    slugifyCaseTitle,
     splitLongPhotoDescription,
     type PublicCaseDraft,
 } from '@/lib/public-case-draft';
 
 interface PublicCasePublishModalProps {
     files: DriveFile[];
+    patientId: string;
     patientName: string;
     onClose: () => void;
 }
 
 function defaultCaseTitle(patientName: string) {
-    const normalized = patientName.trim();
-    return normalized ? `${normalized} - caso clínico` : 'Caso clínico';
+    void patientName;
+    return 'Caso clínico AM Estética Dental';
 }
 
-export default function PublicCasePublishModal({ files, patientName, onClose }: PublicCasePublishModalProps) {
+export default function PublicCasePublishModal({ files, patientId, patientName, onClose }: PublicCasePublishModalProps) {
     const [currentFiles, setCurrentFiles] = useState(files);
     const [title, setTitle] = useState(defaultCaseTitle(patientName));
     const [caseDescription, setCaseDescription] = useState('');
@@ -33,6 +35,24 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
     const [photoDescriptions, setPhotoDescriptions] = useState(() => currentFiles.map(() => ''));
     const [draft, setDraft] = useState<PublicCaseDraft | null>(null);
     const [renamingDriveFiles, setRenamingDriveFiles] = useState(false);
+    const [mode, setMode] = useState<'create' | 'append'>('create');
+    const [slug, setSlug] = useState(() => slugifyCaseTitle(defaultCaseTitle(patientName)));
+    const [slugEdited, setSlugEdited] = useState(false);
+    const [existingCases, setExistingCases] = useState<Array<{ id: string; slug: string; title: string; status: string }>>([]);
+    const [caseId, setCaseId] = useState('');
+    const [publishing, setPublishing] = useState(false);
+    const [publishedUrl, setPublishedUrl] = useState('');
+
+    useEffect(() => {
+        fetch('/api/clinical-cases')
+            .then(response => response.ok ? response.json() : Promise.reject())
+            .then(result => setExistingCases(result.cases || []))
+            .catch(() => setExistingCases([]));
+    }, []);
+
+    useEffect(() => {
+        if (!slugEdited) setSlug(slugifyCaseTitle(title));
+    }, [title, slugEdited]);
 
     const completedDescriptions = useMemo(
         () => photoDescriptions.filter(value => value.trim()).length,
@@ -108,6 +128,57 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
         toast.success('Borrador copiado');
     }
 
+    async function publishNow() {
+        const existingSlug = existingCases.find(item => item.id === caseId)?.slug;
+        if (!caseDescription.trim()) {
+            toast.error('Completá la descripción general del caso');
+            return;
+        }
+        if (mode === 'append' && !caseId) {
+            toast.error('Elegí el caso existente');
+            return;
+        }
+        setPublishing(true);
+        try {
+            const response = await fetch('/api/clinical-cases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mode, caseId: mode === 'append' ? caseId : undefined, patientId,
+                    title, slug: mode === 'append' ? existingSlug : slug,
+                    description: caseDescription,
+                    photos: currentFiles.map((file, index) => ({
+                        id: file.id, name: file.name, createdTime: file.createdTime,
+                        alt: photoDescriptions[index]?.trim() || `${title} - foto ${index + 1}`,
+                        caption: photoDescriptions[index]?.trim() || undefined,
+                    })),
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'No se pudo publicar');
+            setPublishedUrl(result.publicUrl);
+            toast.success(`${result.uploaded} foto${result.uploaded !== 1 ? 's' : ''} publicada${result.uploaded !== 1 ? 's' : ''}`);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo publicar');
+        } finally {
+            setPublishing(false);
+        }
+    }
+
+    if (publishedUrl) {
+        return (
+            <Modal isOpen onClose={onClose} title="Caso publicado" className="max-w-lg">
+                <div className="p-6 text-center">
+                    <Check size={34} className="mx-auto text-emerald-400" />
+                    <p className="mt-3 text-sm text-slate-300">Las fotos quedaron cargadas directamente en la web.</p>
+                    <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#C9A96E] px-4 py-2 text-sm font-bold text-black">
+                        Ver caso publicado <ExternalLink size={15} />
+                    </a>
+                </div>
+            </Modal>
+        );
+    }
+
     return (
         <Modal
             isOpen
@@ -116,12 +187,24 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
             className="max-w-6xl"
         >
             <div className="space-y-5 p-5">
-                <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-                    Esta instancia prepara el caso y las descripciones foto por foto. La publicación automática real todavía requiere conectar credenciales Cloudinary y escritura sobre la repo pública de casos.
+                <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+                    Publicación directa: las fotos se alojan en Cloudinary y el caso aparece en amesteticadental.com sin descargar archivos.
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                     <section className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                            <button onClick={() => setMode('create')} className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === 'create' ? 'bg-[#C9A96E] text-black' : 'bg-white/10 text-white'}`}>Crear caso nuevo</button>
+                            <button onClick={() => setMode('append')} className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === 'append' ? 'bg-[#C9A96E] text-black' : 'bg-white/10 text-white'}`}>Agregar a existente</button>
+                        </div>
+                        {mode === 'append' && (
+                            <select value={caseId} onChange={event => setCaseId(event.target.value)} className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white">
+                                <option value="">Elegir caso…</option>
+                                {existingCases.map(item => <option key={item.id} value={item.id}>{item.title} ({item.status})</option>)}
+                            </select>
+                        )}
+                        {mode === 'create' && (
+                        <>
                         <div>
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">
                                 Título del caso
@@ -132,6 +215,19 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
                                 className="w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none focus:border-[#C9A96E]/60"
                             />
                         </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">URL editable</label>
+                            <div className="flex rounded-lg border border-white/10 bg-slate-950/70 text-sm">
+                                <span className="px-3 py-2 text-slate-500">amesteticadental.com/casos/</span>
+                                <input
+                                    value={slug}
+                                    onChange={event => { setSlugEdited(true); setSlug(slugifyCaseTitle(event.target.value)); }}
+                                    className="min-w-0 flex-1 bg-transparent py-2 pr-2 text-white outline-none"
+                                />
+                            </div>
+                        </div>
+                        </>
+                        )}
 
                         <div>
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -178,12 +274,12 @@ export default function PublicCasePublishModal({ files, patientName, onClose }: 
                             </button>
                             <button
                                 type="button"
-                                disabled
-                                className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white/40"
-                                title="Falta conectar credenciales Cloudinary y publicación de la web pública"
+                                onClick={publishNow}
+                                disabled={publishing}
+                                className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60"
                             >
-                                <CloudUpload size={16} />
-                                Publicar ahora
+                                {publishing ? <Loader2 size={16} className="animate-spin" /> : <CloudUpload size={16} />}
+                                {publishing ? 'Subiendo…' : mode === 'append' ? 'Agregar fotos al caso' : 'Publicar ahora'}
                             </button>
                             <button
                                 type="button"
