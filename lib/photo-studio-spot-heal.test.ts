@@ -52,3 +52,41 @@ test('is safe at image edges and with invalid dimensions', () => {
         pixels
     );
 });
+
+test('preserves a gum-tooth boundary instead of creating a flat pink blur', () => {
+    const width = 140;
+    const height = 90;
+    const boundaryY = 42;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+
+    for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+            const offset = (y * width + x) * 4;
+            const texture = ((x % 9) - 4) * 2;
+            const gum = y < boundaryY;
+            pixels[offset] = (gum ? 220 : 238) + texture;
+            pixels[offset + 1] = (gum ? 132 : 231) + texture;
+            pixels[offset + 2] = (gum ? 142 : 214) + texture;
+            pixels[offset + 3] = 255;
+        }
+    }
+
+    // Clinical defect centered exactly across the pink/white transition.
+    for (let y = boundaryY - 3; y <= boundaryY + 3; y += 1) {
+        for (let x = 67; x <= 73; x += 1) {
+            if (Math.hypot(x - 70, y - boundaryY) > 3.5) continue;
+            const offset = (y * width + x) * 4;
+            pixels[offset] = 12;
+            pixels[offset + 1] = 12;
+            pixels[offset + 2] = 12;
+        }
+    }
+
+    const healed = healSpotPixels(pixels, width, height, 70, boundaryY, 7);
+    const gumPixel = pixelAt(healed, width, 70, boundaryY - 2);
+    const toothPixel = pixelAt(healed, width, 70, boundaryY + 2);
+
+    assert.ok(gumPixel[1] < 170, `gum texture became too white: ${gumPixel}`);
+    assert.ok(toothPixel[1] > 205, `tooth texture became pink/blurred: ${toothPixel}`);
+    assert.ok(Math.abs(gumPixel[1] - toothPixel[1]) > 45, 'the anatomical color boundary was flattened');
+});

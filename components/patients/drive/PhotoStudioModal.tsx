@@ -2618,7 +2618,9 @@ export default function PhotoStudioModal({
         // Deterministic local healing. The OpenCV.js build previously loaded
         // from docs.opencv.org does not include cv.inpaint reliably and its
         // runtime exceptions used to tear down the editor mid-stroke.
-        const margin = Math.max(8, Math.ceil(radius * 1.6));
+        // Texture-aware healing needs enough surrounding tissue to find a
+        // genuinely similar patch along the same anatomical boundary.
+        const margin = Math.max(16, Math.ceil(radius * 6.2));
         const sx = Math.max(0, Math.floor(x - margin));
         const sy = Math.max(0, Math.floor(y - margin));
         const sw = Math.min(ctx.canvas.width - sx, Math.ceil(margin * 2));
