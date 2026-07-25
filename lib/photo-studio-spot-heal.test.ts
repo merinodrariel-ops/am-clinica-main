@@ -32,7 +32,6 @@ test('removes a dark spot using the clean surrounding ring', () => {
     assert.deepEqual(pixelAt(healed, width, 40, 40), [210, 210, 210, 255]);
     assert.deepEqual(pixelAt(healed, width, 5, 5), [210, 210, 210, 255]);
 });
-
 test('supports repeated strokes without changing pixels outside each brush', () => {
     const width = 100;
     const height = 60;
@@ -53,4 +52,3 @@ test('is safe at image edges and with invalid dimensions', () => {
         pixels
     );
 });
-

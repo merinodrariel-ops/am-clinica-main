@@ -52,4 +52,3 @@ export function healSpotPixels(
 
     return output;
 }
-
