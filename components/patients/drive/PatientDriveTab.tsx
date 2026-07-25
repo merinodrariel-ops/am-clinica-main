@@ -869,12 +869,12 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const classifiedGroups = {
         exocad: { title: 'Proyectos Exocad', icon: <Sparkles size={16} className="text-orange-400 animate-pulse" />, files: [] as DriveFile[] },
         foto: { title: 'Fotos', icon: <FileImage size={16} className="text-emerald-500" />, files: [] as DriveFile[] },
+        redes: { title: 'Selección', icon: <Sparkles size={16} className="text-purple-400" />, files: [] as DriveFile[] },
         video: { title: 'Videos', icon: <Video size={16} className="text-amber-500" />, files: [] as DriveFile[] },
         '3d': { title: 'Escaneos y Diseños 3D', icon: <Layers size={16} className="text-indigo-500" />, files: [] as DriveFile[] },
         presentacion: { title: 'Presentaciones', icon: <Presentation size={16} className="text-blue-500" />, files: [] as DriveFile[] },
         documentacion: { title: 'Presupuestos y Documentación', icon: <FileText size={16} className="text-rose-500" />, files: [] as DriveFile[] },
-        otros: { title: 'Otros Archivos', icon: <FileCode size={16} className="text-slate-400" />, files: [] as DriveFile[] },
-        redes: { title: 'Selección', icon: <Sparkles size={16} className="text-purple-400" />, files: [] as DriveFile[] }
+        otros: { title: 'Otros Archivos', icon: <FileCode size={16} className="text-slate-400" />, files: [] as DriveFile[] }
     };
 
     for (const file of files) {
@@ -882,15 +882,17 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         classifiedGroups[cat].files.push(file);
     }
 
-    // Merge "Fotos" + "Selección" into a single grid ordered cover → selección → rest.
+    // Keep Selección visibly next to Fotos. Both sections still share one selection state
+    // and one ordered filmstrip inside Photo Studio.
     const savedOrder = fotosOrder[motherFolderId] || [];
-    classifiedGroups.foto.files = getOrderedGridPhotos(files, savedOrder);
-    classifiedGroups.redes.files = [];
-    const photoIds = classifiedGroups.foto.files.map(file => file.id);
-    const selectedPhotoFiles = classifiedGroups.foto.files.filter(file => selectedPhotoIds.includes(file.id));
+    const orderedPhotoStudioFiles = getOrderedGridPhotos(files, savedOrder);
+    classifiedGroups.foto.files = orderedPhotoStudioFiles.filter(file => classifyFile(file) === 'foto');
+    classifiedGroups.redes.files = orderedPhotoStudioFiles.filter(file => classifyFile(file) === 'redes');
+    const photoIds = orderedPhotoStudioFiles.map(file => file.id);
+    const selectedPhotoFiles = orderedPhotoStudioFiles.filter(file => selectedPhotoIds.includes(file.id));
     const contextMenuFiles = photoContextMenu ? getPhotoSelectionFiles(photoContextMenu.targetIds) : [];
     const contextClickedFile = photoContextMenu
-        ? classifiedGroups.foto.files.find(file => file.id === photoContextMenu.clickedId) ?? null
+        ? orderedPhotoStudioFiles.find(file => file.id === photoContextMenu.clickedId) ?? null
         : null;
     const contextIsSingle = contextMenuFiles.length === 1;
     const contextCanSmileDesign = contextIsSingle && contextClickedFile?.id === classifiedGroups.foto.files[0]?.id;
@@ -1079,6 +1081,13 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             photoTag={photoTags[file.id]}
                                                             patientFolder={getFormattedFolderName(patientName)}
                                                             isSeleccion={classifyFile(file) === 'redes'}
+                                                            selectionEnabled={key === 'redes' && canManageDrive}
+                                                            isSelected={selectedPhotoIds.includes(file.id)}
+                                                            hideInlineActions={key === 'redes'}
+                                                            onSelectionClick={(selectedFile, event) => handlePhotoSelection(selectedFile, photoIds, event)}
+                                                            onContextMenuRequest={key === 'redes'
+                                                                ? (selectedFile, event) => openPhotoContextMenu(selectedFile, photoIds, event)
+                                                                : undefined}
                                                         />
                                                     </div>
                                                     {key === '3d' && dentalBitePairs.has(file.id) && (
@@ -1319,7 +1328,10 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     patientId={patientId}
                     patientName={patientName}
                     canSave={canManageDrive}
-                    allFolderFiles={files.filter(f => ['foto', 'redes', '3d'].includes(classifyFile(f)))}
+                    allFolderFiles={[
+                        ...orderedPhotoStudioFiles,
+                        ...files.filter(f => classifyFile(f) === '3d'),
+                    ]}
                     autoStartSmile={previewAutoSmile}
                     onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
                     onSaved={(options) => {
