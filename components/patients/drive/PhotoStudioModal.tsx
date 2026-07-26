@@ -4465,18 +4465,42 @@ export default function PhotoStudioModal({
     }
 
     function handleCanvasContainerClick(e: React.MouseEvent<HTMLDivElement>) {
-        if (drawMode !== 'drawing') return;
-        const canvas = drawCanvasRef.current;
-        if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        const clickedInsidePhoto =
+        const target = e.target;
+        if (target instanceof Element && target.closest('button, input, textarea, select, a, [role="menu"]')) {
+            return;
+        }
+
+        const artboard = canvasActive ? canvasLayersRef.current : drawCanvasRef.current;
+        if (!artboard) return;
+        const rect = artboard.getBoundingClientRect();
+        const clickedInsideArtboard =
             e.clientX >= rect.left &&
             e.clientX <= rect.right &&
             e.clientY >= rect.top &&
             e.clientY <= rect.bottom;
-        if (clickedInsidePhoto) return;
+        if (clickedInsideArtboard) return;
+
         e.preventDefault();
-        finishDrawingPath(currentPoints);
+        if (drawMode === 'drawing') {
+            finishDrawingPath(currentPoints);
+        } else {
+            setDrawMode('idle');
+            setSelectedShapeId(null);
+            setMultiSelectedIds([]);
+        }
+        setEditingTextId(null);
+        setSelectedTextId(null);
+        setTextToolActive(false);
+        setCanvasSelectedId(null);
+        setCanvasLayerInteracting(false);
+        setContextMenu(null);
+        setCanvasContextMenu(null);
+
+        if (canvasLayerCropId) {
+            void handleConfirmCanvasLayerCrop();
+        } else if (cropActive) {
+            void handleConfirmCrop();
+        }
     }
 
     function handleDrawClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -6103,7 +6127,7 @@ export default function PhotoStudioModal({
                         onTouchStart={canvasActive || cropActive ? undefined : handleTouchStart}
                         onTouchMove={canvasActive || cropActive ? undefined : handleTouchMove}
                         onTouchEnd={canvasActive ? undefined : handleTouchEnd}
-                        onClick={canvasActive || cropActive ? undefined : handleCanvasContainerClick}
+                        onClick={handleCanvasContainerClick}
                         onDoubleClick={canvasActive || cropActive ? undefined : () => { setZoom(1); setPanX(0); setPanY(0); }}
                         style={{ cursor: (!canvasActive && zoom > 1 && !manualBackgroundToolActive) ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                     >
