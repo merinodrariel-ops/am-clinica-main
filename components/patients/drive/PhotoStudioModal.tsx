@@ -49,6 +49,7 @@ import {
 import { buildDriveImageInfoTitle } from '@/lib/photo-studio/drive-image-info';
 import { mapCanvasLayerPointToPixel } from '@/lib/photo-studio/canvas-layer-point';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
+import PublicCasePublishModal from './PublicCasePublishModal';
 import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
 import SmileDesignPanel from './SmileDesignPanel';
@@ -1578,10 +1579,10 @@ export default function PhotoStudioModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [imageUrl]);
 
-    // Multi-select + web download state
+    // Multi-select + direct web publishing state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [multiSelectMode, setMultiSelectMode] = useState(false);
-    const [downloadingWeb, setDownloadingWeb] = useState(false);
+    const [showCasePublishModal, setShowCasePublishModal] = useState(false);
     const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
     const [sharePatientItems, setSharePatientItems] = useState<ShareWithPatientItem[] | null>(null);
     const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -5491,52 +5492,6 @@ export default function PhotoStudioModal({
         }
     }
 
-    async function handleWebDownload() {
-        const files = imageFiles.filter(f => selectedIds.has(f.id));
-        if (files.length === 0) return;
-        setDownloadingWeb(true);
-        try {
-            for (let i = 0; i < files.length; i++) {
-                const f = files[i];
-                const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-                    const el = new Image();
-                    el.crossOrigin = 'anonymous';
-                    el.onload = () => resolve(el);
-                    el.onerror = reject;
-                    el.src = `/api/drive/file/${f.id}`;
-                });
-                const MAX = 1920;
-                let w = img.naturalWidth, h = img.naturalHeight;
-                if (w > MAX || h > MAX) {
-                    const r = Math.min(MAX / w, MAX / h);
-                    w = Math.round(w * r); h = Math.round(h * r);
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = w; canvas.height = h;
-                canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-                await new Promise<void>(res => {
-                    canvas.toBlob(blob => {
-                        if (!blob) { res(); return; }
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${f.name.replace(/\.[^.]+$/, '')}_web.webp`;
-                        a.click();
-                        setTimeout(() => { URL.revokeObjectURL(url); res(); }, 500);
-                    }, 'image/webp', 0.85);
-                });
-                if (i < files.length - 1) await new Promise(r => setTimeout(r, 350));
-            }
-            setSelectedIds(new Set());
-            setMultiSelectMode(false);
-            toast.success(`${files.length} foto${files.length > 1 ? 's descargadas' : ' descargada'} para web`);
-        } catch {
-            toast.error('Error al descargar algunas fotos');
-        } finally {
-            setDownloadingWeb(false);
-        }
-    }
-
     async function materializeCanvasLayersForSave(canvasDocument: CanvasDoc): Promise<CanvasLayer[]> {
         const { uploadCanvasLayerAssetAction } = await import('@/app/actions/patient-files-drive');
         const persisted: CanvasLayer[] = [];
@@ -5861,12 +5816,11 @@ export default function PhotoStudioModal({
                         )}
                         {selectedIds.size > 0 && (
                             <button
-                                onClick={handleWebDownload}
-                                disabled={downloadingWeb}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50"
+                                onClick={() => setShowCasePublishModal(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors"
                             >
-                                {downloadingWeb ? <Loader2 size={14} className="animate-spin" /> : <Globe2 size={14} />}
-                                <span className="hidden sm:inline">Web ({selectedIds.size})</span>
+                                <Globe2 size={14} />
+                                <span className="hidden sm:inline">Publicar web ({selectedIds.size})</span>
                             </button>
                         )}
                         {imageFiles.length > 1 && (
@@ -7381,6 +7335,15 @@ export default function PhotoStudioModal({
                 </AnimatePresence>
             </motion.div>
         </AnimatePresence>
+
+        {showCasePublishModal && (
+            <PublicCasePublishModal
+                patientId={patientId}
+                patientName={patientName}
+                files={imageFiles.filter(item => selectedIds.has(item.id))}
+                onClose={() => setShowCasePublishModal(false)}
+            />
+        )}
 
         {/* ── Presentation Mode ─────────────────────────────────────────── */}
 
