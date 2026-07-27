@@ -4006,6 +4006,7 @@ export default function PhotoStudioModal({
                         id: targetFile.id,
                         name: targetFile.name,
                         driveFileId: targetFile.id,
+                        file: await fetchOriginalAsFile(targetFile),
                     });
                     continue;
                 }

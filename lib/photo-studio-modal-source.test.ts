@@ -28,3 +28,11 @@ test('photo studio thumbnail reorder refreshes the parent grid after saving', ()
         'Photo Studio should refresh PatientDriveTab after order changes so the cover badge is reflected'
     );
 });
+
+test('clean active photos are materialized before opening AirDrop', () => {
+    assert.match(
+        source,
+        /if \(!isDirty && !canvasActive\) \{[\s\S]*?driveFileId: targetFile\.id,[\s\S]*?file: await fetchOriginalAsFile\(targetFile\)/,
+        'The active original must include a File because navigator.share cannot use a Drive id'
+    );
+});
