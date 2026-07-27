@@ -15,11 +15,13 @@ export interface SaveSmileDesignParams {
   slicePos?: number;         // divider position 0-100 (default 50)
   settings: {
     level: string;
+    identity: string;
     edges: boolean;
     edgesIntensity: string;
     texture: boolean;
     textureIntensity: string;
     shape: number;
+    centralLength: string;
   };
   customFilename?: string; // e.g. "DisenoSonrisa_Juan_Perez_2024-03-28"
 }
@@ -125,7 +127,7 @@ export async function saveSmileDesignResult(
     }
 
     const cacheBuster = `?t=${ts}`;
-    const label = `Smile Design ${dateStr} · ${params.settings.level}`;
+    const label = `Smile Design ${dateStr} · ${params.settings.identity} · ${params.settings.level}`;
 
     // Upload to Google Drive if folderId is provided
     let driveFileId: string | undefined;

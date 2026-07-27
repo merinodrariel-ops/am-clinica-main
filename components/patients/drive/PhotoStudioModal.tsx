@@ -6772,10 +6772,10 @@ export default function PhotoStudioModal({
                                 gridData={smileDesign.gridData}
                                 settings={smileDesign.settings}
                                 onSettingsChange={smileDesign.setSettings}
-                                onRegenerate={async () => {
+                                onRegenerate={async (overrides) => {
                                     smileStartTimeRef.current = Date.now();
                                     smileMotion.reset();
-                                    await smileDesign.regenerate();
+                                    await smileDesign.regenerate(overrides);
                                     if (smileStartTimeRef.current) {
                                         setSmileProcessingTime((Date.now() - smileStartTimeRef.current) / 1000);
                                     }

@@ -1,29 +1,22 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import {
+  DEFAULT_SMILE_SETTINGS,
+  type CentralLength,
+  type SmileIdentity,
+  type SmileIntensity3,
+  type SmileSettings,
+  type SmileShade,
+} from '@/lib/smile-design-settings';
 
-export type SmileLevel = 'Natural' | 'Natural White' | 'Natural Ultra White';
-export type SmileIntensity3 = 'Sutil' | 'Medio' | 'Marcado';
-export type CentralLength = 'Cortos' | 'Natural' | 'Largos';
-
-export interface SmileSettings {
-  level: SmileLevel;
-  edges: boolean;
-  edgesIntensity: SmileIntensity3;
-  texture: boolean;
-  textureIntensity: 'Sutil' | 'Medio' | 'Detallado';
-  shape: number; // -1 (femenino) a 1 (masculino), 0 = centro
-  centralLength: CentralLength;
-}
-
-export const DEFAULT_SMILE_SETTINGS: SmileSettings = {
-  level: 'Natural',
-  edges: true,
-  edgesIntensity: 'Medio',
-  texture: true,
-  textureIntensity: 'Medio',
-  shape: 0,
-  centralLength: 'Natural',
+export {
+  DEFAULT_SMILE_SETTINGS,
+  type CentralLength,
+  type SmileIdentity,
+  type SmileIntensity3,
+  type SmileSettings,
+  type SmileShade,
 };
 
 export interface SmileGridData {
@@ -44,7 +37,7 @@ export interface SmileResult {
 
 export interface UseSmileDesignReturn {
   process: (imageBlob: Blob, mimeType?: string) => Promise<void>;
-  regenerate: () => Promise<void>;
+  regenerate: (overrides?: Partial<SmileSettings>) => Promise<void>;
   state: SmileState;
   result: SmileResult | null;
   gridData: SmileGridData | null;
@@ -137,6 +130,7 @@ export function useSmileDesign(): UseSmileDesignReturn {
         imageBase64: base64,
         mimeType: mime,
         level: currentSettings.level,
+        identity: currentSettings.identity,
         edges: currentSettings.edges,
         edgesIntensity: currentSettings.edgesIntensity,
         texture: currentSettings.texture,
@@ -160,8 +154,8 @@ export function useSmileDesign(): UseSmileDesignReturn {
       setSmileState('aligning');
       const compressed = await compressBlob(imageBlob, 3840, 0.98);
 
-      let processedBase64 = compressed.base64;
-      let processedMime = compressed.mimeType;
+      const processedBase64 = compressed.base64;
+      const processedMime = compressed.mimeType;
       let grid: SmileGridData = { bipupilarY: null, smileLineY: null, midlineX: null };
 
       try {
@@ -226,8 +220,10 @@ export function useSmileDesign(): UseSmileDesignReturn {
     }
   }, [settings, callEnhance]);
 
-  const regenerate = useCallback(async () => {
+  const regenerate = useCallback(async (overrides?: Partial<SmileSettings>) => {
     if (!alignedBase64) return;
+    const nextSettings = { ...settings, ...overrides };
+    if (overrides) setSettingsState(nextSettings);
     setError(null);
     setSmileState('enhancing');
     try {
@@ -235,7 +231,7 @@ export function useSmileDesign(): UseSmileDesignReturn {
       const { afterDataUrl, afterBase64, afterMime } = await callEnhance(
         alignedBase64,
         alignedMime,
-        settings
+        nextSettings
       );
       setResult(prev => prev ? { ...prev, afterDataUrl, afterBase64, afterMime } : {
         beforeDataUrl,

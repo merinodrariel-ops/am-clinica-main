@@ -6,10 +6,16 @@ import type {
   SmileGridData,
   SmileResult,
   CentralLength,
+  SmileIdentity,
+  SmileShade,
 } from '@/hooks/useSmileDesign';
 import { DEFAULT_SMILE_SETTINGS } from '@/hooks/useSmileDesign';
+import {
+  getLessWhiteSettings,
+  getMoreNaturalSettings,
+  getMorePerfectSettings,
+} from '@/lib/smile-design-settings';
 import type { MotionState } from '@/hooks/useSmileMotion';
-import BeforeAfterSlider from './BeforeAfterSlider';
 
 interface SmileDesignPanelProps {
   state: SmileState;
@@ -17,7 +23,7 @@ interface SmileDesignPanelProps {
   gridData: SmileGridData | null;
   settings: SmileSettings;
   onSettingsChange: (patch: Partial<SmileSettings>) => void;
-  onRegenerate: () => void;
+  onRegenerate: (overrides?: Partial<SmileSettings>) => void;
   onSave: () => void;
   onShareLink: () => void;
   onExit: () => void;
@@ -33,7 +39,17 @@ interface SmileDesignPanelProps {
   motionError: string | null;
 }
 
-const LEVEL_OPTIONS = ['Natural', 'Natural White', 'Natural Ultra White'] as const;
+const IDENTITY_OPTIONS: { value: SmileIdentity; label: string; hint: string }[] = [
+  { value: 'Fiel', label: 'Fiel al paciente', hint: 'Conserva tamaño, proporciones y personalidad dental.' },
+  { value: 'Equilibrado', label: 'Equilibrado', hint: 'Híbrido entre identidad real y sonrisa armónica.' },
+  { value: 'Idealizado', label: 'Idealizado', hint: 'Mayor corrección, simetría y perfección estética.' },
+];
+const LEVEL_OPTIONS: { value: SmileShade; label: string }[] = [
+  { value: 'Original mejorado', label: 'Original mejorado' },
+  { value: 'Natural', label: 'Natural' },
+  { value: 'Blanco estético', label: 'Blanco estético' },
+  { value: 'Ultra blanco', label: 'Ultra blanco' },
+];
 const INTENSITY3 = ['Sutil', 'Medio', 'Marcado'] as const;
 const TEXTURE_OPTIONS = ['Sutil', 'Medio', 'Detallado'] as const;
 const CENTRAL_LENGTH_OPTIONS: { value: CentralLength; label: string }[] = [
@@ -44,7 +60,6 @@ const CENTRAL_LENGTH_OPTIONS: { value: CentralLength; label: string }[] = [
 
 export default function SmileDesignPanel({
   state,
-  result,
   gridData,
   settings,
   onSettingsChange,
@@ -106,22 +121,48 @@ export default function SmileDesignPanel({
         {/* Controls — always visible so user can adjust before regenerate */}
         <div className={`flex flex-col gap-3 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
 
+          {/* Dental identity */}
+          <div>
+            <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-1.5">Identidad dental</div>
+            <div className="flex flex-col gap-1">
+              {IDENTITY_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => onSettingsChange({ identity: opt.value })}
+                  className={`text-left px-2 py-1.5 rounded border transition-colors ${
+                    settings.identity === opt.value
+                      ? 'bg-purple-900/50 border-purple-500 text-purple-200'
+                      : 'bg-[#1e2130] border-[#2a2d3a] text-gray-400 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="text-[10px] font-semibold">
+                    {settings.identity === opt.value && '● '}{opt.label}
+                    {opt.value === DEFAULT_SMILE_SETTINGS.identity && settings.identity === opt.value && (
+                      <span className="float-right text-[8px] text-purple-400">default</span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-[8px] leading-tight text-gray-500">{opt.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Whitening level */}
           <div>
-            <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-1.5">Nivel de blanco</div>
+            <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-1.5">Tono del esmalte</div>
             <div className="flex flex-col gap-1">
               {LEVEL_OPTIONS.map(opt => (
                 <button
-                  key={opt}
-                  onClick={() => onSettingsChange({ level: opt })}
+                  key={opt.value}
+                  onClick={() => onSettingsChange({ level: opt.value })}
                   className={`text-left px-2 py-1.5 rounded text-[10px] border transition-colors ${
-                    settings.level === opt
+                    settings.level === opt.value
                       ? 'bg-purple-900/50 border-purple-500 text-purple-300 font-semibold'
                       : 'bg-[#1e2130] border-[#2a2d3a] text-gray-400 hover:border-gray-500'
                   }`}
                 >
-                  {settings.level === opt && '● '}{opt}
-                  {opt === DEFAULT_SMILE_SETTINGS.level && settings.level === opt && (
+                  {settings.level === opt.value && '● '}{opt.label}
+                  {opt.value === DEFAULT_SMILE_SETTINGS.level && settings.level === opt.value && (
                     <span className="float-right text-[8px] text-purple-400">default</span>
                   )}
                 </button>
@@ -235,8 +276,39 @@ export default function SmileDesignPanel({
 
         {/* Action buttons */}
         <div className="flex flex-col gap-1.5">
+          {isReady && (
+            <div>
+              <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-1.5">Ajuste rápido</div>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  onClick={() => onRegenerate(getMoreNaturalSettings(settings))}
+                  disabled={isProcessing}
+                  className="rounded-md border border-emerald-500/30 bg-emerald-900/20 px-1 py-2 text-[9px] leading-tight text-emerald-300 hover:border-emerald-400 disabled:opacity-50"
+                  title="Conserva más identidad y baja un nivel el blanco"
+                >
+                  Más natural
+                </button>
+                <button
+                  onClick={() => onRegenerate(getMorePerfectSettings(settings))}
+                  disabled={isProcessing}
+                  className="rounded-md border border-purple-500/30 bg-purple-900/20 px-1 py-2 text-[9px] leading-tight text-purple-300 hover:border-purple-400 disabled:opacity-50"
+                  title="Aumenta la idealización sin modificar el tono"
+                >
+                  Más perfecto
+                </button>
+                <button
+                  onClick={() => onRegenerate(getLessWhiteSettings(settings))}
+                  disabled={isProcessing}
+                  className="rounded-md border border-amber-500/30 bg-amber-900/20 px-1 py-2 text-[9px] leading-tight text-amber-300 hover:border-amber-400 disabled:opacity-50"
+                  title="Baja un nivel el blanco sin modificar la identidad"
+                >
+                  Menos blanco
+                </button>
+              </div>
+            </div>
+          )}
           <button
-            onClick={onRegenerate}
+            onClick={() => onRegenerate()}
             disabled={isProcessing}
             className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm md:text-base font-bold py-2.5 rounded-md flex items-center justify-center gap-1"
           >
@@ -312,7 +384,9 @@ export default function SmileDesignPanel({
         {isReady && processingTime != null && (
           <div className="bg-[#1a1d2e] rounded-lg p-2 text-center">
             <div className="text-[9px] text-emerald-400">✓ Procesado en {processingTime.toFixed(1)}s</div>
-            <div className="text-[8px] text-gray-600 mt-0.5">Auto-alineado · {settings.level}</div>
+            <div className="text-[8px] text-gray-600 mt-0.5">
+              Auto-alineado · {settings.identity} · {settings.level}
+            </div>
           </div>
         )}
 

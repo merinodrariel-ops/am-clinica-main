@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { buildSmileDesignPrompt } from '@/lib/smile-design-prompt';
+import {
+    DEFAULT_SMILE_SETTINGS,
+    type SmileIdentity,
+    type SmileSettings,
+    type SmileShade,
+} from '@/lib/smile-design-settings';
 
 function getAI() {
     const key = process.env.GEMINI_API_KEY;
@@ -7,37 +14,19 @@ function getAI() {
     return new GoogleGenAI({ apiKey: key });
 }
 
-const LEVEL_PROMPTS: Record<string, string> = {
-    Natural: 'un blanqueamiento natural de limpieza profesional',
-    'Natural White': 'un blanqueamiento estético moderado y realista',
-    'Natural Ultra White': 'un blanqueamiento brillante de alto impacto, pero aún fotorrealista',
-};
-
-const EDGES_PROMPTS: Record<string, string> = {
-    'Sutil': 'Keep a hint of incisal translucency — barely noticeable.',
-    'Medio': 'Keep natural incisal translucency typical of healthy adult teeth.',
-    'Marcado': 'Keep visible incisal translucency at the biting edges.',
-};
-
-const TEXTURE_PROMPTS: Record<string, string> = {
-    'Sutil': 'Preserve subtle natural surface micro-texture.',
-    'Medio': 'Preserve natural surface micro-texture with soft perikymata.',
-    'Detallado': 'Preserve realistic surface texture with visible perikymata and subtle lobes.',
-};
-
 // Legacy intensity → level mapping
-const LEGACY_LEVEL: Record<number, string> = {
+const LEGACY_LEVEL: Record<number, SmileShade> = {
     1: 'Natural', 2: 'Natural', 3: 'Natural',
-    4: 'Natural White', 5: 'Natural White', 6: 'Natural White',
-    7: 'Natural Ultra White', 8: 'Natural Ultra White',
-    9: 'Natural Ultra White', 10: 'Natural Ultra White',
+    4: 'Blanco estético', 5: 'Blanco estético', 6: 'Blanco estético',
+    7: 'Ultra blanco', 8: 'Ultra blanco',
+    9: 'Ultra blanco', 10: 'Ultra blanco',
 };
 
 export async function POST(req: NextRequest) {
     try {
         const {
             imageBase64, mimeType,
-            level, edges, edgesIntensity, texture, textureIntensity, shape, centralLength,
+            level, identity, edges, edgesIntensity, texture, textureIntensity, shape, centralLength,
             intensity, // legacy
         } = await req.json();
 
@@ -46,55 +35,43 @@ export async function POST(req: NextRequest) {
         }
 
         // Resolve whitening level
-        const resolvedLevel: string = level
-            ?? LEGACY_LEVEL[Math.max(1, Math.min(10, Math.round(intensity ?? 5)))]
-            ?? 'Natural';
-
-        const baseWhitening = LEVEL_PROMPTS[resolvedLevel] ?? LEVEL_PROMPTS['Natural'];
-        const edgesInstruction = edges && edgesIntensity ? EDGES_PROMPTS[edgesIntensity] ?? '' : '';
-        const textureInstruction = texture && textureIntensity ? TEXTURE_PROMPTS[textureIntensity] ?? '' : '';
-        const CENTRAL_LENGTH_PROMPTS: Record<string, string> = {
-            'Cortos': 'CENTRAL INCISOR LENGTH: Slightly shorten central incisors so they are closer in length to laterals.',
-            'Natural': '',
-            'Largos': 'CENTRAL INCISOR LENGTH: Slightly lengthen central incisors for a more dominant, youthful appearance.',
+        const legacyShadeAliases: Record<string, SmileShade> = {
+            'Natural White': 'Blanco estético',
+            'Natural Ultra White': 'Ultra blanco',
         };
-        const centralLengthInstruction = centralLength && centralLength !== 'Natural'
-            ? CENTRAL_LENGTH_PROMPTS[centralLength] ?? ''
-            : '';
+        const allowedShades: SmileShade[] = [
+            'Original mejorado',
+            'Natural',
+            'Blanco estético',
+            'Ultra blanco',
+        ];
+        const requestedLevel = legacyShadeAliases[level] ?? level;
+        const legacyLevel = typeof intensity === 'number'
+            ? LEGACY_LEVEL[Math.max(1, Math.min(10, Math.round(intensity)))]
+            : undefined;
+        const resolvedLevel: SmileShade = allowedShades.includes(requestedLevel)
+            ? requestedLevel
+            : legacyLevel ?? DEFAULT_SMILE_SETTINGS.level;
+        const allowedIdentities: SmileIdentity[] = ['Fiel', 'Equilibrado', 'Idealizado'];
+        const resolvedIdentity: SmileIdentity = allowedIdentities.includes(identity)
+            ? identity
+            : DEFAULT_SMILE_SETTINGS.identity;
 
-        const shapeInstruction = shape && Math.abs(shape) > 0.1
-            ? shape < 0
-                ? 'Slightly rounder incisal embrasures and softer disto-incisal angles (more feminine morphology).'
-                : 'Slightly flatter incisal edges and squarer line angles (more masculine morphology).'
-            : '';
-
-        // Opt-in anatomy fixes: only include when explicitly requested by the operator.
-        // Applying all of these at once forces the model to hallucinate geometries.
-        const anatomyLines: string[] = [];
-        if (edgesInstruction) anatomyLines.push(`- ${edgesInstruction}`);
-        if (textureInstruction) anatomyLines.push(`- ${textureInstruction}`);
-        if (centralLengthInstruction) anatomyLines.push(`- ${centralLengthInstruction}`);
-        if (shapeInstruction) anatomyLines.push(`- ${shapeInstruction}`);
-
-        const prompt = `Efectúa un rediseño digital completo de la sonrisa de la persona en esta foto.
-
-INSTRUCCIONES CRÍTICAS:
-1. CORRECCIÓN ORTODÓNTICA: Cierra completamente cualquier espacio o diastema entre los dientes. Los dientes deben ser perfectamente contiguos.
-2. ALINEACIÓN Y FORMA: Corrige dientes torcidos o astillados. Hazlos perfectamente rectos, uniformes y simétricos.
-3. EFECTO CARILLAS: Crea una sonrisa perfecta tipo "Hollywood" con forma y proporciones ideales (como carillas de porcelana de alta calidad), pero sin perder el realismo fotográfico.
-4. COLOR: Aplica ${baseWhitening}.
-5. PRESERVACIÓN: El resultado DEBE ser fotorrealista. Mantén todas las demás facciones, la textura de la piel, la iluminación y el fondo original exactamente como están. SOLO los dientes y la sonrisa deben ser transformados.
-
-CALIDAD DE DETALLE:
-- Evita dientes borrosos, pixelados o con bordes serruchados.
-- Mantén contornos dentales limpios y textura natural del esmalte.
-- No alteres labios, nariz, ojos, forma facial ni cabello.
-- No agregues ni elimines dientes visibles.
-
-${anatomyLines.length > 0 ? `AJUSTES FINOS SOLICITADOS:\n${anatomyLines.join('\n')}\n` : ''}Devuelve solo la imagen final editada.`;
+        const settings: SmileSettings = {
+            ...DEFAULT_SMILE_SETTINGS,
+            level: resolvedLevel,
+            identity: resolvedIdentity,
+            edges: typeof edges === 'boolean' ? edges : DEFAULT_SMILE_SETTINGS.edges,
+            edgesIntensity: edgesIntensity ?? DEFAULT_SMILE_SETTINGS.edgesIntensity,
+            texture: typeof texture === 'boolean' ? texture : DEFAULT_SMILE_SETTINGS.texture,
+            textureIntensity: textureIntensity ?? DEFAULT_SMILE_SETTINGS.textureIntensity,
+            shape: typeof shape === 'number' ? shape : DEFAULT_SMILE_SETTINGS.shape,
+            centralLength: centralLength ?? DEFAULT_SMILE_SETTINGS.centralLength,
+        };
+        const prompt = buildSmileDesignPrompt(settings);
 
 
-        console.log(`[smile-design/enhance] level=${resolvedLevel}, edges=${edges}, texture=${texture}, shape=${shape}, payloadBytes=${imageBase64.length}`);
+        console.log(`[smile-design/enhance] level=${resolvedLevel}, identity=${resolvedIdentity}, edges=${settings.edges}, texture=${settings.texture}, shape=${settings.shape}, payloadBytes=${imageBase64.length}`);
 
         const ai = getAI();
         const response = await ai.models.generateContent({
