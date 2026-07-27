@@ -133,7 +133,7 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
         <img
           src={afterSrc}
           alt="Después"
-          className="block w-full h-full object-cover"
+          className="block w-full h-full object-contain"
           draggable={false}
         />
 
@@ -145,7 +145,7 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
           <img
             src={beforeSrc}
             alt="Antes"
-            className="block w-full h-full object-cover"
+            className="block w-full h-full object-contain"
             draggable={false}
           />
         </div>
