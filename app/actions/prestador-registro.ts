@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica-main.vercel.app').replace(/\/$/, '');
 const MIN_FORM_COMPLETION_MS = 4000;
 
-const REGISTRO_CATEGORIAS = ['odontologo', 'asistente', 'reception', 'laboratorio', 'limpieza', 'recaptacion', 'other'] as const;
+const REGISTRO_CATEGORIAS = ['odontologo', 'asistente', 'reception', 'laboratorio', 'marketing', 'limpieza', 'recaptacion', 'other'] as const;
 
 type RegistroCategoria = typeof REGISTRO_CATEGORIAS[number];
 
@@ -38,6 +38,8 @@ function getAreaFromCategoria(categoria: RegistroCategoria): string {
             return 'Recepcion';
         case 'laboratorio':
             return 'Laboratorio';
+        case 'marketing':
+            return 'Marketing';
         case 'limpieza':
             return 'Limpieza';
         case 'recaptacion':
@@ -57,6 +59,8 @@ function getRoleLabelFromCategoria(categoria: RegistroCategoria): string {
             return 'Recepcion';
         case 'laboratorio':
             return 'Laboratorio';
+        case 'marketing':
+            return 'Marketing';
         case 'limpieza':
             return 'Limpieza';
         case 'recaptacion':
@@ -162,11 +166,11 @@ export async function registerPrestadorPublico(
     // Duplicate check by documento
     const { data: existing } = await adminSupabase
         .from('personal')
-        .select('id')
+        .select('id, email')
         .eq('documento', documento)
         .maybeSingle();
 
-    if (existing) {
+    if (existing && existing.email?.toLowerCase() !== email) {
         return { error: 'Ya existe un prestador registrado con ese DNI.' };
     }
 
@@ -193,29 +197,39 @@ export async function registerPrestadorPublico(
         fecha_ingreso: new Date().toISOString().split('T')[0],
     };
 
-    let insertResult = await adminSupabase
-        .from('personal')
-        .insert(basePersonalPayload)
-        .select('id')
-        .single();
+    let insertedPersonal: { id: string } | null = existing ? { id: existing.id } : null;
+    let personalError: { message: string } | null = null;
 
-    if (
-        insertResult.error &&
-        /fecha_nacimiento|column .* does not exist|schema cache/i.test(insertResult.error.message || '')
-    ) {
-        const { fecha_nacimiento: _fechaNacimiento, ...fallbackPayload } = basePersonalPayload;
-        insertResult = await adminSupabase
+    if (existing) {
+        const updateResult = await adminSupabase
             .from('personal')
-            .insert(fallbackPayload)
+            .update({ area, categoria, activo: true, modelo_pago: modeloPago })
+            .eq('id', existing.id);
+        personalError = updateResult.error;
+    } else {
+        let insertResult = await adminSupabase
+            .from('personal')
+            .insert(basePersonalPayload)
             .select('id')
             .single();
+
+        if (
+            insertResult.error &&
+            /fecha_nacimiento|column .* does not exist|schema cache/i.test(insertResult.error.message || '')
+        ) {
+            const { fecha_nacimiento: _fechaNacimiento, ...fallbackPayload } = basePersonalPayload;
+            insertResult = await adminSupabase
+                .from('personal')
+                .insert(fallbackPayload)
+                .select('id')
+                .single();
+        }
+        insertedPersonal = insertResult.data;
+        personalError = insertResult.error;
     }
 
-    const insertedPersonal = insertResult.data;
-    const error = insertResult.error;
-
-    if (error) {
-        console.error('registerPrestadorPublico error:', error);
+    if (personalError) {
+        console.error('registerPrestadorPublico error:', personalError);
         return { error: 'Error al registrar. Intentá de nuevo.' };
     }
 
@@ -226,10 +240,11 @@ export async function registerPrestadorPublico(
         const nextMetadata = {
             full_name: fullName,
             categoria,
+            role: categoria,
         };
 
         // Intentar crear el usuario (puede ya existir si rellenó el form antes)
-        const { data: existingAuthUser } = await adminSupabase.auth.admin.listUsers();
+        const { data: existingAuthUser } = await adminSupabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
         const authUser = existingAuthUser?.users?.find((u: { id: string; email?: string; user_metadata?: Record<string, unknown> }) => u.email === email);
         const alreadyExists = Boolean(authUser);
         let authUserId = authUser?.id || null;

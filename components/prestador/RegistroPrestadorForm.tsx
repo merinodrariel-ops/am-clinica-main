@@ -55,6 +55,7 @@ const CATEGORIA_OPTIONS = [
     { value: 'asistente', label: 'Asistente' },
     { value: 'reception', label: 'Recepcion' },
     { value: 'laboratorio', label: 'Laboratorio' },
+    { value: 'marketing', label: 'Marketing' },
     { value: 'limpieza', label: 'Limpieza' },
     { value: 'recaptacion', label: 'Recaptacion' },
     { value: 'other', label: 'Otro' },
@@ -198,7 +199,7 @@ export default function RegistroPrestadorForm() {
     }
 
     // --- Progress bar ---
-    const ProgressBar = () => (
+    const renderProgressBar = () => (
         <div className="flex flex-col gap-2 mb-8">
             <div className="flex gap-1.5">
                 {STEP_NAMES.map((_, i) => (
@@ -423,7 +424,7 @@ export default function RegistroPrestadorForm() {
 
                 {/* Card */}
                 <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm p-6">
-                    <ProgressBar />
+                    {renderProgressBar()}
 
                     <AnimatePresence mode="wait" initial={false}>
                         <motion.div

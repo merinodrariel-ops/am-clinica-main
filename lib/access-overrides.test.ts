@@ -14,3 +14,10 @@ test('portal remains available for clinical roles and financial modules stay loc
     assert.equal(getCategoryDefault('admin', 'caja_recepcion'), 'full');
     assert.equal(getCategoryDefault('reception', 'caja_admin'), 'none');
 });
+
+test('marketing only inherits read access to patients', () => {
+    assert.equal(getCategoryDefault('marketing', 'patients'), 'read');
+    assert.equal(getCategoryDefault('marketing', 'agenda'), 'none');
+    assert.equal(getCategoryDefault('marketing', 'caja_admin'), 'none');
+    assert.equal(getCategoryDefault('marketing', 'portal'), 'none');
+});

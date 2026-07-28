@@ -399,7 +399,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         }
 
         if (!options?.silent) setStatus('loading');
-        const result = await getPatientAllFilesAction(folderId);
+        const result = await getPatientAllFilesAction(folderId, patientId);
 
         if (result.error) {
             setErrorMsg(result.error);
@@ -411,17 +411,21 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         clearPhotoSelection();
 
         // Load saved photo order
-        const orderData = await getPatientFotosOrder(patientId);
-        setFotosOrder(orderData);
+        if (role !== 'marketing') {
+            const orderData = await getPatientFotosOrder(patientId);
+            setFotosOrder(orderData);
+        }
 
         setStatus('loaded');
 
         // Load photo tags for this patient
-        const tags = await getPhotoTagsForPatientAction(patientId);
-        const tagMap: Record<string, PhotoTag> = {};
-        for (const t of tags) tagMap[t.file_id] = t;
-        setPhotoTags(tagMap);
-    }, [patientId, clearPhotoSelection]);
+        if (role !== 'marketing') {
+            const tags = await getPhotoTagsForPatientAction(patientId);
+            const tagMap: Record<string, PhotoTag> = {};
+            for (const t of tags) tagMap[t.file_id] = t;
+            setPhotoTags(tagMap);
+        }
+    }, [patientId, role, clearPhotoSelection]);
 
     useEffect(() => {
         if (currentFolderUrl && status === 'idle') {

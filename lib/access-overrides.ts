@@ -49,6 +49,7 @@ export function getCategoryDefault(categoria: string, moduleKey: string): 'full'
     // Operational modules — most roles have access
     const OPERATIONAL = ['agenda', 'patients', 'todos', 'recalls', 'inventario', 'workflows'];
     if (OPERATIONAL.includes(moduleKey)) {
+        if (categoria === 'marketing') return moduleKey === 'patients' ? 'read' : 'none';
         // partner_viewer has visibility, but no edit rights by default
         if (categoria === 'partner_viewer') return 'read';
         return 'full';

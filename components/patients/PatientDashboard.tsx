@@ -137,8 +137,9 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const isRecaptacion = role === 'recaptacion';
     const isAsistente = role === 'asistente';
     const isLaboratorio = role === 'laboratorio';
+    const isMarketing = role === 'marketing';
     const hidePaymentTabs = role !== 'admin' && role !== 'owner';
-    const hideContactData = isAsistente || isOdontologo || isLaboratorio;
+    const hideContactData = isAsistente || isOdontologo || isLaboratorio || isMarketing;
 
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
@@ -465,7 +466,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                 <div className="space-y-4">
 
                     {/* 1. Archivos — expanded by default */}
-                    <PatientSection id="archivos" title="Documentación" icon={FolderOpen} defaultOpen>
+                    <PatientSection id="archivos" title={isMarketing ? 'Fotos y videos' : 'Documentación'} icon={FolderOpen} defaultOpen>
                         <PatientDriveTab
                             patientId={patient.id_paciente}
                             patientName={`${patient.apellido}, ${patient.nombre}`}
@@ -473,6 +474,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                         />
                     </PatientSection>
 
+                    {!isMarketing && <>
                     {/* 2. Historia Clínica + Prestaciones + Materiales — moved up for quick access */}
                     <PatientSection id="historia" title="Historia Clínica" icon={FileText} defaultOpen>
                         <div className="border-b border-gray-100 dark:border-gray-800 flex justify-between items-center pb-4 mb-4">
@@ -1219,6 +1221,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             patientName={`${patient.nombre} ${patient.apellido}`}
                         />
                     </PatientSection>
+                    </>}
 
                 </div>
             </div>

@@ -22,6 +22,13 @@ test('admin can manage patients and view patient financial data', () => {
     assert.equal(canViewPatientContactData('admin'), true);
 });
 
+test('marketing can view patients without contact, finance, or management access', () => {
+    assert.equal(canViewPatientRecords('marketing'), true);
+    assert.equal(canManagePatients('marketing'), false);
+    assert.equal(canViewPatientFinancialData('marketing'), false);
+    assert.equal(canViewPatientContactData('marketing'), false);
+});
+
 test('unknown roles do not get patient access by default', () => {
     assert.equal(canViewPatientRecords('google_user'), false);
     assert.equal(canManagePatients('google_user'), false);

@@ -9,6 +9,7 @@ const PATIENT_RECORD_READ_ROLES = new Set([
     'odontologo',
     'asistente',
     'laboratorio',
+    'marketing',
     'recaptacion',
 ]);
 

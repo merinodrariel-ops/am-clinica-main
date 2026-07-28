@@ -17,7 +17,8 @@ import {
     getDriveClient,
     extractSlidesAsImages,
 } from '@/lib/google-drive';
-import { canManagePatientDrive } from '@/lib/patient-drive-access';
+import { canManagePatientDrive, isMarketingMediaMimeType } from '@/lib/patient-drive-access';
+import { canViewPatientRecords } from '@/lib/patient-access';
 
 /**
  * Server action to rename a file in Drive (categorization)
@@ -687,14 +688,48 @@ export async function createCustomSubfolderAction(
 }
 
 export async function getPatientAllFilesAction(
-    motherFolderIdOrUrl: string
+    motherFolderIdOrUrl: string,
+    patientId?: string,
 ): Promise<{ files: DriveFile[]; error?: string }> {
     try {
+        const supabaseServer = await createServerClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return { files: [], error: 'No autenticado' };
+
+        const { data: profile } = await supabaseServer
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .maybeSingle();
+        const role = profile?.categoria || user.user_metadata?.categoria || '';
+        if (!canViewPatientRecords(role)) {
+            return { files: [], error: 'No tenés permisos para ver archivos de pacientes' };
+        }
+
         const motherFolderId = extractFolderIdFromUrl(motherFolderIdOrUrl) || motherFolderIdOrUrl;
         if (!motherFolderId) return { files: [], error: 'ID de carpeta inválido' };
 
+        if (role === 'marketing') {
+            if (!patientId) return { files: [], error: 'Paciente requerido' };
+
+            const admin = getSupabaseAdmin();
+            const { data: patient } = await admin
+                .from('pacientes')
+                .select('link_historia_clinica')
+                .eq('id_paciente', patientId)
+                .eq('is_deleted', false)
+                .maybeSingle();
+            const patientFolderId = extractFolderIdFromUrl(patient?.link_historia_clinica || '');
+            if (!patientFolderId || patientFolderId !== motherFolderId) {
+                return { files: [], error: 'La carpeta no corresponde al paciente' };
+            }
+        }
+
         const files = await listFilesRecursive(motherFolderId, undefined, 0, 3);
-        return { files };
+        const visibleFiles = role === 'marketing'
+            ? files.filter(file => isMarketingMediaMimeType(file.mimeType))
+            : files;
+        return { files: visibleFiles };
     } catch (error) {
         return {
             files: [],

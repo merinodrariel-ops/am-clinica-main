@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getDriveClient } from '@/lib/google-drive';
+import { createClient } from '@/utils/supabase/server';
+import { canViewPatientRecords } from '@/lib/patient-access';
+import { isMarketingMediaMimeType } from '@/lib/patient-drive-access';
 
 export async function GET(
     request: Request,
@@ -14,14 +17,39 @@ export async function GET(
     }
 
     try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+        }
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('categoria')
+            .eq('id', user.id)
+            .maybeSingle();
+        const role = profile?.categoria || user.user_metadata?.categoria || '';
+        if (!canViewPatientRecords(role)) {
+            return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+        }
+
         const drive = getDriveClient();
+        const metadata = await drive.files.get({
+            fileId,
+            fields: 'mimeType',
+        });
+        const mimeType = metadata.data.mimeType || 'application/octet-stream';
+
+        if (role === 'marketing' && !isMarketingMediaMimeType(mimeType)) {
+            return NextResponse.json({ error: 'Marketing solo puede descargar fotos y videos' }, { status: 403 });
+        }
 
         const response = await drive.files.get(
             { fileId, alt: 'media' },
             { responseType: 'stream' }
         );
 
-        const contentType = (response.headers as Record<string, string>)['content-type'] || 'image/jpeg';
+        const contentType = (response.headers as Record<string, string>)['content-type'] || mimeType;
 
         const stream = new ReadableStream({
             start(controller) {

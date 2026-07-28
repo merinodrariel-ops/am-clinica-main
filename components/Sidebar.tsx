@@ -60,7 +60,7 @@ const MENU_ITEMS = [
         label: 'Pacientes',
         href: '/patients',
         key: 'patients',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion']
+        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer', 'laboratorio', 'asistente', 'odontologo', 'recaptacion', 'marketing']
     },
     {
         icon: Megaphone,

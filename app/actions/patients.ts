@@ -75,18 +75,23 @@ function escapeSupabaseSearchTerm(term: string): string {
     return term.replace(/[%_,]/g, '\\$&');
 }
 
-function buildSearchOrClause(tokens: string[]): string {
+function buildSearchOrClause(tokens: string[], includeContact = true): string {
     const terms = Array.from(new Set([tokens.join(' '), ...tokens])).filter(Boolean);
     return terms
         .flatMap((rawTerm) => {
             const term = `%${escapeSupabaseSearchTerm(rawTerm)}%`;
-            return [
+            const fields = [
                 `apellido.ilike.${term}`,
                 `nombre.ilike.${term}`,
-                `email.ilike.${term}`,
-                `documento.ilike.${term}`,
-                `whatsapp.ilike.${term}`,
             ];
+            if (includeContact) {
+                fields.push(
+                    `email.ilike.${term}`,
+                    `documento.ilike.${term}`,
+                    `whatsapp.ilike.${term}`,
+                );
+            }
+            return fields;
         })
         .join(',');
 }
@@ -133,6 +138,15 @@ const PATIENT_LIST_COLUMNS_PRIVATE = [
     'link_historia_clinica',
 ].join(', ');
 
+const PATIENT_LIST_COLUMNS_MARKETING = [
+    'id_paciente',
+    'nombre',
+    'apellido',
+    'estado_paciente',
+    'foto_perfil_url',
+    'link_historia_clinica',
+].join(', ');
+
 export async function listPatientsAction(filters: ListPatientsFilters = {}) {
     try {
         const supabase = await createClient();
@@ -156,10 +170,14 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
         const searchTokens = getPatientSearchTokens(filters.search);
         const onlyWithPhotos = shouldUseOnlyWithPhotosFilter(filters.onlyWithPhotos, filters.search);
         const canViewContactData = canViewPatientContactData(role);
+        const isMarketing = role === 'marketing';
 
         let query = adminSupabase
             .from('pacientes')
-            .select(canViewContactData ? PATIENT_LIST_COLUMNS : PATIENT_LIST_COLUMNS_PRIVATE)
+            .select(isMarketing
+                ? PATIENT_LIST_COLUMNS_MARKETING
+                : (canViewContactData ? PATIENT_LIST_COLUMNS : PATIENT_LIST_COLUMNS_PRIVATE)
+            )
             .eq('is_deleted', false)
             .order('fecha_alta', { ascending: false });
 
@@ -169,7 +187,7 @@ export async function listPatientsAction(filters: ListPatientsFilters = {}) {
         }
 
         if (searchTokens.length) {
-            query = query.or(buildSearchOrClause(searchTokens));
+            query = query.or(buildSearchOrClause(searchTokens, !isMarketing));
         }
 
         if (filters.estado) {
@@ -271,6 +289,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
         const searchTokens = getPatientSearchTokens(filters.search);
         const onlyWithPhotos = shouldUseOnlyWithPhotosFilter(filters.onlyWithPhotos, filters.search);
         const canViewContactData = canViewPatientContactData(role);
+        const isMarketing = role === 'marketing';
 
         // If searchTokens.length > 1, we must fetch in memory to perform the AND match.
         // We select the minimal search fields to keep it as light as possible.
@@ -286,7 +305,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
             if (onlyWithPhotos) {
                 dataQuery = dataQuery.or('link_historia_clinica.gt.,link_google_slides.gt.,foto_perfil_url.gt.');
             }
-            dataQuery = dataQuery.or(buildSearchOrClause(searchTokens));
+            dataQuery = dataQuery.or(buildSearchOrClause(searchTokens, !isMarketing));
 
             if (filters.estado) {
                 dataQuery = dataQuery.eq('estado_paciente', filters.estado);
@@ -311,7 +330,7 @@ export async function getPatientsCountAction(filters: ListPatientsFilters = {}) 
         }
 
         if (searchTokens.length) {
-            query = query.or(buildSearchOrClause(searchTokens));
+            query = query.or(buildSearchOrClause(searchTokens, !isMarketing));
         }
 
         if (filters.estado) {

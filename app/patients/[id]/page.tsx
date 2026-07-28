@@ -16,6 +16,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     await createClient();
     const appProfile = await getUserAppProfile();
     const role = appProfile?.categoria || '';
+    const isMarketing = role === 'marketing';
     const canViewFinancialData = canViewPatientFinancialData(role);
     const canViewContactData = canViewPatientContactData(role);
 
@@ -47,8 +48,8 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         if (patient) {
             // Fetch related data
             const relatedData = await Promise.all([
-                getHistoriaClinica(adminSupabase, id),
-                adminSupabase
+                isMarketing ? Promise.resolve([]) : getHistoriaClinica(adminSupabase, id),
+                isMarketing ? Promise.resolve({ data: [] }) : adminSupabase
                     .from('agenda_appointments')
                     .select('id, patient_id, doctor_id, start_time, status, type')
                     .eq('patient_id', id)
@@ -75,8 +76,10 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 financingPlan = fpData as PlanFinanciacion | null;
             }
 
-            const { review: dr } = await getPatientDesignReview(patient.id_paciente);
-            designReview = dr;
+            if (!isMarketing) {
+                const { review: dr } = await getPatientDesignReview(patient.id_paciente);
+                designReview = dr;
+            }
         }
     } catch (error) {
         console.error('Error fetching patient details:', error);
@@ -102,7 +105,14 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         );
     }
 
-    const safePatient = {
+    const safePatient = isMarketing ? {
+        id_paciente: patient.id_paciente,
+        nombre: patient.nombre,
+        apellido: patient.apellido,
+        estado_paciente: patient.estado_paciente,
+        foto_perfil_url: patient.foto_perfil_url,
+        link_historia_clinica: patient.link_historia_clinica,
+    } as typeof patient : {
         ...patient,
         ...(!canViewContactData ? {
             documento: undefined,

@@ -125,11 +125,30 @@ export async function updateSession(request: NextRequest) {
     const isDoctor = ['odontologo', 'dentist'].includes(userCategory);
     const isAssistant = userCategory === 'asistente';
     const isLab = userCategory === 'laboratorio';
+    const isMarketing = userCategory === 'marketing';
+
+    // Marketing is a deliberately narrow media-only role. Keep every
+    // authenticated navigation inside the patient gallery surface.
+    if (
+        user &&
+        isMarketing &&
+        path !== '/patients' &&
+        !path.startsWith('/patients/') &&
+        !path.startsWith('/api/drive/file/') &&
+        !path.startsWith('/auth')
+    ) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/patients'
+        url.search = ''
+        return NextResponse.redirect(url)
+    }
 
     // OPTIONAL: If user is logged in and visits /login, redirect to correct home page
     if (user && path === '/login') {
         const url = request.nextUrl.clone()
-        if (isDoctor || isAssistant) {
+        if (isMarketing) {
+            url.pathname = '/patients'
+        } else if (isDoctor || isAssistant) {
             url.pathname = '/portal/dashboard'
         } else if (isLab) {
             url.pathname = '/inventario'

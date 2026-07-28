@@ -36,6 +36,7 @@ const APP_CATEGORY_OPTIONS = [
     { value: 'dentist', label: 'Odontólogo' },
     { value: 'asistente', label: 'Asistente' },
     { value: 'laboratorio', label: 'Laboratorio' },
+    { value: 'marketing', label: 'Marketing' },
     { value: 'pricing_manager', label: 'Gestor de Precios' },
     { value: 'partner_viewer', label: 'Solo Lectura' },
 ];
