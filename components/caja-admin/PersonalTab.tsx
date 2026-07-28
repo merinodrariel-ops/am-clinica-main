@@ -1386,6 +1386,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             setProviderReceipts(receipts);
             if (receipts.length > 0) {
                 await showProviderReceipt(receipts, 0);
+            } else {
+                setReceiptViewerLoading(false);
             }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'No se pudieron cargar los comprobantes');
