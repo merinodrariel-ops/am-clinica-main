@@ -696,8 +696,25 @@ export async function createProviderCompany(input: {
     return data as EmpresaPrestadora;
 }
 
-/** Send (or resend) portal access invite to an existing personal record */
-export async function sendAccessInvite(workerId: string): Promise<void> {
+/** Create or resend system access for an existing personal record. */
+export async function sendAccessInvite(workerId: string): Promise<{
+    success: true;
+    mode: 'created' | 'reset';
+    userId: string;
+}> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autorizado');
+
+    const { data: requesterProfile } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .maybeSingle();
+    if (!['owner', 'admin', 'developer'].includes(requesterProfile?.categoria || '')) {
+        throw new Error('No tenés permisos para gestionar accesos');
+    }
+
     const adminSupabase = getAdminClient();
 
     const { data: worker, error: fetchError } = await adminSupabase
@@ -711,17 +728,34 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
 
     const authRole = resolveWorkerAppCategory(worker.categoria, worker.tipo);
 
-    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-        type: 'invite',
-        email: worker.email,
-        options: {
-            redirectTo: `${getAppPublicUrl()}/auth/callback?next=/auth/update-password`,
-            data: {
-                full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
-                categoria: authRole,
+    let existingAuthUser = null;
+    if (worker.user_id) {
+        const { data: authUserData, error: authUserError } = await adminSupabase.auth.admin.getUserById(worker.user_id);
+        if (authUserError) throw new Error(authUserError.message);
+        existingAuthUser = authUserData.user;
+    }
+
+    const linkType: 'invite' | 'recovery' = existingAuthUser?.email_confirmed_at ? 'recovery' : 'invite';
+    const redirectTo = `${getAppPublicUrl()}/auth/callback?next=/auth/update-password`;
+    const linkResult = linkType === 'invite'
+        ? await adminSupabase.auth.admin.generateLink({
+            type: 'invite',
+            email: worker.email,
+            options: {
+                redirectTo,
+                data: {
+                    full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
+                    categoria: authRole,
+                    role: authRole,
+                },
             },
-        },
-    });
+        })
+        : await adminSupabase.auth.admin.generateLink({
+            type: 'recovery',
+            email: worker.email,
+            options: { redirectTo },
+        });
+    const { data: linkData, error: linkError } = linkResult;
 
     if (linkError) throw new Error(linkError.message);
 
@@ -732,7 +766,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
             email: worker.email,
             full_name: `${worker.nombre} ${worker.apellido || ''}`.trim(),
             categoria: authRole,
-            estado: 'invitado',
+            estado: linkType === 'invite' ? 'invitado' : 'activo',
             invitation_sent_at: new Date().toISOString(),
         });
 
@@ -742,7 +776,7 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
             .eq('id', workerId);
     }
 
-    const actionLink = buildAuthCallbackLink(getAppPublicUrl(), linkData, 'invite');
+    const actionLink = buildAuthCallbackLink(getAppPublicUrl(), linkData, linkType);
     if (actionLink) {
         const emailResult = await EmailService.sendInvitation(
             `${worker.nombre} ${worker.apellido || ''}`.trim(),
@@ -757,6 +791,14 @@ export async function sendAccessInvite(workerId: string): Promise<void> {
 
     revalidatePath('/admin/staff');
     revalidatePath('/caja-admin/personal');
+    revalidatePath('/caja-admin');
+
+    if (!authUserId) throw new Error('No se pudo vincular la cuenta al prestador');
+    return {
+        success: true,
+        mode: linkType === 'invite' ? 'created' : 'reset',
+        userId: authUserId,
+    };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

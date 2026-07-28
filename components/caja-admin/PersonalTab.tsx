@@ -77,7 +77,7 @@ import PortfolioEditor from '@/components/caja-admin/PortfolioEditor';
 import SensitiveValue from '@/components/ui/SensitiveValue';
 import { getLiquidacionesConfig } from '@/app/actions/caja-liquidaciones';
 import { registrarMensualidadFija } from '@/app/actions/liquidaciones';
-import { activatePrestadorPendiente } from '@/app/actions/worker-portal';
+import { activatePrestadorPendiente, sendAccessInvite } from '@/app/actions/worker-portal';
 import { eliminarPrestaciones, updatePrestacionesRealizadas } from '@/app/actions/prestaciones';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
@@ -161,6 +161,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [showForm, setShowForm] = useState(false);
     const [showHorasForm, setShowHorasForm] = useState(false);
     const [editingPersonal, setEditingPersonal] = useState<Personal | null>(null);
+    const [sendingAccess, setSendingAccess] = useState(false);
     const [deletingPersonalId, setDeletingPersonalId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [mesActual, setMesActual] = useState(() => {
@@ -388,6 +389,31 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             toast.success(`${activatingPrestador.nombre} activado`);
             setActivatingPrestador(null);
             loadData();
+        }
+    };
+
+    const handleSendAccess = async () => {
+        if (!editingPersonal) return;
+        if (!editingPersonal.email?.trim()) {
+            toast.error('Cargá un email antes de enviar el acceso');
+            return;
+        }
+
+        setSendingAccess(true);
+        try {
+            const result = await sendAccessInvite(editingPersonal.id);
+            const updated = { ...editingPersonal, user_id: result.userId };
+            setEditingPersonal(updated);
+            setPersonal(prev => prev.map(item => item.id === updated.id ? updated : item));
+            toast.success(
+                result.mode === 'created'
+                    ? 'Acceso creado y email enviado'
+                    : 'Email para restablecer la contraseña enviado'
+            );
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo enviar el acceso');
+        } finally {
+            setSendingAccess(false);
         }
     };
 
@@ -2720,6 +2746,49 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                         </div>
                                     </div>
                                 </div>
+
+                                {editingPersonal && (
+                                    <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/20 p-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                                                        Acceso al sistema
+                                                    </h4>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                                                        editingPersonal.user_id
+                                                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                                            : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                                    }`}>
+                                                        {editingPersonal.user_id ? 'Cuenta vinculada' : 'Sin cuenta'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                                                    El rol y sus permisos se asignan automáticamente según el área del prestador.
+                                                </p>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                onClick={() => void handleSendAccess()}
+                                                disabled={sendingAccess || !editingPersonal.email?.trim()}
+                                                className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+                                            >
+                                                <Mail className="w-4 h-4 mr-2" />
+                                                {sendingAccess
+                                                    ? 'Enviando...'
+                                                    : editingPersonal.user_id
+                                                        ? 'Reenviar acceso'
+                                                        : 'Crear acceso y enviar email'}
+                                            </Button>
+                                        </div>
+                                        {!editingPersonal.email?.trim() && (
+                                            <p className="text-xs text-amber-700 dark:text-amber-300 mt-3">
+                                                Primero cargá y guardá el email del prestador.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Historial de tarifas (solo en edición de prestadores por hora) */}
                                 {editingPersonal && formData.modelo_pago === 'horas' && (
