@@ -58,6 +58,8 @@ import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
 import { shouldRegenerateReceiptAfterEdit } from '@/lib/caja-recepcion/receipt-regeneration';
 import { getFinancingStatusForMovementAction } from '@/app/actions/financing-status';
+import CajaFisicaPanel from '@/components/caja/CajaFisicaPanel';
+import { getSucursales, type Sucursal } from '@/lib/caja-admin';
 
 
 // Types
@@ -274,6 +276,7 @@ function CajaRecepcionContent() {
     const [showHistorialMes, setShowHistorialMes] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
     const [efectivo, setEfectivo] = useState<{ usd: number; ars: number } | null>(null);
+    const [sucursalCaja, setSucursalCaja] = useState<Sucursal | null>(null);
 
     useEffect(() => {
         const saved = localStorage.getItem('am.caja-recepcion.sidebar.visible');
@@ -285,6 +288,20 @@ function CajaRecepcionContent() {
     }, [showSidebar]);
 
     const today = useMemo(() => getLocalISODate(), []);
+    const cajaFisicaActiva = Boolean(
+        sucursalCaja?.caja_unificada_desde
+        && today >= sucursalCaja.caja_unificada_desde
+    );
+
+    useEffect(() => {
+        getSucursales().then((rows) => {
+            const madero = rows.find((row) =>
+                row.moneda_local === 'ARS'
+                && !row.nombre.toLowerCase().includes('montevideo')
+            );
+            setSucursalCaja(madero || rows[0] || null);
+        });
+    }, []);
 
     // Edit date modal state
     const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
@@ -997,7 +1014,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div className="space-y-1">
                         <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">
-                            Caja Recepción
+                            Caja · Operación diaria
                         </h1>
                         <p className="text-slate-400 font-medium">
                             Gestión inteligente de cobros y pacientes
@@ -1127,10 +1144,17 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                 {/* Tab Content: Caja */}
                 {activeTab === 'caja' && (<>
 
-                    {/* Arqueo Panel */}
-                    <div className="mb-6">
-                        <ArqueoPanel bnaRate={bnaRate?.venta || 0} onArqueoChange={loadData} />
-                    </div>
+                    {sucursalCaja && (
+                        <div className="mb-6">
+                            <CajaFisicaPanel sucursalId={sucursalCaja.id} tcBna={bnaRate?.venta || 0} />
+                        </div>
+                    )}
+
+                    {!cajaFisicaActiva && (
+                        <div className="mb-6">
+                            <ArqueoPanel bnaRate={bnaRate?.venta || 0} onArqueoChange={loadData} />
+                        </div>
+                    )}
 
                     {/* BNA Rate Banner */}
                     {bnaRate && (
@@ -1170,8 +1194,8 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                         </div>
                     )}
 
-                    {/* Efectivo en Caja — recuadro principal */}
-                    <div className="relative mb-8 overflow-hidden rounded-[2rem] glass-card border-none">
+                    {/* Saldo histórico de Recepción: solo hasta el corte unificado */}
+                    {!cajaFisicaActiva && <div className="relative mb-8 overflow-hidden rounded-[2rem] glass-card border-none">
                         <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-transparent to-navy-900/50" />
                         <div className="absolute -right-20 -top-20 w-64 h-64 bg-teal-500/10 blur-[100px] rounded-full" />
 
@@ -1205,7 +1229,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                     <ArrowRightLeft size={24} className="text-orange-400 group-hover:scale-110 transition-transform" />
                                     <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Traspaso</span>
                                 </button>
-                                <button
+                                {role === 'owner' && <button
                                     onClick={() => {
                                         setTransferDefaultType('RETIRO_EFECTIVO');
                                         setShowTransferencia(true);
@@ -1214,7 +1238,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 >
                                     <Wallet size={24} className="text-orange-300 group-hover:scale-110 transition-transform" />
                                     <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Retiro</span>
-                                </button>
+                                </button>}
                                 <button
                                     onClick={() => setShowNuevoGasto(true)}
                                     className="flex flex-col items-center justify-center w-24 h-24 rounded-3xl glass-card hover:bg-red-500/10 border-white/5 transition-all group"
@@ -1224,7 +1248,31 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div>}
+
+                    {cajaFisicaActiva && (
+                        <div className="mb-8 flex flex-wrap gap-3">
+                            {role === 'owner' && (
+                                <button
+                                    onClick={() => {
+                                        setTransferDefaultType('RETIRO_EFECTIVO');
+                                        setShowTransferencia(true);
+                                    }}
+                                    className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 font-semibold text-amber-300"
+                                >
+                                    <Wallet size={19} />
+                                    Retiro del dueño
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setShowNuevoGasto(true)}
+                                className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-semibold text-red-300"
+                            >
+                                <TrendingUp size={19} className="rotate-180" />
+                                Registrar gasto
+                            </button>
+                        </div>
+                    )}
 
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">

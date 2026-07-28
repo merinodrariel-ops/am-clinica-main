@@ -465,7 +465,11 @@ export async function createMovimiento(
 
     if (lineasError) {
         console.error('Error creating lineas:', lineasError);
-        // Supabase REST error, we should throw it so the user sees the error instead of silently failing
+        // No dejar un encabezado huérfano si una regla de caja rechaza las líneas.
+        await getSupabase()
+            .from('caja_admin_movimientos')
+            .delete()
+            .eq('id', mov.id);
         return { data: null, error: new Error(`Error insertando líneas: ${lineasError.message}`) };
     }
 
@@ -622,6 +626,41 @@ export async function getAperturaAdminDelDia(
     fecha?: string
 ): Promise<CajaAdminArqueo | null> {
     const targetDate = fecha || getLocalISODate();
+    const { data: sucursal } = await getSupabase()
+        .from('sucursales')
+        .select('caja_unificada_desde')
+        .eq('id', sucursalId)
+        .maybeSingle();
+
+    if (sucursal?.caja_unificada_desde && targetDate >= sucursal.caja_unificada_desde) {
+        const { data: cajaFisica, error: cajaFisicaError } = await getSupabase()
+            .from('caja_arqueos')
+            .select('*')
+            .eq('sucursal_id', sucursalId)
+            .eq('fecha', targetDate)
+            .eq('estado', 'abierto')
+            .maybeSingle();
+
+        if (cajaFisicaError) throw cajaFisicaError;
+        if (!cajaFisica) return null;
+
+        return {
+            id: cajaFisica.id,
+            fecha: cajaFisica.fecha,
+            sucursal_id: cajaFisica.sucursal_id,
+            usuario: cajaFisica.usuario_apertura,
+            hora_inicio: cajaFisica.hora_apertura,
+            hora_cierre: null,
+            saldos_iniciales: {
+                ARS: Number(cajaFisica.saldo_inicial_ars || 0),
+                USD: Number(cajaFisica.saldo_inicial_usd || 0),
+            },
+            saldos_finales: {},
+            diferencia_usd: 0,
+            estado: 'Abierto',
+            snapshot_datos: { caja_fisica_unificada: true },
+        };
+    }
 
     const { data, error } = await getSupabase()
         .from('caja_admin_arqueos')

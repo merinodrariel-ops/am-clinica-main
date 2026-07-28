@@ -7,7 +7,6 @@ import {
     LayoutDashboard,
     Users,
     Banknote,
-    Wallet,
     Settings,
     LogOut,
     Package,
@@ -79,17 +78,10 @@ const MENU_ITEMS = [
     },
     {
         icon: Banknote,
-        label: 'Caja Recepción',
-        href: '/caja-recepcion',
+        label: 'Caja',
+        href: '/caja',
         key: 'caja_recepcion',
         roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer']
-    },
-    {
-        icon: Wallet,
-        label: 'Caja Administración',
-        href: '/caja-admin',
-        key: 'caja_admin',
-        roles: ['owner', 'admin', 'partner_viewer', 'developer']
     },
     {
         icon: Package,

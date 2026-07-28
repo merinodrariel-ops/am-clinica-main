@@ -26,6 +26,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { useModalKeyboard } from '@/hooks/useModalKeyboard';
+import CajaFisicaPanel from '@/components/caja/CajaFisicaPanel';
 
 interface Props {
     sucursal: Sucursal;
@@ -49,12 +50,20 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
     const [showCerrarModal, setShowCerrarModal] = useState(false);
     const [saldosIniciales, setSaldosIniciales] = useState<Record<string, number>>({});
     const [expectedBalances, setExpectedBalances] = useState<Record<string, number>>({});
+    const cajaFisicaActiva = Boolean(
+        sucursal.caja_unificada_desde
+        && getLocalISODate() >= sucursal.caja_unificada_desde
+    );
 
 
     useEffect(() => {
+        if (cajaFisicaActiva) {
+            setLoading(false);
+            return;
+        }
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sucursal.id]);
+    }, [sucursal.id, cajaFisicaActiva]);
 
     async function loadData() {
         setLoading(true);
@@ -200,6 +209,10 @@ export default function ArqueoTab({ sucursal, tcBna }: Props) {
 
     useModalKeyboard(showAbrirModal, () => setShowAbrirModal(false), () => void handleAbrir(), { disabled: opening });
     useModalKeyboard(showCerrarModal, () => setShowCerrarModal(false), () => void handleCerrar(), { disabled: submitting });
+
+    if (cajaFisicaActiva) {
+        return <CajaFisicaPanel sucursalId={sucursal.id} tcBna={tcBna} />;
+    }
 
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando...</div>;
 

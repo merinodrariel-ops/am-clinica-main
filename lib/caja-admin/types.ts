@@ -3,6 +3,7 @@ export interface Sucursal {
     id: string;
     nombre: string;
     modo_caja: 'SEPARADA' | 'UNIFICADA';
+    caja_unificada_desde?: string | null;
     moneda_local: string;
     activa: boolean;
     valor_hora_staff_ars?: number;
