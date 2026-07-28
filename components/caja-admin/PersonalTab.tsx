@@ -23,6 +23,8 @@ import {
     Building2,
     BadgeCheck,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     Download,
     Trash2,
     MessageCircle,
@@ -31,6 +33,7 @@ import {
     Settings,
     Info,
     Link2,
+    Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/Button";
@@ -82,6 +85,7 @@ import { eliminarPrestaciones, updatePrestacionesRealizadas } from '@/app/action
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateAdjustedEarnings } from '@/lib/payroll-rules';
 import { formatDateForLocale, getLocalISODate, toDateInputValue } from '@/lib/local-date';
+import { refreshSignedUrl } from '@/lib/supabase-storage';
 
 interface Props {
     sucursal: Sucursal;
@@ -122,6 +126,14 @@ type ProviderTypeOption = {
     value: string;
     label: string;
     tipo: 'prestador' | 'odontologo';
+};
+
+type ProviderReceipt = {
+    id: string;
+    storedValue: string;
+    name: string;
+    month: string;
+    paymentDate?: string | null;
 };
 
 const CONDICION_AFIP_OPTIONS = [
@@ -274,6 +286,11 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [mensualidadComprobante, setMensualidadComprobante] = useState<File | null>(null);
     const [mensualidadLiquidaciones, setMensualidadLiquidaciones] = useState<LiquidacionMensual[]>([]);
     const [mensualidadLoading, setMensualidadLoading] = useState(false);
+    const [receiptViewerPersonal, setReceiptViewerPersonal] = useState<Personal | null>(null);
+    const [providerReceipts, setProviderReceipts] = useState<ProviderReceipt[]>([]);
+    const [activeReceiptIndex, setActiveReceiptIndex] = useState(0);
+    const [activeReceiptUrl, setActiveReceiptUrl] = useState<string | null>(null);
+    const [receiptViewerLoading, setReceiptViewerLoading] = useState(false);
     const [mensualidadForm, setMensualidadForm] = useState({
         mes: mesActual,
         monto: 0,
@@ -1291,6 +1308,89 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         const url = breakdown.comprobante_url;
         if (typeof url === 'string' && url.trim()) return 'Comprobante adjunto';
         return '';
+    }
+
+    function extractProviderReceipts(rows: LiquidacionMensual[]): ProviderReceipt[] {
+        const receipts: ProviderReceipt[] = [];
+        const seen = new Set<string>();
+
+        const addReceipt = (
+            liq: LiquidacionMensual,
+            storedValue: unknown,
+            name: unknown,
+            suffix: string,
+        ) => {
+            if (typeof storedValue !== 'string' || !storedValue.trim() || seen.has(storedValue)) return;
+            seen.add(storedValue);
+            receipts.push({
+                id: `${liq.id}-${suffix}`,
+                storedValue,
+                name: typeof name === 'string' && name.trim()
+                    ? name
+                    : `Comprobante ${mesLabel(getLiquidacionMonth(liq))}`,
+                month: getLiquidacionMonth(liq),
+                paymentDate: liq.fecha_pago,
+            });
+        };
+
+        rows.forEach((liq) => {
+            const breakdown = getLiquidacionBreakdown(liq);
+            addReceipt(liq, breakdown.comprobante_url, breakdown.comprobante_nombre, 'principal');
+
+            if (Array.isArray(breakdown.adjuntos)) {
+                breakdown.adjuntos.forEach((value, index) => {
+                    addReceipt(liq, value, null, `adjunto-${index}`);
+                });
+            }
+
+            const payment = breakdown.pago_caja_admin;
+            if (payment && typeof payment === 'object' && !Array.isArray(payment)) {
+                const paymentData = payment as Record<string, unknown>;
+                addReceipt(liq, paymentData.comprobante_url, paymentData.comprobante_nombre, 'pago');
+                if (Array.isArray(paymentData.adjuntos)) {
+                    paymentData.adjuntos.forEach((value, index) => {
+                        addReceipt(liq, value, null, `pago-adjunto-${index}`);
+                    });
+                }
+            }
+        });
+
+        return receipts.sort((a, b) => b.month.localeCompare(a.month));
+    }
+
+    async function showProviderReceipt(receipts: ProviderReceipt[], index: number) {
+        const receipt = receipts[index];
+        if (!receipt) return;
+        setActiveReceiptIndex(index);
+        setActiveReceiptUrl(null);
+        setReceiptViewerLoading(true);
+        try {
+            const url = await refreshSignedUrl(receipt.storedValue, 'caja-admin');
+            if (!url) throw new Error('No se pudo abrir el comprobante');
+            setActiveReceiptUrl(url);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo abrir el comprobante');
+        } finally {
+            setReceiptViewerLoading(false);
+        }
+    }
+
+    async function openProviderReceipts(p: Personal) {
+        setReceiptViewerPersonal(p);
+        setProviderReceipts([]);
+        setActiveReceiptUrl(null);
+        setReceiptViewerLoading(true);
+        try {
+            const rows = await getLiquidaciones({ personalId: p.id });
+            const receipts = extractProviderReceipts(rows);
+            setProviderReceipts(receipts);
+            if (receipts.length > 0) {
+                await showProviderReceipt(receipts, 0);
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudieron cargar los comprobantes');
+            setReceiptViewerLoading(false);
+        }
     }
 
     async function openMensualidadForm(p: Personal) {
@@ -3514,8 +3614,20 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
+                                                onClick={() => void openProviderReceipts(p)}
+                                                className="h-8 w-8 p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30 rounded-lg transition-colors"
+                                                title="Ver recibos y comprobantes"
+                                                aria-label={`Ver recibos de ${p.nombre} ${p.apellido || ''}`.trim()}
+                                            >
+                                                <FileText className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 onClick={() => openEditForm(p)}
                                                 className="h-8 w-8 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                                title="Editar prestador"
+                                                aria-label={`Editar a ${p.nombre} ${p.apellido || ''}`.trim()}
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </Button>
@@ -3655,6 +3767,117 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                     </div>
                     </div>
                 )}
+
+            {receiptViewerPersonal && portalReady && createPortal((
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+                    onClick={() => setReceiptViewerPersonal(null)}
+                >
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.97 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-widest text-violet-500">Recibos y comprobantes</p>
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                                    {receiptViewerPersonal.nombre} {receiptViewerPersonal.apellido || ''}
+                                </h3>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setReceiptViewerPersonal(null)}
+                                aria-label="Cerrar recibos"
+                            >
+                                <X className="h-5 w-5" />
+                            </Button>
+                        </div>
+
+                        {providerReceipts.length === 0 && !receiptViewerLoading ? (
+                            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+                                <FileText className="h-12 w-12 text-slate-300" />
+                                <p className="font-semibold text-slate-700 dark:text-slate-200">Este prestador todavía no tiene recibos adjuntos.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/60">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        disabled={activeReceiptIndex === 0 || receiptViewerLoading}
+                                        onClick={() => void showProviderReceipt(providerReceipts, activeReceiptIndex - 1)}
+                                        aria-label="Recibo anterior"
+                                    >
+                                        <ChevronLeft className="h-5 w-5" />
+                                    </Button>
+                                    <div className="min-w-0 text-center">
+                                        <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                            {providerReceipts[activeReceiptIndex]?.name || 'Cargando comprobante'}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            {providerReceipts.length > 0
+                                                ? `${activeReceiptIndex + 1} de ${providerReceipts.length} · ${mesLabel(providerReceipts[activeReceiptIndex].month)}`
+                                                : 'Buscando comprobantes...'}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        disabled={activeReceiptIndex >= providerReceipts.length - 1 || receiptViewerLoading}
+                                        onClick={() => void showProviderReceipt(providerReceipts, activeReceiptIndex + 1)}
+                                        aria-label="Recibo siguiente"
+                                    >
+                                        <ChevronRight className="h-5 w-5" />
+                                    </Button>
+                                </div>
+
+                                <div className="relative flex-1 overflow-hidden bg-slate-100 dark:bg-slate-950">
+                                    {receiptViewerLoading ? (
+                                        <div className="flex h-full items-center justify-center">
+                                            <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
+                                        </div>
+                                    ) : activeReceiptUrl && providerReceipts[activeReceiptIndex] ? (
+                                        providerReceipts[activeReceiptIndex].name.toLowerCase().endsWith('.pdf')
+                                            || providerReceipts[activeReceiptIndex].storedValue.toLowerCase().includes('.pdf')
+                                            ? (
+                                                <iframe
+                                                    src={activeReceiptUrl}
+                                                    title={providerReceipts[activeReceiptIndex].name}
+                                                    className="h-full w-full border-0"
+                                                />
+                                            ) : (
+                                                <div className="flex h-full items-center justify-center overflow-auto p-4">
+                                                    <img
+                                                        src={activeReceiptUrl}
+                                                        alt={providerReceipts[activeReceiptIndex].name}
+                                                        className="max-h-full max-w-full rounded-lg object-contain shadow-lg"
+                                                    />
+                                                </div>
+                                            )
+                                    ) : null}
+                                </div>
+
+                                {activeReceiptUrl && (
+                                    <div className="flex justify-end border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                                        <a
+                                            href={activeReceiptUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                                        >
+                                            <ExternalLink className="h-4 w-4" />
+                                            Abrir en otra pestaña
+                                        </a>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </motion.div>
+                </div>
+            ), document.body)}
 
             {mensualidadPersonal && portalReady && createPortal((
                 <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setMensualidadPersonal(null)}>
