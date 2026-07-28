@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import {
     LayoutDashboard,
     Users,
-    Banknote,
     Settings,
     LogOut,
     Package,
@@ -25,6 +24,8 @@ import {
     Megaphone,
     ShieldCheck,
     Sparkles,
+    ReceiptText,
+    Calculator,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -77,11 +78,18 @@ const MENU_ITEMS = [
         roles: ['owner', 'admin', 'developer']
     },
     {
-        icon: Banknote,
-        label: 'Caja',
-        href: '/caja',
+        icon: ReceiptText,
+        label: 'Caja Recepción',
+        href: '/caja-recepcion',
         key: 'caja_recepcion',
-        roles: ['owner', 'admin', 'reception', 'partner_viewer', 'developer']
+        roles: ['owner', 'admin', 'reception', 'developer']
+    },
+    {
+        icon: Calculator,
+        label: 'Administración y liquidaciones',
+        href: '/caja-admin',
+        key: 'caja_admin',
+        roles: ['owner', 'admin', 'developer']
     },
     {
         icon: Package,

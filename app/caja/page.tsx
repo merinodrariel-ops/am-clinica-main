@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function CajaPage() {
     return (
-        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'partner_viewer', 'developer']}>
+        <CategoriaGuard allowedCategorias={['owner', 'admin', 'reception', 'developer']}>
             <CajaClient />
         </CategoriaGuard>
     );

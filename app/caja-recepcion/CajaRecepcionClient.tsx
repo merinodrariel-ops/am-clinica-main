@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { TrendingUp, CreditCard, Clock, Plus, ArrowRightLeft, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Trash2, Users, Wallet, Loader2, MapPin, Star } from 'lucide-react';
+import { TrendingUp, CreditCard, Clock, Plus, DollarSign, Calendar, ExternalLink, RefreshCw, X, Copy, CheckCircle, Check, FileText, AlertTriangle, Pencil, MessageCircle, QrCode, Bitcoin, Landmark, Smartphone, History, Eye, EyeOff, Share2, Search, Filter, ChevronDown, FileImage, Trash2, Users, Loader2, MapPin, Star } from 'lucide-react';
 import { ComprobanteLink } from '@/components/caja/ComprobanteLink';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,11 +44,9 @@ import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import NuevoIngresoForm from '@/components/caja/NuevoIngresoForm';
 import ArqueoPanel from '@/components/caja/ArqueoPanel';
-import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 import HistorialEdicionesModal from '@/components/caja/HistorialEdicionesModal';
-import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
 import { generateReciboNumber } from '@/components/caja/ReciboGenerator';
-import { logMovimientoEdit, deleteMovimiento, getCurrentBalanceRecepcion, getTransferenciasResumenMes } from '@/lib/caja-recepcion';
+import { logMovimientoEdit, deleteMovimiento, getCurrentBalanceRecepcion } from '@/lib/caja-recepcion';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { sendSecurityAlertAction } from '@/app/actions/email';
 import { formatDateForLocale, getLocalISODate, getLocalYearMonth, toDateInputValue } from '@/lib/local-date';
@@ -66,8 +64,8 @@ import { getSucursales, type Sucursal } from '@/lib/caja-admin';
 interface Stats {
     totalDiaUsd: number;
     totalMesUsd: number;
-    retirosMesUsd: number;
-    traspasoNetoMesUsd: number;
+    cantidadIngresos: number;
+    promedioIngresoUsd: number;
     porMetodo: Record<string, number>;
     porCategoria: Record<string, number>;
     totalPacientes: number;
@@ -104,19 +102,6 @@ interface Movimiento {
     split_group_id?: string | null;
     // Populated client-side when grouping multipago splits for display
     _splitSiblings?: Movimiento[];
-}
-
-interface TransferenciaCajaRaw {
-    id: string;
-    fecha_hora: string;
-    tipo_transferencia: string;
-    motivo?: string | null;
-    caja_origen: string;
-    caja_destino?: string | null;
-    monto: number | string;
-    moneda: string;
-    estado?: string | null;
-    usd_equivalente: number | string;
 }
 
 interface PacienteLookup {
@@ -255,7 +240,6 @@ function CajaRecepcionContent() {
     const [bnaRate, setBnaRate] = useState<BnaRate | null>(null);
     const [aperturaAudit, setAperturaAudit] = useState<AperturaAudit | null>(null);
     const [mesActual, setMesActual] = useState(() => getLocalYearMonth());
-    const [showNuevoGasto, setShowNuevoGasto] = useState(false);
     const [privacyMode, setPrivacyMode] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterMetodo, setFilterMetodo] = useState('');
@@ -269,8 +253,6 @@ function CajaRecepcionContent() {
     );
 
     const [showNuevoIngreso, setShowNuevoIngreso] = useState(false);
-    const [showTransferencia, setShowTransferencia] = useState(false);
-    const [transferDefaultType, setTransferDefaultType] = useState<'TRASPASO_INTERNO' | 'RETIRO_EFECTIVO'>('TRASPASO_INTERNO');
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
     const [historialMovId, setHistorialMovId] = useState<string | null>(null);
     const [showHistorialMes, setShowHistorialMes] = useState(false);
@@ -355,11 +337,6 @@ function CajaRecepcionContent() {
             setShowNuevoIngreso(true);
         }
 
-        if (requestedAction === 'nuevo-gasto') {
-            setActiveTab('caja');
-            setShowNuevoGasto(true);
-        }
-
         handledActionRef.current = requestedAction;
     }, [requestedAction]);
 
@@ -405,40 +382,16 @@ function CajaRecepcionContent() {
                 .gte('fecha_movimiento', `${mesActual}-01`)
                 .lt('fecha_movimiento', `${nextMonthStr}-01`);
 
-            // Fetch transfers/withdrawals for selected month
-            const { data: transRaw, error: transError } = await supabase
-                .from('transferencias_caja')
-                .select('*')
-                .or(`caja_origen.eq.RECEPCION,caja_destino.eq.RECEPCION`)
-                .gte('fecha_hora', `${mesActual}-01`)
-                .lt('fecha_hora', `${nextMonthStr}-01`);
-
-            if (transError) console.error('Error fetching transfers:', transError);
-
-            // Merge and sort all movements
+            // Caja Recepción is an income-only surface. Expenses, withdrawals,
+            // transfers and liquidations are managed in Caja Administración.
             let allMovs: Movimiento[] = [];
 
-            // Add standard movements
             if (movMesRaw) {
-                allMovs = [...(movMesRaw as unknown as Movimiento[])];
-            }
-
-            // Add transfers adapted to Movimiento interface
-            if (transRaw) {
-                const transMovs: Movimiento[] = (transRaw as TransferenciaCajaRaw[]).map((t) => ({
-                    id: t.id,
-                    fecha_hora: t.fecha_hora,
-                    fecha_movimiento: t.fecha_hora.split('T')[0],
-                    concepto_nombre: `${t.tipo_transferencia}${t.motivo ? ': ' + t.motivo : ''}`,
-                    categoria: t.tipo_transferencia === 'Retiro' ? 'Retiro' : 'Traspaso',
-                    monto: t.caja_origen === 'RECEPCION' ? -Number(t.monto) : Number(t.monto),
-                    moneda: t.moneda,
-                    metodo_pago: t.tipo_transferencia === 'Retiro' ? 'Efectivo' : (t.caja_destino || t.caja_origen),
-                    estado: t.estado || 'completado',
-                    usd_equivalente: t.caja_origen === 'RECEPCION' ? -Number(t.usd_equivalente) : Number(t.usd_equivalente),
-                    origen: 'transferencias_caja'
-                }));
-                allMovs = [...allMovs, ...transMovs];
+                allMovs = (movMesRaw as unknown as Movimiento[]).filter((movement) =>
+                    movement.categoria !== 'Egreso'
+                    && movement.categoria !== 'Caja'
+                    && Number(movement.monto || 0) >= 0
+                );
             }
 
             // Sort by date descending
@@ -515,7 +468,12 @@ function CajaRecepcionContent() {
             setAperturaAudit((aperturaRaw as AperturaAudit | null) || null);
 
             // Calculate income cards from standard movements only so transfers do not inflate revenue.
-            const standardPagados = (movMesRaw as unknown as Movimiento[] || []).filter(m => m.estado !== 'anulado');
+            const standardPagados = (movMesRaw as unknown as Movimiento[] || []).filter(m =>
+                m.estado !== 'anulado'
+                && m.categoria !== 'Egreso'
+                && m.categoria !== 'Caja'
+                && Number(m.monto || 0) >= 0
+            );
             const standardPagadosHoy = standardPagados.filter(m => {
                 const datePart = m.fecha_movimiento || m.fecha_hora.split('T')[0];
                 return datePart === today;
@@ -523,8 +481,6 @@ function CajaRecepcionContent() {
 
             const totalDiaUsd = standardPagadosHoy.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
             const totalMesUsd = standardPagados.reduce((sum, m) => sum + (m.usd_equivalente && m.usd_equivalente > 0 ? m.usd_equivalente : 0), 0);
-
-            const transferSummary = await getTransferenciasResumenMes(mesActual);
 
             const { count: totalCount } = await supabase
                 .from('pacientes')
@@ -540,8 +496,10 @@ function CajaRecepcionContent() {
             setStats({
                 totalDiaUsd: Math.round(totalDiaUsd * 100) / 100,
                 totalMesUsd: Math.round(totalMesUsd * 100) / 100,
-                retirosMesUsd: transferSummary.retirosUsd,
-                traspasoNetoMesUsd: transferSummary.traspasoNetoUsd,
+                cantidadIngresos: standardPagados.length,
+                promedioIngresoUsd: standardPagados.length > 0
+                    ? Math.round((totalMesUsd / standardPagados.length) * 100) / 100
+                    : 0,
                 porMetodo: {},
                 porCategoria: {},
                 totalPacientes: totalCount || 0,
@@ -1218,59 +1176,15 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => {
-                                        setTransferDefaultType('TRASPASO_INTERNO');
-                                        setShowTransferencia(true);
-                                    }}
-                                    className="flex flex-col items-center justify-center w-24 h-24 rounded-3xl glass-card hover:bg-white/5 border-white/5 transition-all group"
-                                >
-                                    <ArrowRightLeft size={24} className="text-orange-400 group-hover:scale-110 transition-transform" />
-                                    <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Traspaso</span>
-                                </button>
-                                {role === 'owner' && <button
-                                    onClick={() => {
-                                        setTransferDefaultType('RETIRO_EFECTIVO');
-                                        setShowTransferencia(true);
-                                    }}
-                                    className="flex flex-col items-center justify-center w-24 h-24 rounded-3xl glass-card hover:bg-orange-500/10 border-white/5 transition-all group"
-                                >
-                                    <Wallet size={24} className="text-orange-300 group-hover:scale-110 transition-transform" />
-                                    <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Retiro</span>
-                                </button>}
-                                <button
-                                    onClick={() => setShowNuevoGasto(true)}
-                                    className="flex flex-col items-center justify-center w-24 h-24 rounded-3xl glass-card hover:bg-red-500/10 border-white/5 transition-all group"
-                                >
-                                    <TrendingUp size={24} className="text-red-400 rotate-180 group-hover:translate-y-1 transition-transform" />
-                                    <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Gasto</span>
-                                </button>
+                            <div className="rounded-2xl border border-teal-500/20 bg-teal-500/10 px-5 py-4 text-sm text-teal-100">
+                                Esta pantalla registra únicamente ingresos. Los gastos y las liquidaciones se gestionan desde Administración.
                             </div>
                         </div>
                     </div>}
 
                     {cajaFisicaActiva && (
-                        <div className="mb-8 flex flex-wrap gap-3">
-                            {role === 'owner' && (
-                                <button
-                                    onClick={() => {
-                                        setTransferDefaultType('RETIRO_EFECTIVO');
-                                        setShowTransferencia(true);
-                                    }}
-                                    className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 font-semibold text-amber-300"
-                                >
-                                    <Wallet size={19} />
-                                    Retiro del dueño
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setShowNuevoGasto(true)}
-                                className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-semibold text-red-300"
-                            >
-                                <TrendingUp size={19} className="rotate-180" />
-                                Registrar gasto
-                            </button>
+                        <div className="mb-8 rounded-2xl border border-teal-500/20 bg-teal-500/10 px-5 py-4 text-sm text-teal-100">
+                            Caja Recepción muestra y registra únicamente ingresos. Gastos, retiros y liquidaciones están en Administración y liquidaciones.
                         </div>
                     )}
 
@@ -1279,8 +1193,8 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                         {[
                             { label: 'Ingresos Hoy', value: stats?.totalDiaUsd, icon: DollarSign, color: 'teal', privacy: true },
                             { label: 'Ingresos Mes', value: stats?.totalMesUsd, icon: TrendingUp, color: 'blue', privacy: true },
-                            { label: 'Retiros Mes', value: stats?.retirosMesUsd, icon: Wallet, color: 'amber', privacy: true },
-                            { label: 'Traspaso Neto Mes', value: stats?.traspasoNetoMesUsd, icon: ArrowRightLeft, color: 'indigo', privacy: true },
+                            { label: 'Ingresos registrados', value: stats?.cantidadIngresos, icon: FileText, color: 'indigo', privacy: false, count: true },
+                            { label: 'Promedio por ingreso', value: stats?.promedioIngresoUsd, icon: TrendingUp, color: 'amber', privacy: true },
                         ].map((card, i) => (
                             <div key={i} className="glass-card p-6 rounded-3xl border-white/5 hover:border-white/10 transition-all group overflow-hidden">
                                 <div className="flex items-center justify-between mb-4">
@@ -1296,7 +1210,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                 </div>
                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 truncate">{card.label}</p>
                                 <p className="text-2xl sm:text-3xl font-black text-white truncate" title={String(card.value || 0)}>
-                                    {formatPrivacy(formatCurrency(Number(card.value) || 0, 'USD'))}
+                                    {'count' in card && card.count
+                                        ? Number(card.value || 0).toLocaleString('es-AR')
+                                        : formatPrivacy(formatCurrency(Number(card.value) || 0, 'USD'))}
                                 </p>
                             </div>
                         ))}
@@ -2170,31 +2086,12 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                         </div>
 
                         {/* Nuevo Ingreso Modal */}
-                        {/* Expense Modal */}
-                        <NuevoGastoForm
-                            isOpen={showNuevoGasto}
-                            onClose={() => setShowNuevoGasto(false)}
-                            onSuccess={loadData}
-                            bnaRate={bnaRate?.venta || 0}
-                        />
-
-                        {/* Existing Income Modal */}
                         <NuevoIngresoForm
                             isOpen={showNuevoIngreso}
                             onClose={() => setShowNuevoIngreso(false)}
                             onSuccess={loadData}
                             bnaRate={bnaRate?.venta || 0}
                             initialPatientId={searchParams.get('patientId') || undefined}
-                        />
-
-                        {/* Transferencia Modal */}
-                        <TransferenciaAdmin
-                            isOpen={showTransferencia}
-                            onClose={() => setShowTransferencia(false)}
-                            onSuccess={loadData}
-                            bnaRate={bnaRate?.venta || 0}
-                            defaultTipo={transferDefaultType}
-                            fechaMovimiento={aperturaAudit?.fecha}
                         />
 
                         {/* Historial Ediciones Modal — por movimiento individual */}
