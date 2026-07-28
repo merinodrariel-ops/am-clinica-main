@@ -907,8 +907,11 @@ export default function PhotoStudioModal({
             setCanvasSaving(false);
             return;
         }
+        // Keep the status truthful while the debounce is pending. Previously the
+        // UI showed "proyecto editable" during these two seconds even though
+        // closing/switching the canvas would cancel the pending write.
+        setCanvasSaving(true);
         saveTimerRef.current = setTimeout(async () => {
-            setCanvasSaving(true);
             const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
             await savePatientCanvasAction({
                 id: activeCanvasId,
@@ -3605,7 +3608,22 @@ export default function PhotoStudioModal({
         setCanvasContextMenu({ x: clientX, y: clientY, layerId });
     }
 
-    function handleActivateCanvas(canvasId?: string) {
+    async function handleActivateCanvas(canvasId?: string) {
+        if (
+            canvasId &&
+            activeCanvas &&
+            canvasId !== activeCanvas.id &&
+            !activeCanvas.id.startsWith('legacy-')
+        ) {
+            setCanvasSaving(true);
+            try {
+                await persistCanvasDocument(activeCanvas);
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : 'No se pudo guardar el lienzo actual');
+                setCanvasSaving(false);
+                return;
+            }
+        }
         if (canvasId) {
             setActiveCanvasId(canvasId);
         } else if (canvases.length > 0) {
@@ -5546,6 +5564,33 @@ export default function PhotoStudioModal({
         return persisted;
     }
 
+    async function persistCanvasDocument(canvasDocument: CanvasDoc): Promise<CanvasLayer[]> {
+        if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+
+        const layers = await materializeCanvasLayersForSave(canvasDocument);
+        if (layers !== canvasDocument.layers) {
+            setCanvases(prev => prev.map(document =>
+                document.id === canvasDocument.id ? { ...document, layers } : document
+            ));
+        }
+
+        const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+        const result = await savePatientCanvasAction({
+            id: canvasDocument.id,
+            layers: layers.map(layer => ({ ...layer, img: undefined })),
+            ratio: canvasDocument.ratio,
+            bgColor: canvasDocument.bgColor,
+        });
+        if (result.error) {
+            throw new Error(`No se pudo guardar el lienzo editable: ${result.error}`);
+        }
+        setCanvasSaving(false);
+        return layers;
+    }
+
     async function handleSaveToDrive(mode: 'replace' | 'copy', dest: 'patient' | 'social') {
         if (!activeFile) return;
         if (canvasActive && mode === 'replace') {
@@ -5558,24 +5603,7 @@ export default function PhotoStudioModal({
             // A flattened JPG/PNG is only the deliverable. Persist the layer document first
             // so the same canvas can be reopened and adjusted later.
             if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
-                canvasLayersForSave = await materializeCanvasLayersForSave(activeCanvas);
-                if (canvasLayersForSave !== activeCanvas.layers) {
-                    setCanvases(prev => prev.map(canvasDocument =>
-                        canvasDocument.id === activeCanvas.id
-                            ? { ...canvasDocument, layers: canvasLayersForSave }
-                            : canvasDocument
-                    ));
-                }
-                const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
-                const editableSave = await savePatientCanvasAction({
-                    id: activeCanvas.id,
-                    layers: canvasLayersForSave.map(layer => ({ ...layer, img: undefined })),
-                    ratio: activeCanvas.ratio,
-                    bgColor: activeCanvas.bgColor,
-                });
-                if (editableSave.error) {
-                    throw new Error(`No se pudo guardar el lienzo editable: ${editableSave.error}`);
-                }
+                canvasLayersForSave = await persistCanvasDocument(activeCanvas);
             }
             const rawBlob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
             // Un PNG con transparencia a resolución completa supera el límite de 20 MB
@@ -5734,8 +5762,18 @@ export default function PhotoStudioModal({
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
                     <button
                         onClick={async () => {
-                            if ((isDirty || hasUnsavedCanvasAssets) && !confirm('Tenés cambios sin guardar. ¿Salir de todas formas?')) return;
+                            if (isDirty && !confirm('Tenés cambios sin guardar. ¿Salir de todas formas?')) return;
                             await flushPhotoStateSave();
+                            if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
+                                setCanvasSaving(true);
+                                try {
+                                    await persistCanvasDocument(activeCanvas);
+                                } catch (error) {
+                                    toast.error(error instanceof Error ? error.message : 'No se pudo guardar el lienzo');
+                                    setCanvasSaving(false);
+                                    return;
+                                }
+                            }
                             onClose();
                         }}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10 text-white border border-white/10 hover:bg-white/15 transition-colors flex-shrink-0 text-sm"
