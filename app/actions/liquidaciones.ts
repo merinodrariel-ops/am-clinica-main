@@ -433,15 +433,149 @@ export async function approveLiquidacion(id: string): Promise<void> {
     revalidatePath('/caja-admin/liquidaciones');
 }
 
-export async function markLiquidacionPaid(id: string, fechaPago: string): Promise<void> {
+export type MetodoPagoLiquidacion = 'Efectivo' | 'Transferencia bancaria' | 'Mercado Pago';
+
+export async function markLiquidacionPaid(
+    id: string,
+    fechaPago: string,
+    metodoPago?: MetodoPagoLiquidacion,
+    monedaPago?: 'ARS' | 'USD',
+): Promise<void> {
     await assertRole(MANAGE_ROLES, 'gestionar liquidaciones');
+    if (!metodoPago || !monedaPago) {
+        throw new Error('Para confirmar el pago elegí el medio y la moneda desde el detalle de la liquidación.');
+    }
     const admin = getAdminClient();
+
+    const { data: liquidacion, error: liquidacionError } = await admin
+        .from('liquidaciones_mensuales')
+        .select('id, personal_id, total_ars, total_usd, tc_liquidacion, breakdown, personal(nombre, apellido)')
+        .eq('id', id)
+        .single();
+
+    if (liquidacionError || !liquidacion) {
+        throw new Error('Liquidación no encontrada');
+    }
+
+    const totalArs = Number(liquidacion.total_ars || 0);
+    const totalUsd = Number(liquidacion.total_usd || 0);
+    const importe = monedaPago === 'ARS' ? totalArs : totalUsd;
+    if (!Number.isFinite(importe) || importe <= 0) {
+        throw new Error(`La liquidación no tiene un importe válido en ${monedaPago}`);
+    }
+
+    const { data: sucursal, error: sucursalError } = await admin
+        .from('sucursales')
+        .select('id')
+        .eq('activa', true)
+        .eq('moneda_local', 'ARS')
+        .order('nombre')
+        .limit(1)
+        .single();
+
+    if (sucursalError || !sucursal) {
+        throw new Error('No se encontró la sede Madero');
+    }
+
+    const tipoCuenta = metodoPago === 'Efectivo'
+        ? 'EFECTIVO'
+        : metodoPago === 'Mercado Pago'
+            ? 'SERVICIO'
+            : 'BANCO';
+
+    const { data: cuenta, error: cuentaError } = await admin
+        .from('cuentas_financieras')
+        .select('id, nombre_cuenta')
+        .eq('sucursal_id', sucursal.id)
+        .eq('tipo_cuenta', tipoCuenta)
+        .eq('moneda', monedaPago)
+        .eq('activa', true)
+        .order('orden')
+        .limit(1)
+        .single();
+
+    if (cuentaError || !cuenta) {
+        throw new Error(`No hay una cuenta ${tipoCuenta} activa en ${monedaPago}`);
+    }
+
+    const personalRel = Array.isArray(liquidacion.personal)
+        ? liquidacion.personal[0]
+        : liquidacion.personal;
+    const prestador = `${personalRel?.nombre || ''} ${personalRel?.apellido || ''}`.trim() || 'Prestador';
+    const tc = Number(liquidacion.tc_liquidacion || 0);
+    const usdEquivalente = monedaPago === 'USD'
+        ? importe
+        : tc > 0
+            ? importe / tc
+            : totalUsd;
+    const idempotencyKey = `liquidacion:${id}:pago`;
+
+    const { data: movimiento, error: movimientoError } = await admin
+        .from('caja_admin_movimientos')
+        .insert({
+            sucursal_id: sucursal.id,
+            fecha_movimiento: fechaPago,
+            fecha_hora: new Date().toISOString(),
+            descripcion: `Liquidación pagada · ${prestador}`,
+            tipo_movimiento: 'EGRESO',
+            subtipo: 'Liquidación de prestador',
+            nota: `${metodoPago} · ${monedaPago}`,
+            usd_equivalente_total: Math.round(usdEquivalente * 100) / 100,
+            estado: 'Registrado',
+            idempotency_key: idempotencyKey,
+            origen: 'liquidacion',
+        })
+        .select('id')
+        .single();
+
+    if (movimientoError || !movimiento) {
+        if (movimientoError?.code === '23505') {
+            throw new Error('Esta liquidación ya tiene un pago registrado');
+        }
+        throw new Error(movimientoError?.message || 'No se pudo registrar el egreso');
+    }
+
+    const { error: lineaError } = await admin
+        .from('caja_admin_movimiento_lineas')
+        .insert({
+            admin_movimiento_id: movimiento.id,
+            cuenta_id: cuenta.id,
+            importe,
+            moneda: monedaPago,
+            usd_equivalente: Math.round(usdEquivalente * 100) / 100,
+        });
+
+    if (lineaError) {
+        await admin.from('caja_admin_movimientos').delete().eq('id', movimiento.id);
+        throw new Error(lineaError.message);
+    }
+
+    const breakdownActual =
+        liquidacion.breakdown && typeof liquidacion.breakdown === 'object' && !Array.isArray(liquidacion.breakdown)
+            ? liquidacion.breakdown as Record<string, unknown>
+            : {};
 
     let lastError: { message?: string } | null = null;
     for (const estadoDb of ESTADO_DB_CANDIDATES.paid) {
         const { error } = await admin
             .from('liquidaciones_mensuales')
-            .update({ estado: estadoDb, fecha_pago: fechaPago })
+            .update({
+                estado: estadoDb,
+                fecha_pago: fechaPago,
+                breakdown: {
+                    ...breakdownActual,
+                    pago_confirmado: {
+                        caja_movimiento_id: movimiento.id,
+                        fecha_pago: fechaPago,
+                        metodo_pago: metodoPago,
+                        cuenta: cuenta.nombre_cuenta,
+                        moneda: monedaPago,
+                        importe,
+                        usd_equivalente: Math.round(usdEquivalente * 100) / 100,
+                        confirmado_at: new Date().toISOString(),
+                    },
+                },
+            })
             .eq('id', id);
 
         if (!error) {
@@ -453,7 +587,11 @@ export async function markLiquidacionPaid(id: string, fechaPago: string): Promis
         if (!isEstadoConstraintError(error.message)) break;
     }
 
-    if (lastError) throw new Error(lastError.message || 'Error al registrar pago');
+    if (lastError) {
+        await admin.from('caja_admin_movimiento_lineas').delete().eq('admin_movimiento_id', movimiento.id);
+        await admin.from('caja_admin_movimientos').delete().eq('id', movimiento.id);
+        throw new Error(lastError.message || 'Error al registrar pago');
+    }
     revalidatePath('/admin/liquidaciones');
     revalidatePath('/caja-admin/liquidaciones');
 }

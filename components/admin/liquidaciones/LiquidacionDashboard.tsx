@@ -10,6 +10,7 @@ import {
     upsertPrestacion, deletePrestacion, recalcularTotalesLiquidacion,
     getPrestacionesDelMes, approveLiquidacion, markLiquidacionPaid, rejectLiquidacion,
     type PrestacionRealizada, type LiquidacionAdminRow, type LiquidacionResult,
+    type MetodoPagoLiquidacion,
 } from '@/app/actions/liquidaciones';
 import type { PrestacionCatalogoItem } from '@/app/actions/prestaciones';
 
@@ -246,6 +247,10 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
     const [dragOver, setDragOver] = useState(false);
     const [payDateModal, setPayDateModal] = useState(false);
     const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
+    const [payMethod, setPayMethod] = useState<MetodoPagoLiquidacion>('Efectivo');
+    const [payCurrency, setPayCurrency] = useState<'ARS' | 'USD'>(
+        Number(liq.total_usd || 0) > 0 ? 'USD' : 'ARS'
+    );
 
     const withSlides = prestaciones.filter(p => p.slides_url);
     const withoutSlides = prestaciones.filter(p => !p.slides_url);
@@ -385,8 +390,8 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
     async function handlePay() {
         setSaving(true);
         try {
-            await markLiquidacionPaid(liq.id, payDate);
-            toast.success('Liquidación marcada como pagada');
+            await markLiquidacionPaid(liq.id, payDate, payMethod, payCurrency);
+            toast.success('Pago registrado y liquidación marcada como pagada');
             setPayDateModal(false);
             onRefresh();
             onClose();
@@ -741,13 +746,36 @@ export default function LiquidacionDashboard({ row, liq, mes, catalogo, onClose,
             {payDateModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
                     <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-80 shadow-2xl">
-                        <h3 className="text-white font-semibold mb-3">Fecha de pago</h3>
+                        <h3 className="text-white font-semibold mb-1">Confirmar pago real</h3>
+                        <p className="text-xs text-slate-400 mb-4">
+                            Recién al confirmar se genera el egreso en Caja.
+                        </p>
+                        <label className="block text-xs text-slate-400 mb-1">Fecha efectiva</label>
                         <input
                             type="date"
                             value={payDate}
                             onChange={e => setPayDate(e.target.value)}
-                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm mb-4"
+                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm mb-3"
                         />
+                        <label className="block text-xs text-slate-400 mb-1">Medio de pago</label>
+                        <select
+                            value={payMethod}
+                            onChange={e => setPayMethod(e.target.value as MetodoPagoLiquidacion)}
+                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm mb-3"
+                        >
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia bancaria">Transferencia bancaria</option>
+                            <option value="Mercado Pago">Mercado Pago</option>
+                        </select>
+                        <label className="block text-xs text-slate-400 mb-1">Moneda pagada</label>
+                        <select
+                            value={payCurrency}
+                            onChange={e => setPayCurrency(e.target.value as 'ARS' | 'USD')}
+                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm mb-4"
+                        >
+                            <option value="ARS">ARS · {formatARS(Number(liq.total_ars || 0))}</option>
+                            <option value="USD">USD · {formatUSD(Number(liq.total_usd || 0))}</option>
+                        </select>
                         <div className="flex gap-2 justify-end">
                             <button onClick={() => setPayDateModal(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
                                 Cancelar
