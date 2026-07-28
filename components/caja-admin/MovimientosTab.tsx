@@ -65,6 +65,7 @@ import {
 } from "@/app/actions/liquidaciones";
 import { createClient } from "@/utils/supabase/client";
 import { ComprobanteLink } from "@/components/caja/ComprobanteLink";
+import CajaFisicaPanel from "@/components/caja/CajaFisicaPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import HistorialEdicionesModal from "@/components/caja/HistorialEdicionesModal";
 import { ComprobanteUpload } from "@/components/caja/ComprobanteUpload";
@@ -1267,87 +1268,27 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   return (
     <div className="space-y-6">
 
-      {/* ── Live Balance Strip ── */}
-      {balanceVivo && (
-        <div className={`rounded-xl p-4 shadow-sm border transition-colors ${balanceVivo.status === "Cerrado"
-          ? "glass-card bg-black/40 border-white/5"
-          : "glass-card bg-emerald-500/10 border-emerald-500/20"
-          }`}>
-          {/* Status header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${balanceVivo.status === "Cerrado" ? "bg-white/10" : "bg-emerald-500/20"
-                }`}>
-                <div className={`w-2.5 h-2.5 rounded-full ${balanceVivo.status === "Cerrado" ? "bg-slate-400" : "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]"
-                  }`} />
-              </div>
-              <div>
-                <p className="font-semibold text-white text-sm">
-                  {balanceVivo.status === "Cerrado" ? "Caja Cerrada" : "Jornada Abierta"}
-                </p>
-                {balanceVivo.lastCloseDate && (
-                  <p className="text-xs text-slate-400">
-                    {balanceVivo.status === "Cerrado"
-                      ? `Último cierre: ${balanceVivo.lastCloseDate}`
-                      : `Desde cierre del ${balanceVivo.lastCloseDate}`}
-                  </p>
-                )}
-              </div>
-            </div>
-            {/* Gastos rápidos */}
-            <div className="hidden sm:flex items-center gap-4 text-right">
-              <div>
-                <p className="text-[10px] text-red-400 uppercase font-semibold tracking-wide">Gastos hoy</p>
-                <p className="text-sm font-bold text-red-500">
-                  {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.gastosTotalesUsd)}`)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">Gastos mes</p>
-                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
-                  {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalGastosMesUsd)}`)}
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* La misma caja física que ve Recepción: una sola fuente para ambos sectores. */}
+      <CajaFisicaPanel sucursalId={sucursal.id} tcBna={tcBna} />
 
-          {/* Saldos */}
-          <p className="text-[10px] font-semibold text-teal-400 uppercase tracking-wider mb-2">Saldo Actual Estimado</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Efectivo USD */}
-            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-400" />
-                <span className="text-xs font-medium text-slate-300">Efectivo USD</span>
-              </div>
-              <span className="text-sm font-bold text-white font-mono">
-                {formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.saldoUsd))}
-              </span>
+      {/* Resumen administrativo: informa egresos, sin calcular un segundo saldo de caja. */}
+      {balanceVivo && (
+        <div className="glass-card rounded-xl border border-red-500/15 bg-red-500/5 p-4 shadow-sm">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-red-400">
+            Resumen de egresos
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-red-400">Gastos hoy</p>
+              <p className="mt-1 text-sm font-bold text-red-400">
+                {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.gastosTotalesUsd)}`)}
+              </p>
             </div>
-            {/* Efectivo ARS */}
-            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-xs font-medium text-slate-300">Efectivo ARS</span>
-              </div>
-              <span className="text-sm font-bold text-white font-mono">
-                {formatPrivacy(new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(balanceVivo.saldoArs))}
-              </span>
-            </div>
-            {/* Giro Activo */}
-            <div className={`flex justify-between items-center p-3 rounded-xl border border-white/10 ${balanceVivo.giroUsd > 0
-              ? "bg-amber-500/10"
-              : "bg-white/5"
-              }`}>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${balanceVivo.giroUsd > 0 ? "bg-amber-400" : "bg-slate-500"}`} />
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Giro Activo</span>
-              </div>
-              <span className={`text-sm font-bold font-mono ${balanceVivo.giroUsd > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
-                {balanceVivo.giroUsd > 0
-                  ? formatPrivacy(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.giroUsd))
-                  : "Sin deuda"}
-              </span>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Gastos mes</p>
+              <p className="mt-1 text-sm font-bold text-slate-300">
+                {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalGastosMesUsd)}`)}
+              </p>
             </div>
           </div>
         </div>
