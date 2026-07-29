@@ -18,3 +18,9 @@ test('presentation includes editable canvases as slides', () => {
     assert.match(source, /<CanvasPresentationPreview/);
     assert.match(source, /presentationItems\[presentationIdx\]\?\.kind === 'canvas'/);
 });
+
+test('presentation canvases preserve their aspect ratio within the viewport', () => {
+    assert.match(source, /calc\(\(100vh - 96px\) \* \$\{canvasRatio\.w \/ canvasRatio\.h\}\)/);
+    assert.doesNotMatch(source, /width: canvasRatio\.w >= canvasRatio\.h/);
+    assert.doesNotMatch(source, /height: canvasRatio\.h > canvasRatio\.w/);
+});

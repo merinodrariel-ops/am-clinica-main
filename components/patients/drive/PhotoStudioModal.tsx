@@ -738,16 +738,16 @@ function CanvasPresentationPreview({ layers, bgColor, ratio, name }: {
     const backgroundColor = bgColor === 'transparent'
         ? 'transparent'
         : bgColor === 'black' ? '#000000' : '#ffffff';
+    const presentationWidth = `min(90vw, calc((100vh - 96px) * ${canvasRatio.w / canvasRatio.h}), 1400px)`;
 
     return (
         <div
             aria-label={name}
-            className="relative max-h-[calc(100vh-96px)] max-w-full overflow-hidden shadow-2xl"
+            className="relative flex-none overflow-hidden shadow-2xl"
             style={{
                 aspectRatio: `${canvasRatio.w} / ${canvasRatio.h}`,
                 backgroundColor,
-                width: canvasRatio.w >= canvasRatio.h ? 'min(90vw, 1400px)' : 'auto',
-                height: canvasRatio.h > canvasRatio.w ? 'min(82vh, 1200px)' : 'auto',
+                width: presentationWidth,
                 backgroundImage: bgColor === 'transparent'
                     ? 'linear-gradient(45deg,#555 25%,transparent 25%),linear-gradient(-45deg,#555 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#555 75%),linear-gradient(-45deg,transparent 75%,#555 75%)'
                     : undefined,
