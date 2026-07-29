@@ -57,6 +57,12 @@ export default function PatientPortalAccess() {
                         <ShieldCheck size={14} className="text-blue-400" />
                         <span className="text-[10px] font-black tracking-[0.2em] text-blue-200 uppercase">Acceso Privado Premium</span>
                     </div>
+                    <Link
+                        href="/login"
+                        className="text-sm font-bold text-white hover:text-blue-300 transition-colors underline underline-offset-4"
+                    >
+                        ¿Sos parte del equipo? Ingresá por el acceso único
+                    </Link>
                 </motion.div>
 
                 {/* Main Card */}
@@ -79,10 +85,10 @@ export default function PatientPortalAccess() {
                             >
                                 <div className="text-center mb-10">
                                     <h1 className="text-3xl font-black text-white tracking-tight mb-3">
-                                        Acceso a tu portal
+                                        Portal de pacientes
                                     </h1>
                                     <p className="text-slate-400 text-sm leading-relaxed max-w-[280px] mx-auto font-medium">
-                                        Ingresá tu email y te enviamos un enlace seguro para entrar sin contraseña.
+                                        Si sos paciente, ingresá tu email y te enviamos un enlace seguro para entrar sin contraseña.
                                     </p>
                                 </div>
 

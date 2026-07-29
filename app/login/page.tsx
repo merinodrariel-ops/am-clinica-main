@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { login } from '@/app/actions/auth';
 
+type AuthState = { success?: boolean; redirect?: string; error?: string } | null;
+
 function LoginForm() {
     const searchParams = useSearchParams();
     const redirectPath = searchParams.get('redirect') || '/dashboard';
@@ -14,7 +16,7 @@ function LoginForm() {
     
     // Server action driven state
     const [state, formAction, isPending] = useActionState(
-        async (prevState: any, formData: FormData) => {
+        async (_previousState: AuthState, formData: FormData): Promise<AuthState> => {
             setLocalError(null);
             if (!formData.has('redirect')) formData.append('redirect', redirectPath);
             return login(formData);
@@ -28,13 +30,12 @@ function LoginForm() {
     // router.push() keeps the existing AuthContext alive (which has user=null),
     // causing the sidebar and role-based UI to not render until a manual refresh.
     useEffect(() => {
-        const authState = state as { success?: boolean; redirect?: string; error?: string };
-        if (authState?.success && authState?.redirect) {
-            window.location.href = authState.redirect;
+        if (state?.success && state.redirect) {
+            window.location.href = state.redirect;
         }
     }, [state]);
 
-    const error = (state as { error?: string })?.error || localError || null;
+    const error = state?.error || localError || null;
     const isLoading = isPending;
 
     return (
@@ -64,10 +65,11 @@ function LoginForm() {
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                     }}>
-                        Acceso Interno · AM Clínica
+                        Acceso único del equipo
                     </h2>
                     <p className="mt-2 text-sm" style={{ color: 'hsl(230 10% 50%)' }}>
-                        Iniciá sesión con tu email para administrar la clínica
+                        Personal, prestadores y colaboradores ingresan acá con la misma cuenta.
+                        Tu rol define automáticamente qué herramientas podés ver.
                     </p>
                 </div>
 
@@ -87,7 +89,7 @@ function LoginForm() {
                                     border: '1px solid hsl(230 15% 20%)',
                                     color: 'hsl(210 20% 95%)',
                                 }}
-                                placeholder="Email address"
+                                placeholder="Email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
