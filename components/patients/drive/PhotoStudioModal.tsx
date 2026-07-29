@@ -314,6 +314,14 @@ interface FileEditState {
     textAnnotations: TextAnnotation[];
 }
 
+interface PhotoSessionState extends FileEditState {
+    imageUrl: string;
+    bgDone: boolean;
+    bgColor: BgColor;
+    hasTransparentBg: boolean;
+    currentPoints: DrawPoint[];
+}
+
 function normalizeFileEditState(state?: Partial<FileEditState> | null): FileEditState {
     return {
         rotation: normalizeRotation(state?.rotation ?? 0),
@@ -816,6 +824,7 @@ export default function PhotoStudioModal({
     const supabase = useMemo(() => createSupabaseClient(), []);
     // Per-file state cache — persists draws/rotation/brightness across photo navigation
     const fileStatesRef = useRef<Map<string, FileEditState>>(new Map());
+    const photoSessionStatesRef = useRef<Map<string, PhotoSessionState>>(new Map());
     const activeFileIdRef = useRef<string | null>(file?.id ?? null);
     const latestPhotoStateRef = useRef<FileEditState>(normalizeFileEditState());
     const skipNextPhotoStateAutosaveRef = useRef(false);
@@ -2107,14 +2116,6 @@ export default function PhotoStudioModal({
             setCanvasActive(false);
             return;
         }
-        if (isDirty && activeFile) {
-            const cleanPatientName = patientName.replace(/\s+/g, '_');
-            const baseName = activeFile.name.replace(/\.[^.]+$/, '');
-            setExportFileName(`${cleanPatientName}_${baseName}_editada`);
-            setSaveDialogOpen(true);
-            toast.info('Guardá la foto editada en Selección antes de cambiar a otra');
-            return;
-        }
         setCanvasActive(false);
         // Exit Smile Design mode silently when switching photos
         if (smileMode) {
@@ -2128,20 +2129,50 @@ export default function PhotoStudioModal({
             const currentState = normalizeFileEditState({
                 rotation, brightness, drawShapes, textAnnotations,
             });
+            photoSessionStatesRef.current.set(activeFile.id, {
+                ...currentState,
+                imageUrl,
+                bgDone,
+                bgColor,
+                hasTransparentBg,
+                currentPoints,
+            });
+            if (imageUrl.startsWith('blob:')) {
+                if (!createdBlobUrlsRef.current.includes(imageUrl)) {
+                    createdBlobUrlsRef.current.push(imageUrl);
+                }
+                // resetEdits must not revoke a draft that belongs to another photo.
+                objectUrlRef.current = null;
+            }
             fileStatesRef.current.set(activeFile.id, currentState);
             await flushPhotoStateSave({ fileId: activeFile.id, state: currentState });
         }
-        // Reset and restore saved state for the new file (if any)
+        // Reset and restore this session's complete draft, then fall back to the
+        // durable lightweight state (rotation, brightness, drawings and text).
         resetEdits();
+        const sessionDraft = photoSessionStatesRef.current.get(newFile.id);
         const saved = fileStatesRef.current.get(newFile.id);
-        if (saved) {
+        if (sessionDraft) {
+            setImageUrl(sessionDraft.imageUrl);
+            objectUrlRef.current = sessionDraft.imageUrl.startsWith('blob:') ? sessionDraft.imageUrl : null;
+            setRotation(normalizeRotation(sessionDraft.rotation));
+            setBrightness(sessionDraft.brightness);
+            setBgDone(sessionDraft.bgDone);
+            setBgColor(sessionDraft.bgColor);
+            setHasTransparentBg(sessionDraft.hasTransparentBg);
+            setDrawShapes(sessionDraft.drawShapes);
+            setCurrentPoints(sessionDraft.currentPoints);
+            setTextAnnotations(sessionDraft.textAnnotations);
+        } else if (saved) {
             setRotation(normalizeRotation(saved.rotation));
             setBrightness(saved.brightness);
             setDrawShapes(saved.drawShapes);
             setTextAnnotations(saved.textAnnotations);
+            setImageUrl(driveImageUrl(newFile));
+        } else {
+            setImageUrl(driveImageUrl(newFile));
         }
         setActiveFile(newFile);
-        setImageUrl(driveImageUrl(newFile));
     }
 
     function clearMultiSelection() {
@@ -5992,14 +6023,6 @@ export default function PhotoStudioModal({
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
                     <button
                         onClick={async () => {
-                            if (isDirty && activeFile) {
-                                const cleanPatientName = patientName.replace(/\s+/g, '_');
-                                const baseName = activeFile.name.replace(/\.[^.]+$/, '');
-                                setExportFileName(`${cleanPatientName}_${baseName}_editada`);
-                                setSaveDialogOpen(true);
-                                toast.info('Guardá la foto editada en Selección antes de volver');
-                                return;
-                            }
                             await flushPhotoStateSave();
                             if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
                                 setCanvasSaving(true);
