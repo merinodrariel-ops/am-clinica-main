@@ -6846,27 +6846,58 @@ export default function PhotoStudioModal({
                             )})}
                             {editedOutputFiles.map((editedFile) => {
                                 const isEditedOutputSelected = selectedIds.has(editedFile.id);
+                                const showDropLeft = thumbnailDropIndicator?.id === editedFile.id && thumbnailDropIndicator.edge === 'top';
+                                const showDropRight = thumbnailDropIndicator?.id === editedFile.id && thumbnailDropIndicator.edge === 'bottom';
                                 return (
                                 <button
                                     key={`edited-${editedFile.id}`}
                                     draggable
                                     onDragStart={(event) => {
                                         preparePhotoStudioCanvasDrag(event.dataTransfer, editedFile.id);
-                                        event.dataTransfer.effectAllowed = 'copy';
+                                        event.dataTransfer.setData('thumbnailReorderId', editedFile.id);
+                                        event.dataTransfer.effectAllowed = 'copyMove';
+                                        setThumbnailDragId(editedFile.id);
+                                    }}
+                                    onDragOver={(event) => {
+                                        event.preventDefault();
+                                        event.dataTransfer.dropEffect = 'move';
+                                        const rect = event.currentTarget.getBoundingClientRect();
+                                        const edge = event.clientX < rect.left + rect.width / 2 ? 'top' : 'bottom';
+                                        setThumbnailDropIndicator({ id: editedFile.id, edge });
+                                    }}
+                                    onDrop={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        const draggedId = event.dataTransfer.getData('thumbnailReorderId') || thumbnailDragId;
+                                        if (!draggedId) return;
+                                        void handleThumbnailReorder(
+                                            draggedId,
+                                            editedFile.id,
+                                            thumbnailDropIndicator?.id === editedFile.id ? thumbnailDropIndicator.edge : 'top',
+                                        );
+                                    }}
+                                    onDragLeave={() => {
+                                        setThumbnailDropIndicator((previous) => previous?.id === editedFile.id ? null : previous);
+                                    }}
+                                    onDragEnd={() => {
+                                        setThumbnailDragId(null);
+                                        setThumbnailDropIndicator(null);
                                     }}
                                     onClick={(event) => handleThumbnailSelect(editedFile, event)}
                                     onContextMenu={(event) => openThumbnailContextMenu(event, editedFile)}
                                     aria-pressed={isEditedOutputSelected}
-                                    className={`relative flex flex-shrink-0 flex-col items-center gap-1 ${
+                                    className={`relative flex flex-shrink-0 cursor-grab flex-col items-center gap-1 active:cursor-grabbing ${
                                         isEditedOutputSelected || (!canvasActive && activeFile.id === editedFile.id) ? 'text-[#C9A96E]' : 'text-white/55'
-                                    }`}
-                                    title={buildDriveImageInfoTitle(editedFile)}
+                                    } ${thumbnailDragId === editedFile.id ? 'opacity-60 scale-95' : ''}`}
+                                    title={`${buildDriveImageInfoTitle(editedFile)} · Arrastrá hacia los costados para ordenar`}
                                 >
                                     <span className={`relative block h-14 w-20 overflow-hidden rounded-lg border-2 ${
                                         isEditedOutputSelected
                                             ? 'border-[#C9A96E] shadow-[0_0_0_2px_rgba(201,169,110,0.35),0_0_18px_rgba(201,169,110,0.35)]'
                                             : !canvasActive && activeFile.id === editedFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
                                     }`}>
+                                        {showDropLeft && <span className="absolute -left-0.5 bottom-1 top-1 z-20 w-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
+                                        {showDropRight && <span className="absolute -right-0.5 bottom-1 top-1 z-20 w-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
                                         {editedFile.thumbnailLink ? (
                                             <img src={editedFile.thumbnailLink} alt="" referrerPolicy="no-referrer" draggable={false} className="pointer-events-none h-full w-full object-cover" />
                                         ) : (
