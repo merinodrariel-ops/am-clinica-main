@@ -20,6 +20,7 @@ import {
 } from '@/lib/google-drive';
 import { canManagePatientDrive, isMarketingMediaMimeType } from '@/lib/patient-drive-access';
 import { canViewPatientRecords } from '@/lib/patient-access';
+import { getISODateInTimeZone } from '@/lib/local-date';
 
 /**
  * Server action to rename a file in Drive (categorization)
@@ -858,7 +859,7 @@ export async function extractSlidesAsImagesAction(
             const { createHistoriaClinicaEntry } = await import('@/app/actions/patients');
             const hcResult = await createHistoriaClinicaEntry({
                 paciente_id: options.patientId,
-                fecha: new Date().toISOString().split('T')[0],
+                fecha: getISODateInTimeZone(),
                 profesional: options.profesional || 'Importación automática',
                 historia_texto: result.textContent,
             });

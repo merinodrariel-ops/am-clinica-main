@@ -5,6 +5,21 @@ export function getLocalISODate(date: Date = new Date()): string {
     return `${year}-${month}-${day}`;
 }
 
+export function getISODateInTimeZone(
+    date: Date = new Date(),
+    timeZone: string = 'America/Argentina/Buenos_Aires'
+): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+    return `${values.year}-${values.month}-${values.day}`;
+}
+
 export function getLocalYearMonth(date: Date = new Date()): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');

@@ -501,7 +501,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             <div>
                                                 <p className="font-medium">{entry.profesional}</p>
                                                 <p className="text-sm text-gray-500">
-                                                    {new Date(entry.fecha).toLocaleDateString('es-AR', {
+                                                    {formatDateForLocale(entry.fecha, 'es-AR', {
                                                         day: 'numeric',
                                                         month: 'long',
                                                         year: 'numeric'
@@ -510,7 +510,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             </div>
                                             {entry.proximo_control && (
                                                 <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
-                                                    Próx: {new Date(entry.proximo_control).toLocaleDateString('es-AR')}
+                                                    Próx: {formatDateForLocale(entry.proximo_control)}
                                                 </span>
                                             )}
                                         </div>

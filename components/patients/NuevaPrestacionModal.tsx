@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X, Mic, MicOff, Loader2, Save, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { createHistoriaClinicaEntry } from '@/app/actions/patients';
+import { getISODateInTimeZone } from '@/lib/local-date';
 
 interface NuevaPresentacionModalProps {
     patientId: string;
@@ -14,7 +15,7 @@ interface NuevaPresentacionModalProps {
 }
 
 export default function NuevaPrestacionModal({ patientId, profesional, onSaved, onClose }: NuevaPresentacionModalProps) {
-    const todayIso = new Date().toISOString().split('T')[0];
+    const todayIso = getISODateInTimeZone();
 
     const [fecha, setFecha] = useState(todayIso);
     const [historiaTexto, setHistoriaTexto] = useState('');
