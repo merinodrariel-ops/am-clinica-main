@@ -1282,6 +1282,9 @@ export default function PhotoStudioModal({
                     persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
 
                     if (row.file_id !== activeFileIdRef.current) return;
+                    // A live in-session draft is newer than a realtime echo that may
+                    // have been emitted by the preceding switch/autosave request.
+                    if (photoSessionStatesRef.current.has(row.file_id)) return;
 
                     const localState = latestPhotoStateRef.current;
                     if (photoStateDirtyRef.current && serializeFileEditState(nextState) !== serializeFileEditState(localState)) {
