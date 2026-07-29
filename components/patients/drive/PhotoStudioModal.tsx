@@ -48,6 +48,11 @@ import {
 } from '@/lib/photo-studio/canvas-selection';
 import { buildDriveImageInfoTitle } from '@/lib/photo-studio/drive-image-info';
 import { getPendingEditedPhotoIds } from '@/lib/photo-studio-selection-reconciliation';
+import {
+    getPhotoStudioPresentationPhotoIds,
+    getPhotoStudioPresentationScope,
+    type PhotoStudioPresentationScope,
+} from '@/lib/photo-studio/presentation-scope';
 import { mapCanvasLayerPointToPixel } from '@/lib/photo-studio/canvas-layer-point';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import PublicCasePublishModal from './PublicCasePublishModal';
@@ -713,6 +718,54 @@ function CanvasThumbnailPreview({ layers, bgColor, ratio }: {
         });
     }, [layers, bgColor, ratio]);
     return <canvas ref={ref} width={56} height={56} className="w-full h-full object-cover" />;
+}
+
+function CanvasPresentationPreview({ layers, bgColor, ratio, name }: {
+    layers: CanvasLayer[];
+    bgColor: string;
+    ratio: CanvasRatio;
+    name: string;
+}) {
+    const canvasRatio = CANVAS_RATIOS.find(item => item.value === ratio) ?? CANVAS_RATIOS[0];
+    const backgroundColor = bgColor === 'transparent'
+        ? 'transparent'
+        : bgColor === 'black' ? '#000000' : '#ffffff';
+
+    return (
+        <div
+            aria-label={name}
+            className="relative max-h-[calc(100vh-96px)] max-w-full overflow-hidden shadow-2xl"
+            style={{
+                aspectRatio: `${canvasRatio.w} / ${canvasRatio.h}`,
+                backgroundColor,
+                width: canvasRatio.w >= canvasRatio.h ? 'min(90vw, 1400px)' : 'auto',
+                height: canvasRatio.h > canvasRatio.w ? 'min(82vh, 1200px)' : 'auto',
+                backgroundImage: bgColor === 'transparent'
+                    ? 'linear-gradient(45deg,#555 25%,transparent 25%),linear-gradient(-45deg,#555 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#555 75%),linear-gradient(-45deg,transparent 75%,#555 75%)'
+                    : undefined,
+                backgroundSize: bgColor === 'transparent' ? '24px 24px' : undefined,
+                backgroundPosition: bgColor === 'transparent' ? '0 0,0 12px,12px -12px,-12px 0' : undefined,
+            }}
+        >
+            {layers.map(layer => (
+                <img
+                    key={layer.id}
+                    src={layer.src}
+                    alt=""
+                    draggable={false}
+                    className="pointer-events-none absolute"
+                    style={{
+                        left: `${layer.x * 100}%`,
+                        top: `${layer.y * 100}%`,
+                        width: `${layer.w * 100}%`,
+                        height: `${layer.h * 100}%`,
+                        filter: `brightness(${layer.brightness ?? 100}%)`,
+                        transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`,
+                    }}
+                />
+            ))}
+        </div>
+    );
 }
 
 export default function PhotoStudioModal({
@@ -1563,6 +1616,10 @@ export default function PhotoStudioModal({
         });
     }, [baseImageFiles]);
 
+    useEffect(() => {
+        thumbnailOrderRef.current = imageOrderIds;
+    }, [imageOrderIds]);
+
     // Always-current navigate function — used by wheel handler + arrow keys
     const switchToAdjacentRef = useRef<(dir: 1 | -1) => void>(() => {});
     useEffect(() => {
@@ -1626,6 +1683,10 @@ export default function PhotoStudioModal({
     const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
     const [thumbnailDragId, setThumbnailDragId] = useState<string | null>(null);
     const [thumbnailDropIndicator, setThumbnailDropIndicator] = useState<{ id: string; edge: 'top' | 'bottom' } | null>(null);
+    const thumbnailOrderRef = useRef<string[]>(imageOrderIds);
+    const thumbnailDragMovedRef = useRef(false);
+    const thumbnailOrderSavingRef = useRef(false);
+    const pendingThumbnailOrderRef = useRef<string[] | null>(null);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
     const currentTargetIds = useMemo(() => {
         if (selectedIds.size > 0) {
@@ -1681,20 +1742,57 @@ export default function PhotoStudioModal({
     // Presentation mode state
     const [presentationMode, setPresentationMode] = useState(false);
     const [presentationIdx, setPresentationIdx] = useState(0);
+    const [presentationScope, setPresentationScope] = useState<PhotoStudioPresentationScope>('library');
+    const autoPresentationStartedRef = useRef(false);
     const [cleanEditSignature, setCleanEditSignature] = useState<string | null>(null);
+
+    const presentationPhotoIds = useMemo(
+        () => new Set(getPhotoStudioPresentationPhotoIds(imageFiles, presentationScope)),
+        [imageFiles, presentationScope],
+    );
+    const presentationItems = useMemo(() => [
+        ...imageFiles
+            .filter(item => presentationPhotoIds.has(item.id))
+            .map(item => ({ kind: 'photo' as const, id: `photo:${item.id}`, name: item.name, file: item })),
+        ...canvases.map(canvasDocument => ({
+            kind: 'canvas' as const,
+            id: `canvas:${canvasDocument.id}`,
+            name: canvasDocument.name,
+            canvas: canvasDocument,
+        })),
+    ], [canvases, imageFiles, presentationPhotoIds]);
+
+    const startPresentation = useCallback(() => {
+        const scope = getPhotoStudioPresentationScope({
+            activeParentName: activeFile?.parentName,
+            canvasActive,
+        });
+        const photoIds = new Set(getPhotoStudioPresentationPhotoIds(imageFiles, scope));
+        const itemIds = [
+            ...imageFiles.filter(item => photoIds.has(item.id)).map(item => `photo:${item.id}`),
+            ...canvases.map(canvasDocument => `canvas:${canvasDocument.id}`),
+        ];
+        const activeItemId = canvasActive && activeCanvasId
+            ? `canvas:${activeCanvasId}`
+            : `photo:${activeFile?.id}`;
+
+        setPresentationScope(scope);
+        setPresentationIdx(Math.max(0, itemIds.indexOf(activeItemId)));
+        setPresentationMode(true);
+    }, [activeCanvasId, activeFile, canvasActive, canvases, imageFiles]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
+        if (autoPresentationStartedRef.current) return;
         if (!shouldStartPhotoStudioInPresentation({
             viewportWidth: window.innerWidth,
             imageCount: imageFiles.length,
             autoStartSmile: autoStartSmileRef.current,
         })) return;
 
-        const idx = imageFiles.findIndex(f => f.id === activeFile?.id);
-        setPresentationIdx(Math.max(0, idx));
-        setPresentationMode(true);
-    }, [activeFile?.id, imageFiles]);
+        autoPresentationStartedRef.current = true;
+        startPresentation();
+    }, [activeFile?.id, imageFiles, startPresentation]);
 
     const currentEditSignature = useMemo(() => JSON.stringify({
         fileId: activeFile?.id ?? null,
@@ -1810,7 +1908,7 @@ export default function PhotoStudioModal({
         if (!presentationMode) return;
         const handler = (e: KeyboardEvent) => {
             if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                setPresentationIdx(i => Math.min(i + 1, imageFiles.length - 1));
+                setPresentationIdx(i => Math.min(i + 1, presentationItems.length - 1));
             } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                 setPresentationIdx(i => Math.max(i - 1, 0));
             } else if (e.key === 'Escape') {
@@ -1819,7 +1917,7 @@ export default function PhotoStudioModal({
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [presentationMode, imageFiles.length]);
+    }, [presentationMode, presentationItems.length]);
 
     // Arrow-key navigation in normal studio view (mirrors presentation mode arrows)
     useEffect(() => {
@@ -5603,27 +5701,68 @@ export default function PhotoStudioModal({
         }
     }
 
-    async function handleThumbnailReorder(fromId: string, toId: string, edge: 'top' | 'bottom' = 'top') {
+    function persistThumbnailOrder(nextOrder: string[]) {
+        if (!folderId) return;
+        pendingThumbnailOrderRef.current = nextOrder;
+        if (thumbnailOrderSavingRef.current) return;
+        thumbnailOrderSavingRef.current = true;
+        void (async () => {
+            try {
+                while (pendingThumbnailOrderRef.current) {
+                    const orderToSave = pendingThumbnailOrderRef.current;
+                    pendingThumbnailOrderRef.current = null;
+                    const coverFileId = orderToSave[0] || null;
+                    const result = await saveFotosOrderAction(patientId, folderId, orderToSave, coverFileId);
+                    if (result.error) toast.error(result.error);
+                    else onSaved({ silent: true });
+                }
+            } finally {
+                thumbnailOrderSavingRef.current = false;
+            }
+        })();
+    }
+
+    function getReorderedThumbnailIds(fromId: string, toId: string, edge: 'top' | 'bottom' = 'top') {
         if (fromId === toId) return;
-        const fromIndex = imageOrderIds.indexOf(fromId);
-        const toIndex = imageOrderIds.indexOf(toId);
+        const currentOrder = thumbnailOrderRef.current;
+        const fromIndex = currentOrder.indexOf(fromId);
+        const toIndex = currentOrder.indexOf(toId);
         if (fromIndex === -1 || toIndex === -1) return;
 
-        const nextOrder = [...imageOrderIds];
+        const nextOrder = [...currentOrder];
         const [moved] = nextOrder.splice(fromIndex, 1);
         const targetIndex = nextOrder.indexOf(toId);
         const insertionIndex = edge === 'bottom' ? targetIndex + 1 : targetIndex;
         nextOrder.splice(insertionIndex, 0, moved);
+        return nextOrder;
+    }
+
+    function handleThumbnailReorder(fromId: string, toId: string, edge: 'top' | 'bottom' = 'top') {
+        const nextOrder = getReorderedThumbnailIds(fromId, toId, edge);
+        if (!nextOrder) return;
+        thumbnailOrderRef.current = nextOrder;
         setImageOrderIds(nextOrder);
         setThumbnailDragId(null);
         setThumbnailDropIndicator(null);
+        persistThumbnailOrder(nextOrder);
+    }
 
-        if (folderId) {
-            const coverFileId = nextOrder[0] || null;
-            const result = await saveFotosOrderAction(patientId, folderId, nextOrder, coverFileId);
-            if (result.error) toast.error(result.error);
-            else onSaved({ silent: true });
-        }
+    function previewThumbnailReorder(fromId: string, toId: string, edge: 'top' | 'bottom') {
+        const nextOrder = getReorderedThumbnailIds(fromId, toId, edge);
+        if (!nextOrder || nextOrder.every((id, index) => id === thumbnailOrderRef.current[index])) return;
+        thumbnailOrderRef.current = nextOrder;
+        thumbnailDragMovedRef.current = true;
+        setImageOrderIds(nextOrder);
+        setThumbnailDropIndicator({ id: toId, edge });
+    }
+
+    function finishThumbnailReorder() {
+        const shouldPersist = thumbnailDragMovedRef.current;
+        const finalOrder = thumbnailOrderRef.current;
+        thumbnailDragMovedRef.current = false;
+        setThumbnailDragId(null);
+        setThumbnailDropIndicator(null);
+        if (shouldPersist) void persistThumbnailOrder(finalOrder);
     }
 
     async function materializeCanvasLayersForSave(canvasDocument: CanvasDoc): Promise<CanvasLayer[]> {
@@ -5989,13 +6128,9 @@ export default function PhotoStudioModal({
                                 </span>
                             </button>
                         )}
-                        {imageFiles.length > 1 && (
+                        {imageFiles.length + canvases.length > 1 && (
                             <button
-                                onClick={() => {
-                                    const idx = imageFiles.findIndex(f => f.id === activeFile.id);
-                                    setPresentationIdx(Math.max(0, idx));
-                                    setPresentationMode(true);
-                                }}
+                                onClick={startPresentation}
                                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#C9A96E] text-black text-sm font-bold border border-[#C9A96E]/70 hover:bg-[#d9bb7d] transition-colors shadow-lg shadow-black/20"
                             >
                                 <Play size={14} />
@@ -6806,7 +6941,33 @@ export default function PhotoStudioModal({
                                     : 'Lienzos editables y resultados'}
                             </span>
                         </div>
-                        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto px-4 py-2 thin-scrollbar">
+                        <div
+                            className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto px-4 py-2 thin-scrollbar"
+                            onDragOver={(event) => {
+                                if (!thumbnailDragId) return;
+                                event.preventDefault();
+                                event.dataTransfer.dropEffect = 'move';
+                                const targets = Array.from(
+                                    event.currentTarget.querySelectorAll<HTMLElement>('[data-reorder-thumbnail-id]')
+                                );
+                                const nearest = targets.reduce<{ element: HTMLElement; distance: number } | null>((best, element) => {
+                                    const rect = element.getBoundingClientRect();
+                                    const distance = Math.abs(event.clientX - (rect.left + rect.width / 2));
+                                    return !best || distance < best.distance ? { element, distance } : best;
+                                }, null);
+                                const targetId = nearest?.element.dataset.reorderThumbnailId;
+                                if (!nearest || !targetId || targetId === thumbnailDragId) return;
+                                const rect = nearest.element.getBoundingClientRect();
+                                const edge = event.clientX < rect.left + rect.width / 2 ? 'top' : 'bottom';
+                                previewThumbnailReorder(thumbnailDragId, targetId, edge);
+                            }}
+                            onDrop={(event) => {
+                                if (!thumbnailDragId) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                finishThumbnailReorder();
+                            }}
+                        >
                             {canvases.map((cv) => {
                                 const isCanvasSelected = selectedCanvasIds.includes(cv.id);
                                 return (
@@ -6851,11 +7012,13 @@ export default function PhotoStudioModal({
                                 return (
                                 <button
                                     key={`edited-${editedFile.id}`}
+                                    data-reorder-thumbnail-id={editedFile.id}
                                     draggable
                                     onDragStart={(event) => {
                                         preparePhotoStudioCanvasDrag(event.dataTransfer, editedFile.id);
                                         event.dataTransfer.setData('thumbnailReorderId', editedFile.id);
                                         event.dataTransfer.effectAllowed = 'copyMove';
+                                        thumbnailDragMovedRef.current = false;
                                         setThumbnailDragId(editedFile.id);
                                     }}
                                     onDragOver={(event) => {
@@ -6863,26 +7026,15 @@ export default function PhotoStudioModal({
                                         event.dataTransfer.dropEffect = 'move';
                                         const rect = event.currentTarget.getBoundingClientRect();
                                         const edge = event.clientX < rect.left + rect.width / 2 ? 'top' : 'bottom';
-                                        setThumbnailDropIndicator({ id: editedFile.id, edge });
+                                        const draggedId = event.dataTransfer.getData('thumbnailReorderId') || thumbnailDragId;
+                                        if (draggedId) previewThumbnailReorder(draggedId, editedFile.id, edge);
                                     }}
                                     onDrop={(event) => {
                                         event.preventDefault();
                                         event.stopPropagation();
-                                        const draggedId = event.dataTransfer.getData('thumbnailReorderId') || thumbnailDragId;
-                                        if (!draggedId) return;
-                                        void handleThumbnailReorder(
-                                            draggedId,
-                                            editedFile.id,
-                                            thumbnailDropIndicator?.id === editedFile.id ? thumbnailDropIndicator.edge : 'top',
-                                        );
+                                        finishThumbnailReorder();
                                     }}
-                                    onDragLeave={() => {
-                                        setThumbnailDropIndicator((previous) => previous?.id === editedFile.id ? null : previous);
-                                    }}
-                                    onDragEnd={() => {
-                                        setThumbnailDragId(null);
-                                        setThumbnailDropIndicator(null);
-                                    }}
+                                    onDragEnd={finishThumbnailReorder}
                                     onClick={(event) => handleThumbnailSelect(editedFile, event)}
                                     onContextMenu={(event) => openThumbnailContextMenu(event, editedFile)}
                                     aria-pressed={isEditedOutputSelected}
@@ -7559,17 +7711,17 @@ export default function PhotoStudioModal({
                     autoFocus
                     onKeyDown={(e: React.KeyboardEvent) => {
                         if (e.key === 'Escape') { e.stopPropagation(); setPresentationMode(false); }
-                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.stopPropagation(); setPresentationIdx(i => Math.min(i + 1, imageFiles.length - 1)); }
+                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.stopPropagation(); setPresentationIdx(i => Math.min(i + 1, presentationItems.length - 1)); }
                         if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.stopPropagation(); setPresentationIdx(i => Math.max(i - 1, 0)); }
                     }}
                 >
                     {/* Top bar */}
                     <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
                         <span className="text-white/50 text-sm font-mono tabular-nums pointer-events-auto">
-                            {presentationIdx + 1} / {imageFiles.length}
+                            {presentationIdx + 1} / {presentationItems.length}
                         </span>
                         <p className="text-white/60 text-sm truncate max-w-xs">
-                            {imageFiles[presentationIdx]?.name}
+                            {presentationItems[presentationIdx]?.name}
                         </p>
                         <button
                             onClick={() => setPresentationMode(false)}
@@ -7582,25 +7734,42 @@ export default function PhotoStudioModal({
                     {/* Main image */}
                     <div
                         className="flex-1 flex items-center justify-center relative cursor-pointer"
-                        onClick={() => setPresentationIdx(i => Math.min(imageFiles.length - 1, i + 1))}
+                        onClick={() => setPresentationIdx(i => Math.min(presentationItems.length - 1, i + 1))}
                     >
                         <AnimatePresence mode="wait">
-                            <motion.img
-                                key={imageFiles[presentationIdx]?.id}
+                            <motion.div
+                                key={presentationItems[presentationIdx]?.id}
                                 initial={{ opacity: 0, scale: 0.97 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 1.02 }}
                                 transition={{ duration: 0.18 }}
-                                src={`/api/drive/file/${imageFiles[presentationIdx]?.id}`}
-                                alt={imageFiles[presentationIdx]?.name}
-                                className="max-w-full max-h-full object-contain"
+                                className="flex max-h-full max-w-full items-center justify-center"
                                 style={{ maxHeight: 'calc(100vh - 96px)' }}
-                            />
+                            >
+                                {presentationItems[presentationIdx]?.kind === 'photo' ? (
+                                    <img
+                                        src={`/api/drive/file/${presentationItems[presentationIdx].file.id}`}
+                                        alt={presentationItems[presentationIdx].name}
+                                        className="max-h-full max-w-full object-contain"
+                                        style={{ maxHeight: 'calc(100vh - 96px)' }}
+                                    />
+                                ) : presentationItems[presentationIdx]?.kind === 'canvas' ? (
+                                    <CanvasPresentationPreview
+                                        layers={presentationItems[presentationIdx].canvas.layers}
+                                        bgColor={presentationItems[presentationIdx].canvas.bgColor}
+                                        ratio={presentationItems[presentationIdx].canvas.ratio}
+                                        name={presentationItems[presentationIdx].canvas.name}
+                                    />
+                                ) : null}
+                            </motion.div>
                         </AnimatePresence>
 
                         {/* Prev — full-height zone */}
                         <button
-                            onClick={() => setPresentationIdx(i => Math.max(0, i - 1))}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setPresentationIdx(i => Math.max(0, i - 1));
+                            }}
                             disabled={presentationIdx === 0}
                             className="absolute left-0 top-0 bottom-0 w-24 flex items-center justify-start pl-3 group transition-all disabled:opacity-0 disabled:pointer-events-none"
                             style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.35) 0%, transparent 100%)' }}
@@ -7609,8 +7778,11 @@ export default function PhotoStudioModal({
                         </button>
                         {/* Next — full-height zone */}
                         <button
-                            onClick={() => setPresentationIdx(i => Math.min(imageFiles.length - 1, i + 1))}
-                            disabled={presentationIdx === imageFiles.length - 1}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setPresentationIdx(i => Math.min(presentationItems.length - 1, i + 1));
+                            }}
+                            disabled={presentationIdx === presentationItems.length - 1}
                             className="absolute right-0 top-0 bottom-0 w-24 flex items-center justify-end pr-3 group transition-all disabled:opacity-0 disabled:pointer-events-none"
                             style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.35) 0%, transparent 100%)' }}
                         >
@@ -7619,11 +7791,11 @@ export default function PhotoStudioModal({
                     </div>
 
                     {/* Dot indicators */}
-                    {imageFiles.length <= 24 && (
+                    {presentationItems.length <= 24 && (
                         <div className="flex items-center justify-center gap-1.5 py-5 flex-shrink-0">
-                            {imageFiles.map((_, i) => (
+                            {presentationItems.map((item, i) => (
                                 <button
-                                    key={i}
+                                    key={item.id}
                                     onClick={() => setPresentationIdx(i)}
                                     className={`rounded-full transition-all duration-200 ${
                                         i === presentationIdx
