@@ -328,6 +328,7 @@ type AppointmentUpdatePayload = Partial<{
     title: string;
     patient_id: string | null;
     doctor_id: string | null;
+    area_id: string | null;
     start_time: string;
     end_time: string;
     status: string;
@@ -356,6 +357,7 @@ export async function getAppointments(start: string, end: string) {
             notes,
             patient_id,
             doctor_id,
+            area_id,
             color_tag,
             created_at,
             created_by,
@@ -413,6 +415,7 @@ export async function createAppointment(formData: FormData) {
     const title = formData.get('title') as string;
     const patientId = formData.get('patientId') as string || null;
     const doctorId = formData.get('doctorId') as string || null;
+    const areaId = formData.get('areaId') as string || null;
     const startTime = formData.get('startTime') as string;
     const endTime = formData.get('endTime') as string;
     const status = formData.get('status') as string || 'confirmed';
@@ -430,6 +433,7 @@ export async function createAppointment(formData: FormData) {
             title,
             patient_id: patientId ? patientId : null,
             doctor_id: doctorId ? doctorId : null,
+            area_id: areaId ? areaId : null,
             start_time: startTime,
             end_time: endTime,
             status,
@@ -708,7 +712,7 @@ export async function getDoctors() {
     // Source doctors from `personal` to avoid listing non-clinical app users.
     const { data: staff, error: staffError } = await supabase
         .from('personal')
-        .select('user_id, nombre, apellido')
+        .select('user_id, nombre, apellido, area')
         .eq('activo', true)
         .in('tipo', ['odontologo', 'profesional'])
         .not('user_id', 'is', null)
@@ -740,7 +744,7 @@ export async function getDoctors() {
     const profileById = new Map((profiles || []).map(profile => [profile.id, profile]));
 
     return (staff || [])
-        .map((row: { user_id: string | null; nombre: string | null; apellido: string | null }) => {
+        .map((row: { user_id: string | null; nombre: string | null; apellido: string | null; area: string | null }) => {
             const profile = row.user_id ? profileById.get(row.user_id) : null;
             if (!profile || !row.user_id) return null;
 
@@ -749,10 +753,98 @@ export async function getDoctors() {
                 id: profile.id,
                 full_name: profile.full_name || fallbackName || 'Odontólogo',
                 role: profile.categoria,
+                area: row.area || null,
             };
         })
-        .filter((doctor): doctor is { id: string; full_name: string; role: string } => Boolean(doctor))
+        .filter((doctor): doctor is { id: string; full_name: string; role: string; area: string | null } => Boolean(doctor))
         .sort((a, b) => a.full_name.localeCompare(b.full_name, 'es', { sensitivity: 'base' }));
+}
+
+export type AgendaClinicalArea = {
+    id: string;
+    nombre: string;
+    color: string | null;
+    activo: boolean;
+    orden: number | null;
+};
+
+export async function getAgendaClinicalAreas(includeInactive = false): Promise<AgendaClinicalArea[]> {
+    const supabase = await createClient();
+    let query = supabase
+        .from('personal_areas')
+        .select('id, nombre, color, activo, orden')
+        .in('tipo_personal', ['profesional', 'ambos', 'prestador'])
+        .order('orden')
+        .order('nombre');
+
+    if (!includeInactive) query = query.eq('activo', true);
+    const { data, error } = await query;
+    if (error) {
+        console.error('Error fetching clinical areas:', error);
+        return [];
+    }
+    return (data || []) as AgendaClinicalArea[];
+}
+
+async function verifyAgendaAdminAccess() {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autorizado');
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .maybeSingle();
+    if (!profile || !['owner', 'admin', 'developer'].includes(profile.categoria || '')) {
+        throw new Error('Solo administración puede configurar áreas de agenda');
+    }
+}
+
+export async function createAgendaClinicalArea(input: { nombre: string; color?: string }) {
+    try {
+        await verifyAgendaAdminAccess();
+        const supabase = getAdminClient();
+        const nombre = input.nombre.trim();
+        if (nombre.length < 2 || nombre.length > 80) {
+            return { success: false, error: 'El nombre debe tener entre 2 y 80 caracteres' };
+        }
+        const { data: last } = await supabase
+            .from('personal_areas')
+            .select('orden')
+            .order('orden', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        const { error } = await supabase.from('personal_areas').insert({
+            nombre,
+            descripcion: `Área clínica de agenda: ${nombre}`,
+            // The current production constraint keeps the legacy value `prestador`.
+            tipo_personal: 'prestador',
+            color: input.color || '#6366f1',
+            activo: true,
+            orden: (last?.orden || 0) + 10,
+        });
+        if (error) return { success: false, error: error.message };
+        revalidatePath('/agenda');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'No autorizado' };
+    }
+}
+
+export async function setAgendaClinicalAreaActive(id: string, activo: boolean) {
+    try {
+        await verifyAgendaAdminAccess();
+        const supabase = getAdminClient();
+        const { error } = await supabase
+            .from('personal_areas')
+            .update({ activo })
+            .eq('id', id);
+        if (error) return { success: false, error: error.message };
+        revalidatePath('/agenda');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'No autorizado' };
+    }
 }
 
 export async function getImportedEventTypes() {

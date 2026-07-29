@@ -35,6 +35,7 @@ interface AppointmentModalData {
     end: Date;
     patientId: string;
     doctorId: string;
+    areaId?: string | null;
     status: string;
     type: string;
     modality?: string | null;
@@ -54,6 +55,7 @@ interface AgendaAppointmentRecord {
     notes: string | null;
     patient_id: string | null;
     doctor_id: string | null;
+    area_id?: string | null;
     color_tag?: string | null;
     patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null; intervalo_limpieza_meses?: number | null } | null;
     doctor?: { full_name?: string } | null;
@@ -66,6 +68,7 @@ interface AgendaEventExtendedProps {
     notes?: string;
     patient_id?: string;
     doctor_id?: string;
+    area_id?: string;
     patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null; intervalo_limpieza_meses?: number | null };
     doctor?: { full_name?: string };
     conflict?: boolean;
@@ -312,6 +315,7 @@ export default function AgendaCalendar() {
             notes: props.notes || '',
             patientId: props.patient_id || '',
             doctorId: props.doctor_id || '',
+            areaId: props.area_id || '',
             patient: props.patient,
             doctor: props.doctor
         };
@@ -483,6 +487,7 @@ export default function AgendaCalendar() {
                             notes: apt.notes || '',
                             patient_id: apt.patient_id || '',
                             doctor_id: apt.doctor_id || '',
+                            area_id: apt.area_id || '',
                             start_time: apt.start_time,
                             patient: apt.patient || undefined,
                             doctor: apt.doctor || undefined,
@@ -520,6 +525,7 @@ export default function AgendaCalendar() {
                         notes: apt.notes || '',
                         patient_id: apt.patient_id || '',
                         doctor_id: apt.doctor_id || '',
+                        area_id: apt.area_id || '',
                         start_time: apt.start_time,
                         patient: apt.patient || undefined,
                         doctor: apt.doctor || undefined,

@@ -5,6 +5,7 @@ import { X, UserPlus, Save, FileText } from 'lucide-react';
 import { createProviderCompany, createWorkerWithInvite, getProviderCompanies, type CreateWorkerInput } from '@/app/actions/worker-portal';
 import { toast } from 'sonner';
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { getAgendaClinicalAreas } from '@/app/actions/agenda';
 
 const AREAS = [
     'Odontología',
@@ -23,16 +24,18 @@ const CONDICION_AFIP = [
 interface Props {
     onClose: () => void;
     onCreated: () => void;
+    initialType?: 'prestador' | 'odontologo';
 }
 
-export default function NewWorkerModal({ onClose, onCreated }: Props) {
+export default function NewWorkerModal({ onClose, onCreated, initialType = 'prestador' }: Props) {
     const [saving, setSaving] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
     useModalKeyboard(true, onClose, () => formRef.current?.requestSubmit(), { disabled: saving });
-    const [tipo, setTipo] = useState<'prestador' | 'odontologo'>('prestador');
+    const [tipo, setTipo] = useState<'prestador' | 'odontologo'>(initialType);
     const [createdWorkerId, setCreatedWorkerId] = useState<string | null>(null);
     const [showContractPrompt, setShowContractPrompt] = useState(false);
     const [companies, setCompanies] = useState<Array<{ id: string; nombre: string; area_default?: string | null }>>([]);
+    const [clinicalAreas, setClinicalAreas] = useState<string[]>([]);
     const [newCompanyName, setNewCompanyName] = useState('');
     const [creatingCompany, setCreatingCompany] = useState(false);
 
@@ -54,6 +57,9 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
 
     useEffect(() => {
         getProviderCompanies().then(setCompanies).catch(() => setCompanies([]));
+        getAgendaClinicalAreas()
+            .then(areas => setClinicalAreas(areas.map(area => area.nombre)))
+            .catch(() => setClinicalAreas([]));
     }, []);
 
     function setField<K extends keyof CreateWorkerInput>(key: K, val: CreateWorkerInput[K]) {
@@ -218,7 +224,7 @@ export default function NewWorkerModal({ onClose, onCreated }: Props) {
                                     onChange={e => setField('area', e.target.value)}
                                     className={inputClass}
                                 >
-                                    {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+                                    {Array.from(new Set([...AREAS, ...clinicalAreas])).map(a => <option key={a} value={a}>{a}</option>)}
                                 </select>
                             </Field>
                             <Field label="Categoría">

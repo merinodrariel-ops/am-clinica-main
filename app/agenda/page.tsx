@@ -25,6 +25,7 @@ const AgendaCalendar = dynamic(() => import('@/components/agenda/AgendaCalendar'
 const MonthlyAgendaDashboard = dynamic(() => import('@/components/agenda/MonthlyAgendaDashboard'), { ssr: false });
 const DoctorScheduleConfig = dynamic(() => import('@/components/agenda/DoctorScheduleConfig'), { ssr: false });
 const AgendaBlocksManager = dynamic(() => import('@/components/agenda/AgendaBlocksManager'), { ssr: false });
+const AgendaAreasManager = dynamic(() => import('@/components/agenda/AgendaAreasManager'), { ssr: false });
 
 type Tab = 'calendar' | 'config';
 
@@ -154,6 +155,7 @@ export default function AgendaPage() {
             {activeTab === 'config' && (
                 <div className="flex-1 min-h-0 overflow-y-auto">
                     <div className="max-w-4xl mx-auto space-y-8 pb-8">
+                        <AgendaAreasManager />
                         <DoctorScheduleConfig />
                         <hr className="border-gray-200 dark:border-gray-700" />
                         <AgendaBlocksManager doctors={doctors} />

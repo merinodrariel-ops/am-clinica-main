@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors } from '@/app/actions/agenda';
+import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors, getAgendaClinicalAreas, type AgendaClinicalArea } from '@/app/actions/agenda';
 import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle, UserPlus } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -33,6 +33,7 @@ interface Doctor {
     id: string;
     full_name: string;
     role: string;
+    area?: string | null;
 }
 
 interface AppointmentData {
@@ -40,6 +41,7 @@ interface AppointmentData {
     title: string;
     patientId: string;
     doctorId: string;
+    areaId?: string | null;
     start: Date;
     end: Date;
     status: string;
@@ -101,11 +103,13 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const [loading, setLoading] = useState(false);
     const isSubmitting = useRef(false);
     const [doctors, setDoctors] = useState<Doctor[]>([]);
+    const [areas, setAreas] = useState<AgendaClinicalArea[]>([]);
 
     // Form State
     const [title, setTitle] = useState('');
     const [patientId, setPatientId] = useState('');
     const [doctorId, setDoctorId] = useState('');
+    const [areaId, setAreaId] = useState('');
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
     const [status, setStatus] = useState('confirmed');
@@ -143,11 +147,16 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         )
         .slice(0, 8);
 
-    const filteredDoctors = doctors.filter(d => d.full_name.toLowerCase().includes(doctorSearch.toLowerCase()));
+    const selectedArea = areas.find(area => area.id === areaId);
+    const filteredDoctors = doctors.filter(d =>
+        d.full_name.toLowerCase().includes(doctorSearch.toLowerCase())
+        && (!selectedArea || !d.area || d.area.localeCompare(selectedArea.nombre, 'es', { sensitivity: 'base' }) === 0)
+    );
 
     const loadDoctors = useCallback(async () => {
-        const docs = await getDoctors();
+        const [docs, clinicalAreas] = await Promise.all([getDoctors(), getAgendaClinicalAreas()]);
         setDoctors(docs);
+        setAreas(clinicalAreas);
     }, []);
 
     const loadTarifario = useCallback(async () => {
@@ -180,6 +189,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setTitle(initialData.title || '');
             setPatientId(initialData.patientId || '');
             setDoctorId(initialData.doctorId || '');
+            setAreaId(initialData.areaId || '');
             if (initialData.doctor) {
                 setDoctorSearch(initialData.doctor.full_name || '');
             }
@@ -209,6 +219,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setTitle('');
             setPatientId('');
             setDoctorId('');
+            setAreaId('');
             setDoctorSearch('');
             setSelectedPatientName('');
             setSelectedPatientStatus('');
@@ -333,6 +344,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         formData.append('title', title);
         formData.append('patientId', patientId);
         formData.append('doctorId', doctorId);
+        formData.append('areaId', areaId);
         formData.append('startTime', new Date(startTime).toISOString());
         formData.append('endTime', new Date(endTime).toISOString());
         formData.append('status', status);
@@ -354,6 +366,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     title,
                     patient_id: patientId ? patientId : null,
                     doctor_id: doctorId ? doctorId : null,
+                    area_id: areaId ? areaId : null,
                     start_time: new Date(startTime).toISOString(),
                     end_time: new Date(endTime).toISOString(),
                     status,
@@ -383,7 +396,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setLoading(false);
             isSubmitting.current = false;
         }
-    }, [initialData?.id, loading, title, patientId, doctorId, startTime, endTime, status, type, modality, orthoReplacementDays, notes, onSave, onClose]);
+    }, [initialData?.id, loading, title, patientId, doctorId, areaId, startTime, endTime, status, type, modality, orthoReplacementDays, notes, onSave, onClose]);
 
     const handleFormSubmit = useCallback(() => {
         handleSubmit();
@@ -719,6 +732,22 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
                     {/* Date Time Row */}
                     <div className="grid grid-cols-2 gap-5">
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Área clínica</label>
+                                <select
+                                    className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                    value={areaId}
+                                    onChange={(e) => {
+                                        setAreaId(e.target.value);
+                                        setDoctorId('');
+                                        setDoctorSearch('');
+                                    }}
+                                >
+                                    <option value="">Sin área específica</option>
+                                    {areas.map(area => <option key={area.id} value={area.id}>{area.nombre}</option>)}
+                                </select>
+                            </div>
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Inicio</label>
                             <Input
@@ -728,6 +757,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 value={startTime}
                                 onChange={(e) => setStartTime(e.target.value)}
                             />
+                        </div>
                         </div>
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Fin</label>
