@@ -21,3 +21,8 @@ test('ExoCAD guide avoids editing the project directly on the streamed Drive mou
         'the guide should document the local workspace boundary'
     );
 });
+
+test('ExoCAD guide documents the fast write test available in launcher 2.1', () => {
+    assert.match(EXOCAD_WINDOWS_GUIDE.humanSteps.join('\n'), /Probar guardado/);
+    assert.match(EXOCAD_WINDOWS_GUIDE.technicalNotes.join('\n'), /lanzador 2\.1.*probar la escritura/i);
+});

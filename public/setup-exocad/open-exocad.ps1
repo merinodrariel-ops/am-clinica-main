@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$LauncherVersion = "2.0.0"
+$LauncherVersion = "2.1.0"
 
 Add-Type -AssemblyName PresentationFramework
 
@@ -207,6 +207,53 @@ function Save-ChangedFilesToDrive {
     }
 }
 
+function Test-DriveFolderWriteAccess {
+    param([Parameter(Mandatory = $true)][string]$FolderPath)
+
+    if (-not (Get-Process -Name "GoogleDriveFS" -ErrorAction SilentlyContinue)) {
+        throw "Google Drive para Escritorio no está activo. Abrilo y volvé a probar."
+    }
+    if (-not (Test-Path -LiteralPath $FolderPath -PathType Container)) {
+        throw "No se encontró la carpeta de Google Drive que se quiere comprobar: $FolderPath"
+    }
+
+    $token = [Guid]::NewGuid().ToString("N")
+    $createdPath = Join-Path $FolderPath ".am-clinica-write-test-$token.tmp"
+    $renamedPath = Join-Path $FolderPath ".am-clinica-write-test-$token.verified"
+    $expectedContent = "AM Clinica Exocad write test $token"
+
+    try {
+        Set-Content -LiteralPath $createdPath -Value $expectedContent -Encoding utf8 -NoNewline
+        if (-not (Test-Path -LiteralPath $createdPath)) {
+            throw "La unidad G no confirmó la creación del archivo temporal."
+        }
+
+        Move-Item -LiteralPath $createdPath -Destination $renamedPath
+        if (-not (Test-Path -LiteralPath $renamedPath)) {
+            throw "La unidad G no confirmó el cambio de nombre del archivo temporal."
+        }
+
+        $savedContent = Get-Content -LiteralPath $renamedPath -Raw
+        if ($savedContent -ne $expectedContent) {
+            throw "La unidad G devolvió un contenido diferente al que se guardó."
+        }
+
+        Remove-Item -LiteralPath $renamedPath -Force
+        if (Test-Path -LiteralPath $renamedPath) {
+            throw "La unidad G no confirmó la eliminación del archivo temporal."
+        }
+    } finally {
+        if (Test-Path -LiteralPath $createdPath) {
+            Remove-Item -LiteralPath $createdPath -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path -LiteralPath $renamedPath) {
+            Remove-Item -LiteralPath $renamedPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-LauncherLog "WRITE TEST PASSED: $FolderPath"
+}
+
 try {
     $protocolUrl = ($ProtocolUrlParts -join " ").Trim('"')
     if ([string]::IsNullOrWhiteSpace($protocolUrl)) {
@@ -235,6 +282,10 @@ try {
 
     $patientFolder = Get-DecodedQueryParam -Url $protocolUrl -Name "patientFolder"
     $relativePath = Get-DecodedQueryParam -Url $protocolUrl -Name "path"
+    $mode = Get-DecodedQueryParam -Url $protocolUrl -Name "mode"
+    if ([string]::IsNullOrWhiteSpace($mode)) {
+        $mode = "open"
+    }
     if ($null -eq $patientFolder) {
         throw "Falta el parámetro obligatorio patientFolder."
     }
@@ -273,6 +324,16 @@ try {
     }
 
     $targetItem = Get-Item -LiteralPath $targetPath
+    if ($mode -eq "check") {
+        $testFolder = if ($targetItem.PSIsContainer) { $targetItem.FullName } else { $targetItem.Directory.FullName }
+        Test-DriveFolderWriteAccess -FolderPath $testFolder
+        Show-LauncherMessage -Message "Prueba superada.`n`nEsta computadora pudo crear, renombrar, leer y eliminar un archivo temporal en la carpeta sincronizada de Google Drive.`n`nCarpeta comprobada:`n$testFolder" -Title "AM Clínica - Guardado disponible"
+        exit 0
+    }
+    if ($mode -ne "open") {
+        throw "Modo de apertura no reconocido: $mode"
+    }
+
     $isExocadProject = -not $targetItem.PSIsContainer -and $targetItem.Extension -match '^\.(project|projects|dentalproject)$'
     if (-not $isExocadProject) {
         Start-Process -FilePath $targetItem.FullName

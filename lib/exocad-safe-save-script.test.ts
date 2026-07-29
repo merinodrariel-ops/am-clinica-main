@@ -36,9 +36,19 @@ test('Exocad launcher keeps backups and rejects unsafe or unverifiable sessions'
 test('installer ships the matching safe-save launcher version and configuration defaults', async () => {
     const installer = await readFile(installerPath, 'utf8');
 
-    assert.match(installer, /launcherVersion = "2\.0\.0"/);
+    assert.match(installer, /launcherVersion = "2\.1\.0"/);
     assert.match(installer, /localWorkspaceRoot/);
     assert.match(installer, /backupRoot/);
     assert.match(installer, /syncGraceSeconds/);
     assert.match(installer, /Copy-Item -Path \$sourceScript -Destination \$targetScript -Force/);
+});
+
+test('launcher can verify Drive write access without opening or changing an Exocad project', async () => {
+    const script = await readFile(scriptPath, 'utf8');
+
+    assert.match(script, /Test-DriveFolderWriteAccess/);
+    assert.match(script, /Set-Content[\s\S]+Move-Item[\s\S]+Get-Content[\s\S]+Remove-Item/);
+    assert.match(script, /mode -eq "check"/);
+    assert.match(script, /Prueba superada/);
+    assert.match(script, /WRITE TEST PASSED/);
 });

@@ -13,6 +13,7 @@ import {
     updateFileContentInDrive,
     copyDriveFile,
     renameFileInDrive,
+    setExocadDisplayNameInDrive,
     createDriveFolder,
     getDriveClient,
     extractSlidesAsImages,
@@ -36,6 +37,25 @@ export async function renameDriveFileAction(
     } catch (error) {
         console.error('[renameDriveFileAction] Error:', error);
         return { success: false, error: 'Failed to rename file' };
+    }
+}
+
+export async function setExocadDisplayNameAction(
+    fileId: string,
+    displayName: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const roleCheck = await requireDriveManageRole('cambiar el nombre visible de proyectos Exocad');
+        if (roleCheck.error) return { success: false, error: roleCheck.error };
+
+        const cleanName = displayName.replace(/\s+/g, ' ').trim();
+        if (!cleanName) return { success: false, error: 'Escribí un nombre para identificar el proyecto' };
+        if (cleanName.length > 100) return { success: false, error: 'El nombre no puede superar 100 caracteres' };
+
+        return await setExocadDisplayNameInDrive(fileId, cleanName);
+    } catch (error) {
+        console.error('[setExocadDisplayNameAction] Error:', error);
+        return { success: false, error: 'No se pudo guardar el nombre visible' };
     }
 }
 
@@ -63,6 +83,7 @@ export interface DriveFile {
     imageHeight?: number;
     parentName?: string;
     relativePath?: string;
+    appProperties?: Record<string, string>;
 }
 
 export interface FolderWithFiles {

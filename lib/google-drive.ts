@@ -717,14 +717,14 @@ export async function ensurePatientPresentationFolder(
 /**
  * List files in any folder by its ID
  */
-export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string; modifiedTime?: string; thumbnailLink?: string; size?: string; imageWidth?: number; imageHeight?: number }[]; error?: string }> {
+export async function listFolderFiles(folderId: string): Promise<{ files?: { id: string; name: string; webViewLink: string; mimeType: string; createdTime: string; modifiedTime?: string; thumbnailLink?: string; size?: string; imageWidth?: number; imageHeight?: number; appProperties?: Record<string, string> }[]; error?: string }> {
     try {
         const drive = getDrive();
         const response = await drive.files.list({
             q: `'${folderId}' in parents and trashed=false`,
             includeItemsFromAllDrives: true,
             supportsAllDrives: true,
-            fields: 'files(id, name, webViewLink, mimeType, createdTime, modifiedTime, thumbnailLink, size, imageMediaMetadata(width,height))',
+            fields: 'files(id, name, webViewLink, mimeType, createdTime, modifiedTime, thumbnailLink, size, imageMediaMetadata(width,height), appProperties)',
             orderBy: 'createdTime asc',
         });
 
@@ -740,6 +740,7 @@ export async function listFolderFiles(folderId: string): Promise<{ files?: { id:
                 size: f.size || undefined,
                 imageWidth: f.imageMediaMetadata?.width ? Number(f.imageMediaMetadata.width) : undefined,
                 imageHeight: f.imageMediaMetadata?.height ? Number(f.imageMediaMetadata.height) : undefined,
+                appProperties: f.appProperties || undefined,
             })) || [],
         };
     } catch (error) {
@@ -938,6 +939,32 @@ export async function renameFileInDrive(
     return { success: true };
   } catch (error) {
     console.error('[Drive] Error renaming file:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Stores a clinic-facing Exocad name without changing the technical filename.
+ * Exocad project files can reference their original basename internally.
+ */
+export async function setExocadDisplayNameInDrive(
+  fileId: string,
+  displayName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const drive = getDrive();
+    await drive.files.update({
+      fileId,
+      supportsAllDrives: true,
+      requestBody: {
+        appProperties: {
+          amClinicExocadDisplayName: displayName,
+        },
+      },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('[Drive] Error saving Exocad display name:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

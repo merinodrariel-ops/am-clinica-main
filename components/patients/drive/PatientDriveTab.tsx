@@ -48,6 +48,7 @@ import {
 } from '@/app/actions/patient-files-drive';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
+import ExocadProjectCard from './ExocadProjectCard';
 import DrivePreviewModal from './DrivePreviewModal';
 import DriveUploadButton from './DriveUploadButton';
 import ShareWithPatientModal from './ShareWithPatientModal';
@@ -57,6 +58,7 @@ import { getPhotoTagsForPatientAction, type PhotoTag } from '@/app/actions/photo
 import { getContextMenuSelection, updatePhotoGridSelection } from '@/lib/drive-photo-grid-selection';
 import { toggle3DSelection, canOpenPair, resolveSelectionPair } from '@/lib/drive-3d-selection';
 import { uploadFilesToDrive } from '@/lib/drive-upload-files';
+import { buildExocadProjectPresentations } from '@/lib/exocad-project-presentation';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -908,6 +910,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         const timeB = new Date(b.modifiedTime || b.createdTime).getTime();
         return timeB - timeA;
     });
+    const exocadProjects = buildExocadProjectPresentations(files);
 
     return (
         <div className="flex gap-0 items-start">
@@ -1021,7 +1024,31 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                         )}
                                     </div>
 
-                                    {key === 'foto' && canManageDrive ? (
+                                    {key === 'exocad' ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                                            {exocadProjects.map(presentation => (
+                                                <ExocadProjectCard
+                                                    key={presentation.project.id}
+                                                    presentation={presentation}
+                                                    patientFolder={getFormattedFolderName(patientName)}
+                                                    canManage={canManageDrive}
+                                                    onDisplayNameSaved={(fileId, displayName) => {
+                                                        setFiles(currentFiles => currentFiles.map(file => (
+                                                            file.id === fileId
+                                                                ? {
+                                                                    ...file,
+                                                                    appProperties: {
+                                                                        ...(file.appProperties || {}),
+                                                                        amClinicExocadDisplayName: displayName,
+                                                                    },
+                                                                }
+                                                                : file
+                                                        )));
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : key === 'foto' && canManageDrive ? (
                                         <DndContext
                                             sensors={dndSensors}
                                             collisionDetection={closestCenter}
