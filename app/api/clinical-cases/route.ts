@@ -9,10 +9,19 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const ALLOWED_ROLES = new Set(['owner', 'admin', 'reception', 'marketing']);
-type Photo = { id: string; name: string; alt: string; caption?: string; createdTime?: string };
+type Photo = {
+    id: string;
+    name: string;
+    alt: string;
+    caption?: string;
+    altEn: string;
+    captionEn?: string;
+    createdTime?: string;
+};
 type Payload = {
     mode: 'create' | 'append'; caseId?: string; patientId: string;
     title: string; slug: string; description: string; photos: Photo[];
+    translation: { title: string; description: string };
 };
 
 async function publisher() {
@@ -76,8 +85,16 @@ export async function POST(request: NextRequest) {
     const actor = await publisher();
     if (!actor) return NextResponse.json({ error: 'Sin permiso para publicar casos' }, { status: 403 });
     const body = await request.json().catch(() => null) as Payload | null;
-    if (!body?.patientId || !body.title?.trim() || !body.description?.trim() || !body.photos?.length) {
-        return NextResponse.json({ error: 'Faltan título, descripción o fotos' }, { status: 400 });
+    if (
+        !body?.patientId
+        || !body.title?.trim()
+        || !body.description?.trim()
+        || !body.translation?.title?.trim()
+        || !body.translation?.description?.trim()
+        || !body.photos?.length
+        || body.photos.some(photo => !photo.altEn?.trim())
+    ) {
+        return NextResponse.json({ error: 'Faltan título, descripción, traducción al inglés o fotos' }, { status: 400 });
     }
     const admin = actor.admin;
     let caseId = body.caseId;
@@ -94,6 +111,16 @@ export async function POST(request: NextRequest) {
             source: 'app', patient_id: body.patientId, slug, status: 'draft',
             title: body.title.trim(), description: body.description.trim(),
             categories: ['Caso clínico'], copy: body.description.trim(),
+            translations: {
+                en: {
+                    title: body.translation.title.trim(),
+                    subtitle: body.translation.description.trim(),
+                    description: body.translation.description.trim(),
+                    copy: body.translation.description.trim(),
+                    categories: ['Clinical case'],
+                    duration: 'Clinical case',
+                },
+            },
             doctor_name: 'Dr. Ariel Merino', created_by: actor.user.id, updated_by: actor.user.id,
         }).select('id').single();
         if (error || !data) return NextResponse.json(
@@ -117,7 +144,14 @@ export async function POST(request: NextRequest) {
                 role: order === 0 ? 'cover' : 'other', cloudinary_public_id: result.public_id,
                 cloudinary_url: result.url, cloudinary_secure_url: result.secure_url,
                 public_url: result.secure_url, alt: photo.alt, caption: photo.caption || photo.alt,
-                metadata: { source: 'drive', clinic: 'AM Estética Dental' }, sort_order: order,
+                metadata: { source: 'drive', clinic: 'AM Estética Dental' },
+                translations: {
+                    en: {
+                        alt: photo.altEn.trim(),
+                        caption: (photo.captionEn || photo.altEn).trim(),
+                    },
+                },
+                sort_order: order,
             });
             if (error) throw error;
             order += 1;
@@ -132,6 +166,9 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({
         caseId, slug, uploaded: pending.length, skippedDuplicates: body.photos.length - pending.length,
-        publicUrl: `https://www.amesteticadental.com/casos/${slug}`,
+        publicUrl: 'https://www.amesteticadental.com/casos-antes-y-despues',
+        englishUrl: 'https://www.amesteticadental.com/en/before-after',
+        detailUrl: `https://www.amesteticadental.com/casos/${slug}`,
+        englishDetailUrl: `https://www.amesteticadental.com/en/cases/${slug}`,
     });
 }

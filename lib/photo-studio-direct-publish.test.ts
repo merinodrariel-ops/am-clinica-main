@@ -35,7 +35,7 @@ const publisherSource = readFileSync('components/patients/drive/PublicCasePublis
 
 test('the publisher opens the case-writing assistant before explicit publication', () => {
     assert.match(publisherSource, /fetch\('\/api\/clinical-cases\/assistant'/);
-    assert.match(publisherSource, /El asistente completa el borrador; nada se publica hasta que pulses Publicar ahora/);
+    assert.match(publisherSource, /El asistente completa español e inglés; nada se publica hasta que pulses Publicar ahora/);
     assert.match(publisherSource, /fetch\('\/api\/clinical-cases'/);
 });
 
@@ -46,4 +46,15 @@ test('the pre-publication dashboard supports ordered photos and Drive metadata s
     assert.match(publisherSource, /Mejorar metadata y renombrar en Drive/);
     assert.match(publisherSource, /renameDriveFileAction\(file\.id, newName\)/);
     assert.doesNotMatch(publisherSource, /Relato largo para repartir/);
+});
+
+test('case publication targets the bilingual before-after galleries', () => {
+    const routeSource = readFileSync('app/api/clinical-cases/route.ts', 'utf8');
+    const assistantSource = readFileSync('app/api/clinical-cases/assistant/route.ts', 'utf8');
+    assert.match(routeSource, /publicUrl: 'https:\/\/www\.amesteticadental\.com\/casos-antes-y-despues'/);
+    assert.match(routeSource, /englishUrl: 'https:\/\/www\.amesteticadental\.com\/en\/before-after'/);
+    assert.match(routeSource, /translations: \{/);
+    assert.match(assistantSource, /titleEn/);
+    assert.match(assistantSource, /photoDescriptionsEn/);
+    assert.match(publisherSource, /translation: \{ title: nextTitleEn, description: nextDescriptionEn \}/);
 });

@@ -26,6 +26,7 @@ Reglas obligatorias:
 - El título debe describir el tratamiento o transformación, nunca identificar al paciente.
 - La descripción general debe poder publicarse tal como está.
 - Generá una descripción específica por cada foto, respetando el orden y sin afirmar qué muestra una imagen si no surge del relato. Si falta contexto, describila de forma neutral.
+- Entregá también una versión en inglés natural, orientada a pacientes internacionales. Debe conservar exactamente los mismos hechos, sin agregar ni quitar información clínica.
 - Si faltan datos importantes, señalalo brevemente en assistantMessage, pero entregá igualmente el mejor borrador posible con lo confirmado.`;
 
 const PROPOSAL_TOOL: Anthropic.Tool = {
@@ -41,8 +42,22 @@ const PROPOSAL_TOOL: Anthropic.Tool = {
                 type: 'array',
                 items: { type: 'string' },
             },
+            titleEn: { type: 'string' },
+            descriptionEn: { type: 'string' },
+            photoDescriptionsEn: {
+                type: 'array',
+                items: { type: 'string' },
+            },
         },
-        required: ['assistantMessage', 'title', 'description', 'photoDescriptions'],
+        required: [
+            'assistantMessage',
+            'title',
+            'description',
+            'photoDescriptions',
+            'titleEn',
+            'descriptionEn',
+            'photoDescriptionsEn',
+        ],
     },
 };
 
@@ -108,6 +123,10 @@ export async function POST(request: Request) {
             ? input.photoDescriptions.map(value => String(value || '')).slice(0, photoNames.length)
             : [];
         while (descriptions.length < photoNames.length) descriptions.push('');
+        const descriptionsEn = Array.isArray(input.photoDescriptionsEn)
+            ? input.photoDescriptionsEn.map(value => String(value || '')).slice(0, photoNames.length)
+            : [];
+        while (descriptionsEn.length < photoNames.length) descriptionsEn.push('');
 
         return NextResponse.json({
             reply: String(input.assistantMessage || 'Preparé un borrador para que lo revises.'),
@@ -115,6 +134,9 @@ export async function POST(request: Request) {
                 title: String(input.title || '').trim(),
                 description: String(input.description || '').trim(),
                 photoDescriptions: descriptions,
+                titleEn: String(input.titleEn || '').trim(),
+                descriptionEn: String(input.descriptionEn || '').trim(),
+                photoDescriptionsEn: descriptionsEn,
             },
         });
     } catch (error) {

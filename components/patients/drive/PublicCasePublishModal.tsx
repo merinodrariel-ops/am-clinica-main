@@ -45,6 +45,9 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
     const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
     const [assistantInput, setAssistantInput] = useState('');
     const [assistantLoading, setAssistantLoading] = useState(false);
+    const [titleEn, setTitleEn] = useState('');
+    const [descriptionEn, setDescriptionEn] = useState('');
+    const [photoDescriptionsEn, setPhotoDescriptionsEn] = useState(() => currentFiles.map(() => ''));
     const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
     const [enhancingFileId, setEnhancingFileId] = useState<string | null>(null);
 
@@ -129,6 +132,10 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
 
         setCurrentFiles(nextFiles);
         setPhotoDescriptions(nextDescriptions);
+        const nextDescriptionsEn = [...photoDescriptionsEn];
+        const [movedDescriptionEn] = nextDescriptionsEn.splice(fromIndex, 1);
+        nextDescriptionsEn.splice(toIndex, 0, movedDescriptionEn);
+        setPhotoDescriptionsEn(nextDescriptionsEn);
         setDraggedFileId(null);
         setDraft(null);
     }
@@ -158,7 +165,8 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'No se pudo mejorar la descripción');
             const improved = String(result.proposal?.photoDescriptions?.[index] || '').trim();
-            if (!improved) throw new Error('El asistente no devolvió una descripción útil');
+            const improvedEn = String(result.proposal?.photoDescriptionsEn?.[index] || '').trim();
+            if (!improved || !improvedEn) throw new Error('El asistente no devolvió la metadata bilingüe completa');
 
             const newName = buildDrivePhotoFileName(index + 1, improved, file.name);
             const renameResult = await renameDriveFileAction(file.id, newName);
@@ -167,6 +175,7 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
             }
 
             setPhotoDescriptions(prev => prev.map((value, photoIndex) => photoIndex === index ? improved : value));
+            setPhotoDescriptionsEn(prev => prev.map((value, photoIndex) => photoIndex === index ? improvedEn : value));
             setCurrentFiles(prev => prev.map(item => item.id === file.id ? { ...item, name: newName } : item));
             setDraft(null);
             toast.success(`Foto ${index + 1}: metadata mejorada y nombre sincronizado con Drive`);
@@ -219,6 +228,11 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
             if (Array.isArray(result.proposal?.photoDescriptions)) {
                 setPhotoDescriptions(currentFiles.map((_, index) => result.proposal.photoDescriptions[index] || ''));
             }
+            if (result.proposal?.titleEn) setTitleEn(result.proposal.titleEn);
+            if (result.proposal?.descriptionEn) setDescriptionEn(result.proposal.descriptionEn);
+            if (Array.isArray(result.proposal?.photoDescriptionsEn)) {
+                setPhotoDescriptionsEn(currentFiles.map((_, index) => result.proposal.photoDescriptionsEn[index] || ''));
+            }
             setDraft(null);
             toast.success('Propuesta aplicada; revisala antes de publicar');
         } catch (error) {
@@ -242,6 +256,43 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
         }
         setPublishing(true);
         try {
+            let nextTitleEn = titleEn.trim();
+            let nextDescriptionEn = descriptionEn.trim();
+            let nextPhotoDescriptionsEn = photoDescriptionsEn;
+            if (
+                !nextTitleEn
+                || !nextDescriptionEn
+                || currentFiles.some((_, index) => !nextPhotoDescriptionsEn[index]?.trim())
+            ) {
+                const translationResponse = await fetch('/api/clinical-cases/assistant', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [{
+                            role: 'user',
+                            content: 'Prepará la versión final bilingüe de este caso. Conservá literalmente los hechos confirmados y completá todos los textos y metadatos en inglés antes de publicar.',
+                        }],
+                        photoNames: currentFiles.map(file => file.name),
+                        draft: { title, description: caseDescription, photoDescriptions },
+                    }),
+                });
+                const translationResult = await translationResponse.json();
+                if (!translationResponse.ok) {
+                    throw new Error(translationResult.error || 'No se pudo preparar la versión en inglés');
+                }
+                nextTitleEn = String(translationResult.proposal?.titleEn || '').trim();
+                nextDescriptionEn = String(translationResult.proposal?.descriptionEn || '').trim();
+                nextPhotoDescriptionsEn = currentFiles.map(
+                    (_, index) => String(translationResult.proposal?.photoDescriptionsEn?.[index] || '').trim()
+                );
+                if (!nextTitleEn || !nextDescriptionEn || nextPhotoDescriptionsEn.some(value => !value)) {
+                    throw new Error('La traducción al inglés quedó incompleta; no se publicó el caso');
+                }
+                setTitleEn(nextTitleEn);
+                setDescriptionEn(nextDescriptionEn);
+                setPhotoDescriptionsEn(nextPhotoDescriptionsEn);
+            }
+
             const response = await fetch('/api/clinical-cases', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -249,10 +300,13 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
                     mode, caseId: mode === 'append' ? caseId : undefined, patientId,
                     title, slug: mode === 'append' ? existingSlug : slug,
                     description: caseDescription,
+                    translation: { title: nextTitleEn, description: nextDescriptionEn },
                     photos: currentFiles.map((file, index) => ({
                         id: file.id, name: file.name, createdTime: file.createdTime,
                         alt: photoDescriptions[index]?.trim() || `${title} - foto ${index + 1}`,
                         caption: photoDescriptions[index]?.trim() || undefined,
+                        altEn: nextPhotoDescriptionsEn[index],
+                        captionEn: nextPhotoDescriptionsEn[index],
                     })),
                 }),
             });
@@ -273,8 +327,11 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
                 <div className="p-6 text-center">
                     <Check size={34} className="mx-auto text-emerald-400" />
                     <p className="mt-3 text-sm text-slate-300">Las fotos quedaron cargadas directamente en la web.</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                        El caso aparece en Antes y después, tanto en español como en inglés.
+                    </p>
                     <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#C9A96E] px-4 py-2 text-sm font-bold text-black">
-                        Ver caso publicado <ExternalLink size={15} />
+                        Ver Antes y después <ExternalLink size={15} />
                     </a>
                 </div>
             </Modal>
@@ -342,7 +399,7 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
                         </button>
                     </div>
                     <p className="mt-2 text-[11px] text-slate-500">
-                        El asistente completa el borrador; nada se publica hasta que pulses Publicar ahora.
+                        El asistente completa español e inglés; nada se publica hasta que pulses Publicar ahora.
                     </p>
                 </section>
 
