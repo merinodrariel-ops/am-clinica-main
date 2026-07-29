@@ -63,3 +63,12 @@ export function formatDateForLocale(
 
     return date.toLocaleDateString(locale, options);
 }
+
+export function formatCalendarDateForLocale(
+    value?: string | null,
+    locale: string = 'es-AR',
+    options?: Intl.DateTimeFormatOptions
+): string {
+    const calendarDate = value?.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? value;
+    return formatDateForLocale(calendarDate, locale, options);
+}

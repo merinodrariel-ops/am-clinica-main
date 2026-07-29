@@ -42,7 +42,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
 import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
-import { formatDateForLocale } from '@/lib/local-date';
+import { formatCalendarDateForLocale, formatDateForLocale } from '@/lib/local-date';
 import { updatePatientAction } from '@/app/actions/patients';
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
 import type { PlanFinanciacion } from '@/lib/financiacion';
@@ -501,7 +501,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             <div>
                                                 <p className="font-medium">{entry.profesional}</p>
                                                 <p className="text-sm text-gray-500">
-                                                    {formatDateForLocale(entry.fecha, 'es-AR', {
+                                                    {formatCalendarDateForLocale(entry.fecha, 'es-AR', {
                                                         day: 'numeric',
                                                         month: 'long',
                                                         year: 'numeric'
@@ -510,7 +510,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                             </div>
                                             {entry.proximo_control && (
                                                 <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
-                                                    Próx: {formatDateForLocale(entry.proximo_control)}
+                                                    Próx: {formatCalendarDateForLocale(entry.proximo_control)}
                                                 </span>
                                             )}
                                         </div>
