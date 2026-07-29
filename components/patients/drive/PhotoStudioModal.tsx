@@ -15,7 +15,7 @@ import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
-import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, deleteDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction } from '@/app/actions/patient-files-drive';
+import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, deleteDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction, syncEditedPhotosToSelectionAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import FabricCanvasStage from './FabricCanvasStage';
@@ -47,6 +47,7 @@ import {
     updateCanvasDocumentSelection,
 } from '@/lib/photo-studio/canvas-selection';
 import { buildDriveImageInfoTitle } from '@/lib/photo-studio/drive-image-info';
+import { getPendingEditedPhotoIds } from '@/lib/photo-studio-selection-reconciliation';
 import { mapCanvasLayerPointToPixel } from '@/lib/photo-studio/canvas-layer-point';
 import ShareWithPatientModal, { type ShareWithPatientItem } from './ShareWithPatientModal';
 import PublicCasePublishModal from './PublicCasePublishModal';
@@ -1489,6 +1490,35 @@ export default function PhotoStudioModal({
         () => imageFiles.filter(item => editedFileIds.has(item.id) || item.name.toLowerCase().includes('_editada')),
         [editedFileIds, imageFiles],
     );
+    const legacySelectionSyncKeyRef = useRef('');
+
+    // Older Photo Studio versions remembered edited outputs locally but did not
+    // always move their Drive files into Selección. Reconcile only those
+    // explicitly marked IDs; never infer edits from every image in the patient.
+    useEffect(() => {
+        if (!folderId || editedFileIds.size === 0) return;
+
+        const pendingFileIds = getPendingEditedPhotoIds(baseImageFiles, editedFileIds);
+        if (pendingFileIds.length === 0) return;
+
+        const syncKey = `${folderId}:${pendingFileIds.join(',')}`;
+        if (legacySelectionSyncKeyRef.current === syncKey) return;
+        legacySelectionSyncKeyRef.current = syncKey;
+
+        void syncEditedPhotosToSelectionAction(folderId, pendingFileIds).then(result => {
+            if (result.error) {
+                toast.error(`No se pudo actualizar la Selección: ${result.error}`);
+                return;
+            }
+            if (result.failed.length > 0) {
+                toast.warning(`${result.failed.length} foto(s) editada(s) no pudieron pasar a Selección`);
+            }
+            if (result.moved.length > 0) {
+                toast.success(`${result.moved.length} foto(s) editada(s) recuperada(s) en Selección`);
+                onSaved({ silent: true });
+            }
+        });
+    }, [baseImageFiles, editedFileIds, folderId, onSaved]);
 
     // Prefetch neighboring photos so arrow-key navigation feels instant.
     // Warms the small placeholder for a ±2 window (cheap) and the full-res original
@@ -1976,6 +2006,14 @@ export default function PhotoStudioModal({
     async function handleSwitchFile(newFile: DriveFile) {
         if (newFile.id === activeFile?.id) {
             setCanvasActive(false);
+            return;
+        }
+        if (isDirty && activeFile) {
+            const cleanPatientName = patientName.replace(/\s+/g, '_');
+            const baseName = activeFile.name.replace(/\.[^.]+$/, '');
+            setExportFileName(`${cleanPatientName}_${baseName}_editada`);
+            setSaveDialogOpen(true);
+            toast.info('Guardá la foto editada en Selección antes de cambiar a otra');
             return;
         }
         setCanvasActive(false);
@@ -5762,7 +5800,14 @@ export default function PhotoStudioModal({
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
                     <button
                         onClick={async () => {
-                            if (isDirty && !confirm('Tenés cambios sin guardar. ¿Salir de todas formas?')) return;
+                            if (isDirty && activeFile) {
+                                const cleanPatientName = patientName.replace(/\s+/g, '_');
+                                const baseName = activeFile.name.replace(/\.[^.]+$/, '');
+                                setExportFileName(`${cleanPatientName}_${baseName}_editada`);
+                                setSaveDialogOpen(true);
+                                toast.info('Guardá la foto editada en Selección antes de volver');
+                                return;
+                            }
                             await flushPhotoStateSave();
                             if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
                                 setCanvasSaving(true);

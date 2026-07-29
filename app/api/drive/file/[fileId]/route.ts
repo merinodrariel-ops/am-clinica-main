@@ -70,6 +70,18 @@ export async function GET(
             : 'public, max-age=600, s-maxage=604800, stale-while-revalidate=86400');
         // Allow canvas drawImage() without tainting (needed for PhotoStudio export)
         headers.set('Access-Control-Allow-Origin', '*');
+        if (mimeType === 'text/html') {
+            // Exocad exports are interactive documents supplied from Drive.
+            // They may run their viewer scripts in a new tab, but the CSP
+            // sandbox prevents them from inheriting the authenticated clinic
+            // origin or navigating the opener.
+            headers.set('Content-Type', 'text/html; charset=utf-8');
+            headers.set(
+                'Content-Security-Policy',
+                "sandbox allow-scripts allow-downloads allow-pointer-lock; default-src 'self' data: blob: https:; script-src 'unsafe-inline' 'unsafe-eval' data: blob: https:; style-src 'unsafe-inline' data: blob: https:; img-src data: blob: https:; connect-src data: blob: https:"
+            );
+            headers.set('Content-Disposition', 'inline');
+        }
 
         return new Response(stream, { headers });
     } catch (error) {

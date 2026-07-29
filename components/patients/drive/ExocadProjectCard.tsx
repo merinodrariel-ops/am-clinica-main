@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { Edit3, Eye, FileCode2, Loader2, Play, Save, ShieldCheck, X } from 'lucide-react';
+import { Edit3, Eye, FileCode2, Loader2, Play, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { setExocadDisplayNameAction } from '@/app/actions/patient-files-drive';
 import type { ExocadProjectPresentation } from '@/lib/exocad-project-presentation';
@@ -34,7 +33,6 @@ export default function ExocadProjectCard({
     const [editing, setEditing] = useState(false);
     const [draftName, setDraftName] = useState(displayName);
     const [saving, setSaving] = useState(false);
-    const [showHtmlPreview, setShowHtmlPreview] = useState(false);
     const imageUrl = imagePreview
         ? `/api/drive/file/${imagePreview.id}?v=${encodeURIComponent(imagePreview.modifiedTime || imagePreview.createdTime)}`
         : '';
@@ -156,13 +154,15 @@ export default function ExocadProjectCard({
 
                     <div className="grid grid-cols-2 gap-2">
                         {htmlPreview ? (
-                            <button
-                                onClick={() => setShowHtmlPreview(true)}
+                            <a
+                                href={`/api/drive/file/${htmlPreview.id}?v=${encodeURIComponent(htmlPreview.modifiedTime || htmlPreview.createdTime)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 py-2 text-[11px] font-semibold text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400"
                             >
                                 <Eye size={13} />
                                 Ver HTML 3D
-                            </button>
+                            </a>
                         ) : (
                             <div className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-[11px] text-slate-400 dark:border-white/10">
                                 <Eye size={13} />
@@ -193,32 +193,6 @@ export default function ExocadProjectCard({
                 </div>
             </article>
 
-            {showHtmlPreview && htmlPreview && typeof document !== 'undefined' && createPortal(
-                <div className="fixed inset-0 z-[100] flex flex-col bg-slate-950/95 backdrop-blur-md">
-                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                        <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-white">{displayName}</p>
-                            <p className="text-xs text-white/45">Vista 3D HTML · solo lectura</p>
-                        </div>
-                        <button
-                            onClick={() => setShowHtmlPreview(false)}
-                            className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/15"
-                            aria-label="Cerrar preview HTML"
-                        >
-                            <X size={18} />
-                        </button>
-                    </div>
-                    <div className="flex-1 p-2 sm:p-4">
-                        <iframe
-                            src={`/api/drive/file/${htmlPreview.id}?v=${encodeURIComponent(htmlPreview.modifiedTime || htmlPreview.createdTime)}`}
-                            title={`Preview 3D de ${displayName}`}
-                            sandbox="allow-scripts allow-downloads allow-pointer-lock"
-                            className="h-full w-full rounded-xl bg-white"
-                        />
-                    </div>
-                </div>,
-                document.body
-            )}
         </>
     );
 }

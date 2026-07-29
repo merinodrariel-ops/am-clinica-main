@@ -159,6 +159,39 @@ async function moveFileToSelectionFolder(
     return {};
 }
 
+async function isDriveFileInsideFolder(
+    drive: ReturnType<typeof getDriveClient>,
+    fileId: string,
+    expectedAncestorFolderId: string
+): Promise<boolean> {
+    let currentIds = [fileId];
+    const visited = new Set<string>();
+
+    for (let depth = 0; depth < 5 && currentIds.length > 0; depth += 1) {
+        const nextParentIds = new Set<string>();
+
+        for (const currentId of currentIds) {
+            if (currentId === expectedAncestorFolderId) return true;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+
+            const metadata = await drive.files.get({
+                fileId: currentId,
+                fields: 'parents',
+                supportsAllDrives: true,
+            });
+            for (const parentId of metadata.data.parents || []) {
+                if (parentId === expectedAncestorFolderId) return true;
+                if (!visited.has(parentId)) nextParentIds.add(parentId);
+            }
+        }
+
+        currentIds = [...nextParentIds];
+    }
+
+    return false;
+}
+
 function getFolderDisplayName(folderName: string): string {
     // New convention: "[PRESENTACION] APELLIDO, Nombre" → "PRESENTACION"
     const bracketMatch = folderName.match(/^\[(.+?)\]/);
@@ -605,6 +638,51 @@ export async function replaceEditedPhotoAction(
         return {};
     } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * Repairs legacy Photo Studio outputs that were marked as edited locally but
+ * remained in the general photo folder. Only explicit file IDs supplied by the
+ * authenticated editor are moved.
+ */
+export async function syncEditedPhotosToSelectionAction(
+    patientFolderId: string,
+    fileIds: string[]
+): Promise<{ moved: string[]; failed: Array<{ fileId: string; error: string }>; error?: string }> {
+    const emptyResult = { moved: [], failed: [] as Array<{ fileId: string; error: string }> };
+
+    try {
+        const roleCheck = await requireDriveManageRole('reconciliar fotos editadas con Selección');
+        if (roleCheck.error) return { ...emptyResult, error: roleCheck.error };
+        if (!DRIVE_ID_RE.test(patientFolderId)) return { ...emptyResult, error: 'Carpeta del paciente inválida' };
+
+        const uniqueFileIds = [...new Set(fileIds)].slice(0, 100);
+        if (uniqueFileIds.some(fileId => !DRIVE_ID_RE.test(fileId))) {
+            return { ...emptyResult, error: 'Hay archivos editados con un identificador inválido' };
+        }
+
+        const drive = getDriveClient();
+        const moved: string[] = [];
+        const failed: Array<{ fileId: string; error: string }> = [];
+
+        for (const fileId of uniqueFileIds) {
+            const belongsToPatient = await isDriveFileInsideFolder(drive, fileId, patientFolderId);
+            if (!belongsToPatient) {
+                failed.push({ fileId, error: 'El archivo no pertenece a la carpeta de este paciente' });
+                continue;
+            }
+            const result = await moveFileToSelectionFolder(drive, fileId, patientFolderId);
+            if (result.error) failed.push({ fileId, error: result.error });
+            else moved.push(fileId);
+        }
+
+        return { moved, failed };
+    } catch (error) {
+        return {
+            ...emptyResult,
+            error: error instanceof Error ? error.message : String(error),
+        };
     }
 }
 
