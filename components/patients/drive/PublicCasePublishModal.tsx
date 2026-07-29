@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Clipboard, CloudUpload, ExternalLink, FileText, Loader2, Send, Sparkles, Wand2, X } from 'lucide-react';
+import { Check, Clipboard, CloudUpload, ExternalLink, FileText, GripVertical, Loader2, Send, Sparkles, Wand2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { renameDriveFileAction } from '@/app/actions/patient-files-drive';
 import Modal from '@/components/ui/Modal';
@@ -11,7 +11,6 @@ import {
     buildDrivePhotoFileName,
     buildPublicCaseDraft,
     slugifyCaseTitle,
-    splitLongPhotoDescription,
     type PublicCaseDraft,
 } from '@/lib/public-case-draft';
 
@@ -33,7 +32,6 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
     const [currentFiles, setCurrentFiles] = useState(files);
     const [title, setTitle] = useState(defaultCaseTitle(patientName));
     const [caseDescription, setCaseDescription] = useState('');
-    const [longDescription, setLongDescription] = useState('');
     const [photoDescriptions, setPhotoDescriptions] = useState(() => currentFiles.map(() => ''));
     const [draft, setDraft] = useState<PublicCaseDraft | null>(null);
     const [renamingDriveFiles, setRenamingDriveFiles] = useState(false);
@@ -47,6 +45,8 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
     const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
     const [assistantInput, setAssistantInput] = useState('');
     const [assistantLoading, setAssistantLoading] = useState(false);
+    const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
+    const [enhancingFileId, setEnhancingFileId] = useState<string | null>(null);
 
     useEffect(() => {
         fetch('/api/clinical-cases')
@@ -67,19 +67,6 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
     function updatePhotoDescription(index: number, value: string) {
         setPhotoDescriptions(prev => prev.map((current, i) => i === index ? value : current));
         setDraft(null);
-    }
-
-    function applyLongDescription() {
-        const parsed = splitLongPhotoDescription(longDescription, currentFiles.length);
-        const parsedCount = parsed.filter(Boolean).length;
-        if (parsedCount === 0) {
-            toast.error('No encontré referencias tipo "foto 1", "foto 2" en el texto.');
-            return;
-        }
-
-        setPhotoDescriptions(prev => prev.map((current, index) => parsed[index] || current));
-        setDraft(null);
-        toast.success(`${parsedCount} descripción${parsedCount !== 1 ? 'es' : ''} aplicada${parsedCount !== 1 ? 's' : ''}`);
     }
 
     function prepareDraft() {
@@ -125,6 +112,69 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
         setDraft(null);
         setRenamingDriveFiles(false);
         toast.success(`${renamed.length} foto${renamed.length !== 1 ? 's renombradas' : ' renombrada'} en Drive`);
+    }
+
+    function reorderPhotos(targetFileId: string) {
+        if (!draggedFileId || draggedFileId === targetFileId) return;
+        const fromIndex = currentFiles.findIndex(file => file.id === draggedFileId);
+        const toIndex = currentFiles.findIndex(file => file.id === targetFileId);
+        if (fromIndex < 0 || toIndex < 0) return;
+
+        const nextFiles = [...currentFiles];
+        const [movedFile] = nextFiles.splice(fromIndex, 1);
+        nextFiles.splice(toIndex, 0, movedFile);
+        const nextDescriptions = [...photoDescriptions];
+        const [movedDescription] = nextDescriptions.splice(fromIndex, 1);
+        nextDescriptions.splice(toIndex, 0, movedDescription);
+
+        setCurrentFiles(nextFiles);
+        setPhotoDescriptions(nextDescriptions);
+        setDraggedFileId(null);
+        setDraft(null);
+    }
+
+    async function enhancePhotoMetadata(index: number) {
+        const file = currentFiles[index];
+        const description = photoDescriptions[index]?.trim();
+        if (!file || !description || enhancingFileId) {
+            if (!description) toast.error('Primero describí qué muestra esta foto');
+            return;
+        }
+
+        setEnhancingFileId(file.id);
+        try {
+            const response = await fetch('/api/clinical-cases/assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [{
+                        role: 'user',
+                        content: `Mejorá únicamente la descripción de la foto ${index + 1} para usarla como metadata pública (alt y caption). Conservá estrictamente los hechos que escribí y no modifiques las demás fotos: ${description}`,
+                    }],
+                    photoNames: currentFiles.map(item => item.name),
+                    draft: { title, description: caseDescription, photoDescriptions },
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'No se pudo mejorar la descripción');
+            const improved = String(result.proposal?.photoDescriptions?.[index] || '').trim();
+            if (!improved) throw new Error('El asistente no devolvió una descripción útil');
+
+            const newName = buildDrivePhotoFileName(index + 1, improved, file.name);
+            const renameResult = await renameDriveFileAction(file.id, newName);
+            if (renameResult.error || !renameResult.success) {
+                throw new Error(renameResult.error || 'No se pudo renombrar el archivo en Drive');
+            }
+
+            setPhotoDescriptions(prev => prev.map((value, photoIndex) => photoIndex === index ? improved : value));
+            setCurrentFiles(prev => prev.map(item => item.id === file.id ? { ...item, name: newName } : item));
+            setDraft(null);
+            toast.success(`Foto ${index + 1}: metadata mejorada y nombre sincronizado con Drive`);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo mejorar la metadata');
+        } finally {
+            setEnhancingFileId(null);
+        }
     }
 
     async function copyDraft() {
@@ -296,6 +346,48 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
                     </p>
                 </section>
 
+                <section className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
+                    <div className="mb-3">
+                        <p className="text-sm font-semibold text-white">Orden de publicación</p>
+                        <p className="text-xs text-slate-400">
+                            Arrastrá las fotos. De izquierda a derecha queda definido el orden 1, 2, 3… que verá la web.
+                        </p>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                        {currentFiles.map((file, index) => (
+                            <div
+                                key={`order-${file.id}`}
+                                draggable
+                                onDragStart={() => setDraggedFileId(file.id)}
+                                onDragEnd={() => setDraggedFileId(null)}
+                                onDragOver={event => event.preventDefault()}
+                                onDrop={() => reorderPhotos(file.id)}
+                                className={`relative w-24 shrink-0 cursor-grab rounded-xl border p-2 active:cursor-grabbing ${
+                                    draggedFileId === file.id
+                                        ? 'border-[#C9A96E] bg-[#C9A96E]/10 opacity-60'
+                                        : 'border-white/10 bg-white/[0.04]'
+                                }`}
+                            >
+                                <div className="relative aspect-square overflow-hidden rounded-lg bg-slate-900">
+                                    <img
+                                        src={`/api/drive/thumbnail/${encodeURIComponent(file.id)}?s=240${file.modifiedTime ? `&v=${encodeURIComponent(file.modifiedTime)}` : ''}`}
+                                        alt=""
+                                        draggable={false}
+                                        className="h-full w-full object-cover"
+                                    />
+                                    <span className="absolute left-1 top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-[#C9A96E] px-1 text-xs font-black text-black">
+                                        {index + 1}
+                                    </span>
+                                    <GripVertical size={15} className="absolute bottom-1 right-1 rounded bg-black/70 p-0.5 text-white" />
+                                </div>
+                                <p className="mt-1 truncate text-center text-[10px] text-slate-400" title={file.name}>
+                                    {file.name}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                     <section className="space-y-3">
                         <div className="grid grid-cols-2 gap-2">
@@ -343,28 +435,6 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
                                 onChange={event => { setCaseDescription(event.target.value); setDraft(null); }}
                                 rows={5}
                                 placeholder="Ej: Gingivectomía láser + limpieza + microdiseño de sonrisa en resina. Cambios principales, técnica, tiempos y lectura clínica del antes/después."
-                            />
-                        </div>
-
-                        <div>
-                            <div className="mb-1 flex items-center justify-between gap-2">
-                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400">
-                                    Relato largo para repartir
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={applyLongDescription}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
-                                >
-                                    <Wand2 size={13} />
-                                    Repartir
-                                </button>
-                            </div>
-                            <Textarea
-                                value={longDescription}
-                                onChange={event => setLongDescription(event.target.value)}
-                                rows={7}
-                                placeholder='Pegá texto libre: "La foto 1 es..., la foto 2 es..., la foto doce es..."'
                             />
                         </div>
 
@@ -450,6 +520,19 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
                                             rows={3}
                                             placeholder={`Descripción clínica de la foto ${index + 1}`}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => void enhancePhotoMetadata(index)}
+                                            disabled={!photoDescriptions[index]?.trim() || enhancingFileId !== null}
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-500/20 px-2.5 py-1.5 text-xs font-semibold text-violet-200 hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            {enhancingFileId === file.id
+                                                ? <Loader2 size={13} className="animate-spin" />
+                                                : <Wand2 size={13} />}
+                                            {enhancingFileId === file.id
+                                                ? 'Mejorando y sincronizando…'
+                                                : 'Mejorar metadata y renombrar en Drive'}
+                                        </button>
                                     </div>
                                 </div>
                             ))}

@@ -38,3 +38,12 @@ test('the publisher opens the case-writing assistant before explicit publication
     assert.match(publisherSource, /El asistente completa el borrador; nada se publica hasta que pulses Publicar ahora/);
     assert.match(publisherSource, /fetch\('\/api\/clinical-cases'/);
 });
+
+test('the pre-publication dashboard supports ordered photos and Drive metadata sync', () => {
+    assert.match(publisherSource, /Orden de publicación/);
+    assert.match(publisherSource, /draggable/);
+    assert.match(publisherSource, /onDrop=\{\(\) => reorderPhotos\(file\.id\)\}/);
+    assert.match(publisherSource, /Mejorar metadata y renombrar en Drive/);
+    assert.match(publisherSource, /renameDriveFileAction\(file\.id, newName\)/);
+    assert.doesNotMatch(publisherSource, /Relato largo para repartir/);
+});
