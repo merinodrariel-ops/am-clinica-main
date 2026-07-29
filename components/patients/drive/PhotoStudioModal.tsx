@@ -1075,7 +1075,17 @@ export default function PhotoStudioModal({
 
     // Edit state
     const [rotation, setRotation] = useState(0);
-    const [brightness, setBrightness] = useState(100);
+    const [brightness, setBrightnessState] = useState(100);
+    const setBrightness = useCallback((value: number | ((previous: number) => number)) => {
+        const nextBrightness = typeof value === 'function'
+            ? value(latestPhotoStateRef.current.brightness)
+            : value;
+        latestPhotoStateRef.current = {
+            ...latestPhotoStateRef.current,
+            brightness: nextBrightness,
+        };
+        setBrightnessState(nextBrightness);
+    }, []);
     const [bgProcessing, setBgProcessing] = useState(false);
     const [bgDone, setBgDone] = useState(false);
     const [subjectTransformOpen, setSubjectTransformOpen] = useState(false);
