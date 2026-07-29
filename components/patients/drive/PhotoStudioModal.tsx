@@ -7480,7 +7480,14 @@ export default function PhotoStudioModal({
                                 type="range" min={0} max={200} step={1}
                                 value={brightness}
                                 onPointerDown={() => pushHistory()}
-                                onChange={e => setBrightness(Number(e.target.value))}
+                                onChange={e => {
+                                    const nextBrightness = Number(e.target.value);
+                                    latestPhotoStateRef.current = {
+                                        ...latestPhotoStateRef.current,
+                                        brightness: nextBrightness,
+                                    };
+                                    setBrightness(nextBrightness);
+                                }}
                                 className="w-20 accent-yellow-400"
                             />
                         </div>
