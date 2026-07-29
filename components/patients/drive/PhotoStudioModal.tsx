@@ -1616,6 +1616,8 @@ export default function PhotoStudioModal({
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [multiSelectMode, setMultiSelectMode] = useState(false);
     const [showCasePublishModal, setShowCasePublishModal] = useState(false);
+    const [publicCaseFiles, setPublicCaseFiles] = useState<DriveFile[]>([]);
+    const [preparingCasePublish, setPreparingCasePublish] = useState(false);
     const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
     const [sharePatientItems, setSharePatientItems] = useState<ShareWithPatientItem[] | null>(null);
     const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -1653,7 +1655,6 @@ export default function PhotoStudioModal({
         const top = Math.max(PADDING, Math.min(preferredTop, window.innerHeight - MENU_HEIGHT - PADDING));
 
         setMenuView('main');
-        setSelectedCanvasIds([]);
         setThumbnailContextMenu({
             x: left,
             y: top,
@@ -2052,7 +2053,6 @@ export default function PhotoStudioModal({
     }
 
     function handleThumbnailSelect(file: DriveFile, e: React.MouseEvent<HTMLButtonElement>) {
-        setSelectedCanvasIds([]);
         const wantsMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey || multiSelectMode;
 
         if (!wantsMultiSelect) {
@@ -3691,7 +3691,6 @@ export default function PhotoStudioModal({
         });
         setSelectedCanvasIds(nextSelection);
         setCanvasSelectionAnchorId(canvasId);
-        clearMultiSelection();
         if (!additive || nextSelection.includes(canvasId)) handleActivateCanvas(canvasId);
     }
 
@@ -3706,8 +3705,62 @@ export default function PhotoStudioModal({
         setSelectedCanvasIds(targetIds);
         setCanvasSelectionAnchorId(canvasId);
         setCanvasThumbnailContextMenu({ x, y, targetIds });
-        clearMultiSelection();
         handleActivateCanvas(canvasId);
+    }
+
+    async function handlePrepareMixedCasePublish() {
+        if (preparingCasePublish) return;
+        const selectedPhotos = imageFiles.filter(item => selectedIds.has(item.id));
+        const selectedCanvases = canvases.filter(canvas => selectedCanvasIds.includes(canvas.id));
+        if (selectedPhotos.length + selectedCanvases.length === 0) return;
+
+        setPreparingCasePublish(true);
+        try {
+            const canvasFiles: DriveFile[] = [];
+            for (const canvasDocument of selectedCanvases) {
+                const blob = await exportCanvasDocumentToBlob(
+                    canvasDocument,
+                    canvasDocument.id === activeCanvasId,
+                );
+                const optimizedBlob = await shrinkBlobForUpload(blob);
+                const extension = optimizedBlob.type === 'image/png' ? 'png' : 'jpg';
+                const safeName = canvasDocument.name.trim()
+                    .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]+/g, '_') || 'lienzo';
+                const fileName = `${safeName}.${extension}`;
+                const formData = new FormData();
+                formData.append('file', optimizedBlob, fileName);
+                const result = await uploadPhotoForSocialAction(folderId, fileName, formData);
+                if (result.error || !result.fileId) {
+                    throw new Error(result.error || `No se pudo preparar ${canvasDocument.name}`);
+                }
+                const now = new Date().toISOString();
+                canvasFiles.push({
+                    id: result.fileId,
+                    name: fileName,
+                    mimeType: optimizedBlob.type,
+                    webViewLink: '',
+                    createdTime: now,
+                    modifiedTime: now,
+                    thumbnailLink: 'drive',
+                    parentName: 'Selección',
+                });
+            }
+
+            setPublicCaseFiles([...selectedPhotos, ...canvasFiles]);
+            setShowCasePublishModal(true);
+            if (canvasFiles.length > 0) {
+                onSaved({ silent: true });
+                toast.success(
+                    canvasFiles.length === 1
+                        ? 'Lienzo preparado para publicar; el proyecto editable se conserva'
+                        : `${canvasFiles.length} lienzos preparados; los proyectos editables se conservan`
+                );
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'No se pudo preparar la selección para publicar');
+        } finally {
+            setPreparingCasePublish(false);
+        }
     }
 
     async function handleDuplicateCanvasDocuments(targetIds: string[]) {
@@ -5922,13 +5975,18 @@ export default function PhotoStudioModal({
                                 </button>
                             </div>
                         )}
-                        {selectedIds.size > 0 && (
+                        {selectedIds.size + selectedCanvasIds.length > 0 && (
                             <button
-                                onClick={() => setShowCasePublishModal(true)}
+                                onClick={() => void handlePrepareMixedCasePublish()}
+                                disabled={preparingCasePublish}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/80 text-white text-sm font-semibold hover:bg-blue-600 transition-colors"
                             >
-                                <Globe2 size={14} />
-                                <span className="hidden sm:inline">Publicar web ({selectedIds.size})</span>
+                                {preparingCasePublish ? <Loader2 size={14} className="animate-spin" /> : <Globe2 size={14} />}
+                                <span className="hidden sm:inline">
+                                    {preparingCasePublish
+                                        ? 'Preparando…'
+                                        : `Publicar web (${selectedIds.size + selectedCanvasIds.length})`}
+                                </span>
                             </button>
                         )}
                         {imageFiles.length > 1 && (
@@ -7448,8 +7506,11 @@ export default function PhotoStudioModal({
             <PublicCasePublishModal
                 patientId={patientId}
                 patientName={patientName}
-                files={imageFiles.filter(item => selectedIds.has(item.id))}
-                onClose={() => setShowCasePublishModal(false)}
+                files={publicCaseFiles}
+                onClose={() => {
+                    setShowCasePublishModal(false);
+                    setPublicCaseFiles([]);
+                }}
             />
         )}
 

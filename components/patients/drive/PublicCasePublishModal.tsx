@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Clipboard, CloudUpload, ExternalLink, FileText, Loader2, Wand2, X } from 'lucide-react';
+import { Check, Clipboard, CloudUpload, ExternalLink, FileText, Loader2, Send, Sparkles, Wand2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { renameDriveFileAction } from '@/app/actions/patient-files-drive';
 import Modal from '@/components/ui/Modal';
@@ -21,6 +21,8 @@ interface PublicCasePublishModalProps {
     patientName: string;
     onClose: () => void;
 }
+
+type AssistantMessage = { role: 'user' | 'assistant'; content: string };
 
 function defaultCaseTitle(patientName: string) {
     void patientName;
@@ -42,6 +44,9 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
     const [caseId, setCaseId] = useState('');
     const [publishing, setPublishing] = useState(false);
     const [publishedUrl, setPublishedUrl] = useState('');
+    const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+    const [assistantInput, setAssistantInput] = useState('');
+    const [assistantLoading, setAssistantLoading] = useState(false);
 
     useEffect(() => {
         fetch('/api/clinical-cases')
@@ -128,6 +133,53 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
         toast.success('Borrador copiado');
     }
 
+    async function askCaseAssistant() {
+        const message = assistantInput.trim();
+        if (!message || assistantLoading) return;
+        const nextMessages: AssistantMessage[] = [...assistantMessages, { role: 'user', content: message }];
+        setAssistantMessages(nextMessages);
+        setAssistantInput('');
+        setAssistantLoading(true);
+        try {
+            const response = await fetch('/api/clinical-cases/assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: nextMessages,
+                    photoNames: currentFiles.map(file => file.name),
+                    draft: {
+                        title,
+                        description: caseDescription,
+                        photoDescriptions,
+                    },
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'No se pudo redactar el caso');
+
+            setAssistantMessages(prev => [...prev, {
+                role: 'assistant',
+                content: result.reply || 'Preparé una propuesta para revisar.',
+            }]);
+            if (result.proposal?.title) {
+                setTitle(result.proposal.title);
+                setSlugEdited(false);
+            }
+            if (result.proposal?.description) setCaseDescription(result.proposal.description);
+            if (Array.isArray(result.proposal?.photoDescriptions)) {
+                setPhotoDescriptions(currentFiles.map((_, index) => result.proposal.photoDescriptions[index] || ''));
+            }
+            setDraft(null);
+            toast.success('Propuesta aplicada; revisala antes de publicar');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'No se pudo usar el asistente';
+            setAssistantMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
+            toast.error(errorMessage);
+        } finally {
+            setAssistantLoading(false);
+        }
+    }
+
     async function publishNow() {
         const existingSlug = existingCases.find(item => item.id === caseId)?.slug;
         if (!caseDescription.trim()) {
@@ -190,6 +242,59 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
                 <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
                     Publicación directa: las fotos se alojan en Cloudinary y el caso aparece en amesteticadental.com sin descargar archivos.
                 </div>
+
+                <section className="rounded-xl border border-violet-400/25 bg-violet-400/[0.08] p-4">
+                    <div className="flex items-start gap-3">
+                        <Sparkles size={19} className="mt-0.5 shrink-0 text-violet-300" />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-white">Contale la historia al asistente</p>
+                            <p className="mt-1 text-xs text-slate-400">
+                                Explicá qué se hizo, qué problema se buscó resolver y qué muestran las fotos. No incluyas el nombre del paciente.
+                            </p>
+                        </div>
+                    </div>
+                    {assistantMessages.length > 0 && (
+                        <div className="mt-3 max-h-40 space-y-2 overflow-y-auto rounded-lg bg-black/20 p-3">
+                            {assistantMessages.map((message, index) => (
+                                <div
+                                    key={`${message.role}-${index}`}
+                                    className={`text-sm ${message.role === 'user' ? 'text-slate-200' : 'text-violet-200'}`}
+                                >
+                                    <span className="mr-1 font-semibold">
+                                        {message.role === 'user' ? 'Vos:' : 'Asistente:'}
+                                    </span>
+                                    {message.content}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <div className="mt-3 flex gap-2">
+                        <Textarea
+                            value={assistantInput}
+                            onChange={event => setAssistantInput(event.target.value)}
+                            rows={3}
+                            placeholder="Ej: La paciente consultó por... Realizamos... La primera foto muestra..."
+                            onKeyDown={event => {
+                                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                                    event.preventDefault();
+                                    void askCaseAssistant();
+                                }
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => void askCaseAssistant()}
+                            disabled={!assistantInput.trim() || assistantLoading}
+                            className="inline-flex w-32 shrink-0 items-center justify-center gap-2 rounded-lg bg-violet-500 px-3 text-sm font-bold text-white hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {assistantLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                            {assistantLoading ? 'Redactando' : 'Redactar'}
+                        </button>
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-500">
+                        El asistente completa el borrador; nada se publica hasta que pulses Publicar ahora.
+                    </p>
+                </section>
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                     <section className="space-y-3">
