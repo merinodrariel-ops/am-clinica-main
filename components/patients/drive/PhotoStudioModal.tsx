@@ -2126,9 +2126,9 @@ export default function PhotoStudioModal({
         }
         // Save current photo's editable state before switching
         if (activeFile) {
-            const currentState = normalizeFileEditState({
-                rotation, brightness, drawShapes, textAnnotations,
-            });
+            // Read from the live ref: thumbnail handlers can otherwise retain the
+            // render that created them and miss the very latest slider/drawing edit.
+            const currentState = normalizeFileEditState(latestPhotoStateRef.current);
             photoSessionStatesRef.current.set(activeFile.id, {
                 ...currentState,
                 imageUrl,

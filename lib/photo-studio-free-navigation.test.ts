@@ -14,6 +14,7 @@ const switchSource = source.slice(switchStart, switchEnd);
 test('photo navigation autosaves without forcing the export dialog', () => {
     assert.doesNotMatch(switchSource, /setSaveDialogOpen\(true\)/);
     assert.doesNotMatch(switchSource, /if \(isDirty/);
+    assert.match(switchSource, /normalizeFileEditState\(latestPhotoStateRef\.current\)/);
     assert.match(switchSource, /flushPhotoStateSave\(\{ fileId: activeFile\.id, state: currentState \}\)/);
 });
 
