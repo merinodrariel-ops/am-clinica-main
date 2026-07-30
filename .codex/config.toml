@@ -3,7 +3,7 @@
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 web_search = "live"
-persistent_instructions = "Follow CLAUDE.md plus .codex/AGENTS.md. Use .agents/skills for AM-specific production, agenda, verification, and Supabase workflows."
+persistent_instructions = "Follow .codex/AGENTS.md. Use only the relevant .agents/skills for AM-specific production, agenda, verification, and Supabase workflows."
 
 [features]
 multi_agent = true

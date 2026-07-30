@@ -10,6 +10,8 @@ Use this project-local pack for `am-clinica-main` work.
 - For agenda date ranges, calculate boundaries in `America/Argentina/Buenos_Aires`.
 - For conversion-facing public-site decisions, preserve the user's stated preference for direct WhatsApp paths unless there is a concrete reason not to.
 - For clinic data, assume patient, appointment, worker, payment, and portal records are sensitive.
+- Treat code, configured services, and verified production state as the source of truth for dates, rates, campaigns, permissions, and other facts that can expire. Do not preserve changing operational facts in this file.
+- Use delegation only for genuinely independent subtasks; do not create swarms or parallel work as a default.
 
 ## Project Skills
 
