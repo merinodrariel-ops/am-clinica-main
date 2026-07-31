@@ -321,12 +321,16 @@ function applySavedOrder(files: DriveFile[], savedOrder: string[]): DriveFile[] 
 // The main photo grid merges "Fotos" + "Selección" (Redes) into a single sortable grid.
 // Order: cover first, then every selection photo, then the rest. Saved order still decides
 // the cover and the relative order inside each group, but never sends Selección to the end.
-function getOrderedGridPhotos(files: DriveFile[], savedOrder: string[]): DriveFile[] {
+function getOrderedGridPhotos(files: DriveFile[], savedOrder: string[], coverFileId?: string | null): DriveFile[] {
     const gridFiles = files.filter(f => {
         const c = classifyFile(f);
         return c === 'foto' || c === 'redes';
     });
-    const ordered = applySavedOrder(gridFiles, savedOrder);
+    const saved = applySavedOrder(gridFiles, savedOrder);
+    const storedCover = coverFileId ? saved.find(file => file.id === coverFileId) : undefined;
+    const ordered = storedCover
+        ? [storedCover, ...saved.filter(file => file.id !== storedCover.id)]
+        : saved;
     const cover = ordered.slice(0, 1);
     const coverId = cover[0]?.id;
     const selection = ordered.filter(f => f.id !== coverId && classifyFile(f) === 'redes');
@@ -353,9 +357,10 @@ interface PatientDriveTabProps {
     patientId: string;
     patientName: string;
     motherFolderUrl: string | null | undefined;
+    initialCoverFileId?: string | null;
 }
 
-export default function PatientDriveTab({ patientId, patientName, motherFolderUrl }: PatientDriveTabProps) {
+export default function PatientDriveTab({ patientId, patientName, motherFolderUrl, initialCoverFileId }: PatientDriveTabProps) {
     const { categoria: role, profile } = useAuth();
     const canUpload = UPLOAD_ROLES.has(role || '');
     const canManageDrive = DRIVE_MANAGE_ROLES.has(role || '');
@@ -373,6 +378,11 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const [isGlobalDragging, setIsGlobalDragging] = useState(false);
     const globalDragDepthRef = useRef(0);
     const [fotosOrder, setFotosOrder] = useState<Record<string, string[]>>({});
+    const [coverFileId, setCoverFileId] = useState<string | null>(initialCoverFileId ?? null);
+
+    useEffect(() => {
+        setCoverFileId(initialCoverFileId ?? null);
+    }, [initialCoverFileId]);
     const [extractingSlidesId, setExtractingSlidesId] = useState<string | null>(null);
     const [sharePatientFile, setSharePatientFile] = useState<DriveFile | null>(null);
     const [sharePatientFiles, setSharePatientFiles] = useState<DriveFile[]>([]);
@@ -442,22 +452,29 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         if (!over || active.id === over.id) return;
 
         const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
-        const photos = getOrderedGridPhotos(files, fotosOrder[motherFolderId] || []);
-        const oldIdx = photos.findIndex(f => f.id === String(active.id));
-        const newIdx = photos.findIndex(f => f.id === String(over.id));
+        const photos = getOrderedGridPhotos(files, fotosOrder[motherFolderId] || [], coverFileId);
+        const visiblePhotos = photos.filter(file => classifyFile(file) === 'foto');
+        const oldIdx = visiblePhotos.findIndex(f => f.id === String(active.id));
+        const newIdx = visiblePhotos.findIndex(f => f.id === String(over.id));
         if (oldIdx === -1 || newIdx === -1) return;
 
-        const reordered = arrayMove(photos, oldIdx, newIdx);
-        const ids = reordered.map(f => f.id);
-        const coverFileId = reordered[0]?.id || undefined;
+        const reorderedVisiblePhotos = arrayMove(visiblePhotos, oldIdx, newIdx);
+        const nextCoverFileId = reorderedVisiblePhotos[0]?.id || undefined;
+        const selectionPhotos = photos.filter(file => classifyFile(file) === 'redes');
+        const remainingPhotos = reorderedVisiblePhotos.filter(file => file.id !== nextCoverFileId);
+        const canonicalPhotos = nextCoverFileId
+            ? [reorderedVisiblePhotos[0], ...selectionPhotos, ...remainingPhotos]
+            : [...selectionPhotos, ...remainingPhotos];
+        const ids = canonicalPhotos.map(f => f.id);
 
         // Update files in state
         const otherFiles = files.filter(f => !isGridPhoto(f));
-        setFiles([...reordered, ...otherFiles]);
+        setFiles([...canonicalPhotos, ...otherFiles]);
 
         setFotosOrder(prev => ({ ...prev, [motherFolderId]: ids }));
+        setCoverFileId(nextCoverFileId ?? null);
 
-        void saveFotosOrderAction(patientId, motherFolderId, ids, coverFileId).then(result => {
+        void saveFotosOrderAction(patientId, motherFolderId, ids, nextCoverFileId).then(result => {
             if (result.error) {
                 toast.error(`No se pudo guardar la portada: ${result.error}`);
             } else {
@@ -469,7 +486,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     function getPhotoSelectionFiles(targetIds = selectedPhotoIds): DriveFile[] {
         const targetSet = new Set(targetIds);
         const motherFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
-        return getOrderedGridPhotos(files, fotosOrder[motherFolderId] || []).filter(file => targetSet.has(file.id));
+        return getOrderedGridPhotos(files, fotosOrder[motherFolderId] || [], coverFileId).filter(file => targetSet.has(file.id));
     }
 
     function handlePhotoSelection(
@@ -891,7 +908,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     // Keep Selección visibly next to Fotos. Both sections still share one selection state
     // and one ordered filmstrip inside Photo Studio.
     const savedOrder = fotosOrder[motherFolderId] || [];
-    const orderedPhotoStudioFiles = getOrderedGridPhotos(files, savedOrder);
+    const orderedPhotoStudioFiles = getOrderedGridPhotos(files, savedOrder, coverFileId);
     classifiedGroups.foto.files = orderedPhotoStudioFiles.filter(file => classifyFile(file) === 'foto');
     classifiedGroups.redes.files = orderedPhotoStudioFiles.filter(file => classifyFile(file) === 'redes');
     const photoIds = orderedPhotoStudioFiles.map(file => file.id);
@@ -1063,7 +1080,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                         <SortableFileCard
                                                             key={file.id}
                                                             file={file}
-                                                            isPortada={idx === 0}
+                                                            isPortada={file.id === coverFileId}
                                                             onPreview={f => openPreview(f, motherFolderId)}
                                                             onDelete={canManageDrive ? handleDeleteFile : undefined}
                                                             onShare={handleShareFile}
@@ -1112,6 +1129,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             photoTag={photoTags[file.id]}
                                                             patientFolder={getFormattedFolderName(patientName)}
                                                             isSeleccion={classifyFile(file) === 'redes'}
+                                                            isPortada={file.id === coverFileId}
                                                             selectionEnabled={key === 'redes' && canManageDrive}
                                                             isSelected={selectedPhotoIds.includes(file.id)}
                                                             hideInlineActions={key === 'redes'}
@@ -1366,6 +1384,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                     autoStartSmile={previewAutoSmile}
                     onClose={() => { setPreviewFile(null); setPreviewPaired3DFile(null); setPreviewFolderId(''); setPreviewAutoSmile(false); }}
                     onSaved={(options) => {
+                        if (options?.coverFileId) setCoverFileId(options.coverFileId);
                         handleUploadedToFolder(options);
                     }}
                 />

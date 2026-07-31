@@ -16,8 +16,13 @@ test('photo studio thumbnail reorder persists the first photo as cover', () => {
     );
     assert.match(
         source,
-        /saveFotosOrderAction\(patientId,\s*folderId,\s*nextOrder,\s*coverFileId\)/,
+        /saveFotosOrderAction\(patientId,\s*folderId,\s*orderToSave,\s*coverFileId\)/,
         'Photo Studio should persist the first thumbnail id as foto_perfil_url'
+    );
+    assert.match(
+        source,
+        /onSaved\(\{\s*silent:\s*true,\s*coverFileId:/,
+        'Photo Studio should report the saved cover back to the patient file grid'
     );
 });
 

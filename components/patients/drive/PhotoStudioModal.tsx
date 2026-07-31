@@ -295,7 +295,7 @@ interface PhotoStudioModalProps {
     patientName: string;
     canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
-    onSaved: (options?: { silent?: boolean }) => void; // called after successful save → triggers folder refresh
+    onSaved: (options?: { silent?: boolean; coverFileId?: string }) => void; // called after successful save → triggers folder refresh
     autoStartSmile?: boolean;
 }
 
@@ -5826,7 +5826,7 @@ export default function PhotoStudioModal({
                     const coverFileId = orderToSave[0] || null;
                     const result = await saveFotosOrderAction(patientId, folderId, orderToSave, coverFileId);
                     if (result.error) toast.error(result.error);
-                    else onSaved({ silent: true });
+                    else onSaved({ silent: true, coverFileId: coverFileId ?? undefined });
                 }
             } finally {
                 thumbnailOrderSavingRef.current = false;

@@ -24,7 +24,7 @@ interface DrivePreviewModalProps {
     patientName: string;
     canSave: boolean;
     onClose: () => void;
-    onSaved: (options?: { silent?: boolean }) => void;
+    onSaved: (options?: { silent?: boolean; coverFileId?: string }) => void;
     autoStartSmile?: boolean;
 }
 
