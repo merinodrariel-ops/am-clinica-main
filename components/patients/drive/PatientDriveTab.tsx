@@ -59,6 +59,11 @@ import { getContextMenuSelection, updatePhotoGridSelection } from '@/lib/drive-p
 import { toggle3DSelection, canOpenPair, resolveSelectionPair } from '@/lib/drive-3d-selection';
 import { uploadFilesToDrive } from '@/lib/drive-upload-files';
 import { buildExocadProjectPresentations } from '@/lib/exocad-project-presentation';
+import {
+    canManagePatientDrive,
+    canUploadPatientDrive,
+    canUploadPatientDriveMimeType,
+} from '@/lib/patient-drive-access';
 
 // ─── Sortable photo card ─────────────────────────────────────────────────────
 
@@ -343,9 +348,6 @@ function isGridPhoto(file: DriveFile): boolean {
     return c === 'foto' || c === 'redes';
 }
 
-const UPLOAD_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
-const DRIVE_MANAGE_ROLES = new Set(['owner', 'admin', 'asistente', 'laboratorio']);
-
 type PhotoContextMenuState = {
     x: number;
     y: number;
@@ -362,8 +364,8 @@ interface PatientDriveTabProps {
 
 export default function PatientDriveTab({ patientId, patientName, motherFolderUrl, initialCoverFileId }: PatientDriveTabProps) {
     const { categoria: role, profile } = useAuth();
-    const canUpload = UPLOAD_ROLES.has(role || '');
-    const canManageDrive = DRIVE_MANAGE_ROLES.has(role || '');
+    const canUpload = canUploadPatientDrive(role);
+    const canManageDrive = canManagePatientDrive(role);
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
     const [files, setFiles] = useState<DriveFile[]>([]);
@@ -804,10 +806,16 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
     const handleOverlayDrop = async (event: DragEvent<HTMLElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        const files = event.dataTransfer?.files;
+        const droppedFiles = Array.from(event.dataTransfer?.files || []);
+        const files = droppedFiles.filter(file => canUploadPatientDriveMimeType(role, file.type));
         const dropFolderId = extractFolderIdFromUrl(currentFolderUrl) || '';
         resetGlobalDrag();
-        if (!canUpload || !dropFolderId || !files || files.length === 0) return;
+        if (droppedFiles.length !== files.length) {
+            toast.error(role === 'marketing'
+                ? 'Marketing solo puede subir videos'
+                : 'Uno o más archivos no están permitidos');
+        }
+        if (!canUpload || !dropFolderId || files.length === 0) return;
 
         const toastId = toast.loading(`Subiendo ${files.length} archivo${files.length > 1 ? 's' : ''}…`);
         try {

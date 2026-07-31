@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getDriveClient } from '@/lib/google-drive';
 import { Readable } from 'stream';
-
-const UPLOAD_ALLOWED_ROLES = ['owner', 'admin', 'asistente', 'laboratorio'];
+import { canUploadPatientDrive, canUploadPatientDriveMimeType } from '@/lib/patient-drive-access';
 
 function getDriveUploadErrorMessage(error: unknown): string {
     const fallback = error instanceof Error ? error.message : 'Error subiendo archivo';
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
             .eq('id', user.id)
             .single();
 
-        if (!profile || !UPLOAD_ALLOWED_ROLES.includes(profile.categoria)) {
+        if (!profile || !canUploadPatientDrive(profile.categoria)) {
             return NextResponse.json({ error: 'No tenés permisos para subir archivos' }, { status: 403 });
         }
 
@@ -51,6 +50,14 @@ export async function POST(request: Request) {
 
         if (!file || !folderId) {
             return NextResponse.json({ error: 'Faltan campos: file y folderId' }, { status: 400 });
+        }
+
+        if (!canUploadPatientDriveMimeType(profile.categoria, file.type)) {
+            return NextResponse.json({
+                error: profile.categoria === 'marketing'
+                    ? 'Marketing solo puede subir videos'
+                    : 'Tipo de archivo no permitido',
+            }, { status: 403 });
         }
 
         // 3. Upload to Drive

@@ -20,6 +20,33 @@ export interface UploadToDriveResult {
     errors: string[]; // "filename: message"
 }
 
+async function uploadVideoDirectlyToDrive(file: File, uploadName: string, opts: UploadToDriveOptions) {
+    const sessionResponse = await fetch('/api/drive/upload-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fileName: uploadName,
+            mimeType: file.type,
+            fileSize: file.size,
+            folderId: opts.folderId,
+            patientId: opts.patientId,
+        }),
+    });
+    const session = await sessionResponse.json().catch(() => ({})) as { uploadUrl?: string; error?: string };
+    if (!sessionResponse.ok || !session.uploadUrl) {
+        throw new Error(session.error || 'No se pudo iniciar la subida del video');
+    }
+
+    const uploadResponse = await fetch(session.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+    });
+    if (!uploadResponse.ok) {
+        throw new Error('Google Drive no pudo completar la subida del video');
+    }
+}
+
 /**
  * Shared uploader used by both the upload button and the full-screen drop overlay,
  * so dropping files anywhere on the patient folder uploads them (not only on the
@@ -52,6 +79,12 @@ export async function uploadFilesToDrive(
             const uploadName = opts.fileNamePrefix
                 ? buildSeoFileName(opts.fileNamePrefix, i + 1, ext)
                 : file.name;
+
+            if (file.type.startsWith('video/')) {
+                await uploadVideoDirectlyToDrive(file, uploadName, opts);
+                successCount++;
+                continue;
+            }
 
             const formData = new FormData();
             formData.append('file', fileToUpload, uploadName);

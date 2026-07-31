@@ -136,6 +136,14 @@ export function getDriveClient() {
     return getDrive();
 }
 
+export async function getDriveAccessToken(): Promise<string> {
+    const auth = getAuth();
+    const accessToken = await auth.getAccessToken();
+    const token = typeof accessToken === 'string' ? accessToken : accessToken?.token;
+    if (!token) throw new Error('No se pudo obtener un token de Google Drive');
+    return token;
+}
+
 export interface DriveWriterAccessResult {
     granted: string[];
     alreadyWriter: string[];

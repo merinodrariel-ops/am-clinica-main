@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canManagePatientDrive, canUploadPatientDrive, isMarketingMediaMimeType } from './patient-drive-access';
+import {
+    canManagePatientDrive,
+    canUploadPatientDrive,
+    canUploadPatientDriveMimeType,
+    isMarketingMediaMimeType,
+} from './patient-drive-access';
 
 test('laboratorio can upload and manage patient Drive files', () => {
     assert.equal(canUploadPatientDrive('laboratorio'), true);
@@ -20,4 +25,13 @@ test('marketing media filter only accepts images and videos', () => {
     assert.equal(isMarketingMediaMimeType('video/mp4'), true);
     assert.equal(isMarketingMediaMimeType('application/pdf'), false);
     assert.equal(isMarketingMediaMimeType('application/zip'), false);
+});
+
+test('marketing can upload videos but cannot upload or manage other patient files', () => {
+    assert.equal(canUploadPatientDrive('marketing'), true);
+    assert.equal(canUploadPatientDriveMimeType('marketing', 'video/mp4'), true);
+    assert.equal(canUploadPatientDriveMimeType('marketing', 'video/quicktime'), true);
+    assert.equal(canUploadPatientDriveMimeType('marketing', 'image/jpeg'), false);
+    assert.equal(canUploadPatientDriveMimeType('marketing', 'application/pdf'), false);
+    assert.equal(canManagePatientDrive('marketing'), false);
 });

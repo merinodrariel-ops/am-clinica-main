@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadFilesToDrive } from '@/lib/drive-upload-files';
+import { useAuth } from '@/contexts/AuthContext';
+import { canUploadPatientDriveMimeType } from '@/lib/patient-drive-access';
 
 interface DriveUploadButtonProps {
     folderId: string;
@@ -28,13 +30,21 @@ export default function DriveUploadButton({
     successMessage,
     fileNamePrefix,
 }: DriveUploadButtonProps) {
+    const { categoria: role } = useAuth();
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
 
     const handleFiles = async (files: FileList) => {
+        const acceptedFiles = Array.from(files).filter(file => canUploadPatientDriveMimeType(role, file.type));
+        if (acceptedFiles.length !== files.length) {
+            toast.error(role === 'marketing'
+                ? 'Marketing solo puede subir videos'
+                : 'Uno o más archivos no están permitidos');
+        }
+        if (acceptedFiles.length === 0) return;
         setUploading(true);
-        const { successCount, errors } = await uploadFilesToDrive(files, { folderId, patientId, fileNamePrefix });
+        const { successCount, errors } = await uploadFilesToDrive(acceptedFiles, { folderId, patientId, fileNamePrefix });
 
         errors.forEach(err => toast.error(`Error subiendo ${err}`));
 
@@ -56,6 +66,7 @@ export default function DriveUploadButton({
             ref={inputRef}
             type="file"
             multiple
+            accept={role === 'marketing' ? 'video/*' : undefined}
             className="hidden"
             onChange={e => e.target.files && handleFiles(e.target.files)}
         />
