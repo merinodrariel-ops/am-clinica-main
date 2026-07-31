@@ -15,6 +15,19 @@ test('Cmd/Ctrl+Z always uses the global editor history', () => {
 
     assert.match(shortcutBlock, /handleUndo\(\)/);
     assert.doesNotMatch(shortcutBlock, /handleUndoLastDrawPoint\(\)/);
+    assert.match(shortcutBlock, /\['range', 'checkbox', 'radio', 'button', 'color'\]\.includes\(input\.type\)/);
+});
+
+test('horizontal wheel movement pans instead of zooming', () => {
+    const wheelBlock = source.slice(
+        source.indexOf('const wheelHandler = (e: WheelEvent)'),
+        source.indexOf('// Non-passive touch handlers'),
+    );
+
+    assert.match(wheelBlock, /Math\.abs\(e\.deltaX\) > Math\.abs\(e\.deltaY\)/);
+    assert.match(wheelBlock, /e\.shiftKey/);
+    assert.match(wheelBlock, /setPanX/);
+    assert.match(wheelBlock, /if \(horizontalDelta !== 0\)/);
 });
 
 test('photo snapshots preserve pixel edits, adjustments, drawings, and text together', () => {

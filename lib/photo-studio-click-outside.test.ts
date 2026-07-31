@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync('components/patients/drive/PhotoStudioModal.tsx', 'utf8');
 
 test('clicking outside the artboard is handled in canvas and crop modes', () => {
-    assert.match(source, /const artboard = canvasActive \? canvasLayersRef\.current : drawCanvasRef\.current;/);
+    assert.match(source, /const artboard = artboardContainerRef\.current;/);
+    assert.match(source, /<div ref=\{artboardContainerRef\} style=/);
     assert.match(source, /onClick=\{handleCanvasContainerClick\}/);
     assert.doesNotMatch(source, /onClick=\{canvasActive \|\| cropActive \? undefined : handleCanvasContainerClick\}/);
 });
@@ -15,4 +16,10 @@ test('outside click clears canvas, drawing, and text selections', () => {
     assert.match(source, /setSelectedShapeId\(null\)/);
     assert.match(source, /setSelectedTextId\(null\)/);
     assert.match(source, /void handleConfirmCanvasLayerCrop\(\)/);
+    assert.match(source, /void handleConfirmCrop\(\)/);
+    assert.match(source, /void handleConfirmBg\(\)/);
+});
+
+test('new background-removal actions default to a white background', () => {
+    assert.match(source, /useState<BgColor>\('white'\)/);
 });

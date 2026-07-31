@@ -866,6 +866,7 @@ export default function PhotoStudioModal({
     const cropJustEnteredRef = useRef<boolean>(false);     // skip the first useEffect fire when entering crop mode
     const cropRebakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
+    const artboardContainerRef = useRef<HTMLDivElement>(null);
     const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
     const touchRef = useRef<{ dist: number; startZoom: number } | null>(null);
     const cancelBgRef = useRef(false);
@@ -1157,7 +1158,7 @@ export default function PhotoStudioModal({
     const [bgProcessing, setBgProcessing] = useState(false);
     const [bgDone, setBgDone] = useState(false);
     const [subjectTransformOpen, setSubjectTransformOpen] = useState(false);
-    const [bgColor, setBgColor] = useState<BgColor>('transparent');
+    const [bgColor, setBgColor] = useState<BgColor>('white');
     const [hasTransparentBg, setHasTransparentBg] = useState(false);
     const [cropActive, setCropActive] = useState(false);
     const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
@@ -1930,7 +1931,7 @@ export default function PhotoStudioModal({
         setBrightness(100);
         setBgDone(false);
         setBgProcessing(false);
-        setBgColor('transparent');
+        setBgColor('white');
         setHasTransparentBg(false);
         setCropActive(false);
         setCrop({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
@@ -2058,6 +2059,18 @@ export default function PhotoStudioModal({
         const wheelHandler = (e: WheelEvent) => {
             e.preventDefault();
             if (isCropActiveRef.current) return;
+
+            const horizontalDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY)
+                ? e.deltaX
+                : e.shiftKey
+                    ? e.deltaY
+                    : 0;
+            if (horizontalDelta !== 0) {
+                setPanX(prev => prev - horizontalDelta / Math.max(zoomRef.current, 0.25));
+                return;
+            }
+
+            if (e.deltaY === 0) return;
             const delta = e.deltaY > 0 ? -0.15 : 0.15;
             setZoom(prev => {
                 const next = Math.min(5, Math.max(0.25, prev + delta));
@@ -2088,8 +2101,12 @@ export default function PhotoStudioModal({
     // Keyboard shortcut: Cmd/Ctrl+Z → undo the latest editor action globally.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            const tag = (e.target as HTMLElement)?.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            const target = e.target as HTMLElement | null;
+            const input = target instanceof HTMLInputElement ? target : null;
+            const isTextEntry = target instanceof HTMLTextAreaElement
+                || target?.isContentEditable
+                || (input !== null && !['range', 'checkbox', 'radio', 'button', 'color'].includes(input.type));
+            if (isTextEntry) return;
             if (e.metaKey || e.ctrlKey) {
                 if (e.shiftKey && e.key.toLowerCase() === 'z') {
                     e.preventDefault();
@@ -2787,7 +2804,7 @@ export default function PhotoStudioModal({
                 
                 pushHistory();
                 setBgDone(true);
-                setBgColor('black');
+                setBgColor('white');
                 toast.success('Editor manual inicializado', { id: toastId });
             } catch (err) {
                 toast.error('Error al inicializar editor manual', { id: toastId });
@@ -2900,7 +2917,7 @@ export default function PhotoStudioModal({
         });
     }
 
-    async function handleConfirmBg() {
+    async function handleConfirmBg(): Promise<string> {
         pushHistory({
             kind: 'photo',
             imageUrl: preBgUrlRef.current ?? imageUrl,
@@ -2913,31 +2930,38 @@ export default function PhotoStudioModal({
             currentPoints: structuredClone(currentPoints),
             textAnnotations: structuredClone(textAnnotations),
         });
-        const img = await loadCanvasImage(imageUrl);
+        const editedCanvas = offscreenCanvasRef.current;
+        const img = editedCanvas ? null : await loadCanvasImage(imageUrl);
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        canvas.width = editedCanvas?.width ?? img!.naturalWidth;
+        canvas.height = editedCanvas?.height ?? img!.naturalHeight;
         const ctx = canvas.getContext('2d')!;
         if (bgColor === 'white' || bgColor === 'black') {
             ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#111111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(editedCanvas ?? img!, 0, 0);
         const isPng = bgColor === 'transparent';
-        canvas.toBlob(blob => {
-            if (!blob) return;
-            const newUrl = URL.createObjectURL(blob);
-            createdBlobUrlsRef.current.push(newUrl);
-            objectUrlRef.current = newUrl;
-            setImageUrl(newUrl);
-            setBgDone(false);
-            setBgColor('transparent');
-            setHasTransparentBg(isPng);
-            setBrushMode(null);
-            offscreenCanvasRef.current = null;
-            preBgUrlRef.current = null;
-            preCropImageRef.current = null;
-        }, isPng ? 'image/png' : 'image/jpeg', 0.95);
+        const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+                result => result ? resolve(result) : reject(new Error('No se pudo confirmar la edición de fondo')),
+                isPng ? 'image/png' : 'image/jpeg',
+                0.95,
+            );
+        });
+        const newUrl = URL.createObjectURL(blob);
+        createdBlobUrlsRef.current.push(newUrl);
+        objectUrlRef.current = newUrl;
+        setImageUrl(newUrl);
+        setBgDone(false);
+        setBgColor('white');
+        setHasTransparentBg(isPng);
+        setBrushMode(null);
+        setMagicWandActive(false);
+        offscreenCanvasRef.current = null;
+        preBgUrlRef.current = null;
+        preCropImageRef.current = null;
+        return newUrl;
     }
 
     function handleUndoBgRemoval() {
@@ -2951,7 +2975,7 @@ export default function PhotoStudioModal({
         setImageUrl(prev);
         preBgUrlRef.current = null;
         setBgDone(false);
-        setBgColor('transparent');
+        setBgColor('white');
         setHasTransparentBg(false);
     }
 
@@ -4790,7 +4814,7 @@ export default function PhotoStudioModal({
             return;
         }
 
-        const artboard = canvasActive ? canvasLayersRef.current : drawCanvasRef.current;
+        const artboard = artboardContainerRef.current;
         if (!artboard) return;
         const rect = artboard.getBoundingClientRect();
         const clickedInsideArtboard =
@@ -4820,6 +4844,8 @@ export default function PhotoStudioModal({
             void handleConfirmCanvasLayerCrop();
         } else if (cropActive) {
             void handleConfirmCrop();
+        } else if (!canvasActive && (bgDone || brushMode !== null || magicWandActive)) {
+            void handleConfirmBg();
         }
     }
 
@@ -5337,17 +5363,17 @@ export default function PhotoStudioModal({
         }
     }
 
-    async function exportToBlob(): Promise<Blob> {
+    async function exportToBlob(sourceUrl = imageUrl, exportRotation = rotation): Promise<Blob> {
         // Crop is already baked into imageUrl (done at confirm time).
         // This function only needs to apply remaining rotation + brightness.
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
             const i = new Image();
-            if (imageUrl && !imageUrl.startsWith('blob:') && !imageUrl.startsWith('data:')) {
+            if (sourceUrl && !sourceUrl.startsWith('blob:') && !sourceUrl.startsWith('data:')) {
                 i.crossOrigin = 'anonymous';
             }
             i.onload = () => resolve(i);
             i.onerror = () => reject(new Error('No se pudo cargar la imagen para exportar'));
-            i.src = imageUrl;
+            i.src = sourceUrl;
         });
 
         const outW = img.naturalWidth;
@@ -5363,7 +5389,7 @@ export default function PhotoStudioModal({
         });
         const mime = isPng ? 'image/png' : 'image/jpeg';
 
-        const radians = (rotation * Math.PI) / 180;
+        const radians = (exportRotation * Math.PI) / 180;
         const sin = Math.abs(Math.sin(radians));
         const cos = Math.abs(Math.cos(radians));
         const canvasW = Math.ceil(outW * cos + outH * sin);
@@ -5512,20 +5538,21 @@ export default function PhotoStudioModal({
         setCropActive(true);
     }
 
-    async function handleConfirmCrop() {
+    async function handleConfirmCrop(): Promise<string | null> {
         if (!completedCrop || completedCrop.width === 0) {
             // If there's an active crop mode but no selection drawn, warn the user
             // instead of silently exiting (which looks like the crop was applied)
             if (!prevCroppedUrlRef.current) {
                 toast.error('Dibujá el área de recorte antes de confirmar');
-                return;
+                return null;
             }
             // Re-crop cancelled with no new selection → restore previous crop
-            setImageUrl(prevCroppedUrlRef.current);
-            objectUrlRef.current = prevCroppedUrlRef.current.startsWith('blob:') ? prevCroppedUrlRef.current : null;
+            const restoredUrl = prevCroppedUrlRef.current;
+            setImageUrl(restoredUrl);
+            objectUrlRef.current = restoredUrl.startsWith('blob:') ? restoredUrl : null;
             prevCroppedUrlRef.current = null;
             setCropActive(false);
-            return;
+            return restoredUrl;
         }
 
         const sourceUrl = preCropImageRef.current ?? imageUrl;
@@ -5586,6 +5613,9 @@ export default function PhotoStudioModal({
             setCropAspectPreset('free');
             // Rotation was baked into the crop source image; reset so it isn't applied twice
             setRotation(0);
+            cropPreBakeRef.current = null;
+            setCropActive(false);
+            return newUrl;
         } catch {
             toast.error('No se pudo aplicar el recorte');
             if (prevCroppedUrlRef.current) {
@@ -5596,6 +5626,7 @@ export default function PhotoStudioModal({
         }
         cropPreBakeRef.current = null;
         setCropActive(false);
+        return null;
     }
 
     function handleCancelCrop() {
@@ -5941,13 +5972,29 @@ export default function PhotoStudioModal({
         }
         setSaving(mode);
         try {
+            let photoSourceUrl = imageUrl;
+            let photoExportRotation = rotation;
+            if (!canvasActive && cropActive) {
+                const croppedUrl = await handleConfirmCrop();
+                if (!croppedUrl) {
+                    toast.error('No se guardó: primero confirmá un área de recorte válida');
+                    return;
+                }
+                photoSourceUrl = croppedUrl;
+                photoExportRotation = 0;
+            } else if (!canvasActive && (bgDone || brushMode !== null || magicWandActive)) {
+                photoSourceUrl = await handleConfirmBg();
+            }
+
             let canvasLayersForSave = activeCanvas?.layers ?? [];
             // A flattened JPG/PNG is only the deliverable. Persist the layer document first
             // so the same canvas can be reopened and adjusted later.
             if (canvasActive && activeCanvas && !activeCanvas.id.startsWith('legacy-')) {
                 canvasLayersForSave = await persistCanvasDocument(activeCanvas);
             }
-            const rawBlob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
+            const rawBlob = canvasActive
+                ? await exportCanvasToBlob()
+                : await exportToBlob(photoSourceUrl, photoExportRotation);
             // Alinear el archivo con el límite real de Vercel antes de crear FormData;
             // preservamos alpha y evitamos que el request muera antes del backend.
             const blob = await shrinkBlobForUpload(rawBlob);
@@ -6562,7 +6609,7 @@ export default function PhotoStudioModal({
                             </div>
                         )}
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
-                        <div style={{
+                        <div ref={artboardContainerRef} style={{
                             transform: isCropActive ? 'none' : `scale(${zoom}) translate(${panX}px, ${panY}px)`,
                             transformOrigin: 'center',
                             transition: isDragging || isCropActive ? 'none' : 'transform 0.05s ease-out',
