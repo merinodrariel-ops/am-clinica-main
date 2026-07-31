@@ -8,23 +8,35 @@ import {
 } from './smile-design-settings';
 import { buildSmileDesignPrompt } from './smile-design-prompt';
 
-test('defaults to an equilibrated identity with a natural shade', () => {
+test('defaults to an equilibrated identity with a minimally improved original shade', () => {
   assert.equal(DEFAULT_SMILE_SETTINGS.identity, 'Equilibrado');
-  assert.equal(DEFAULT_SMILE_SETTINGS.level, 'Natural');
+  assert.equal(DEFAULT_SMILE_SETTINGS.level, 'Original mejorado');
 });
 
 test('quick actions move identity and shade independently', () => {
   const moreNatural = getMoreNaturalSettings(DEFAULT_SMILE_SETTINGS);
   assert.equal(moreNatural.identity, 'Fiel');
-  assert.equal(moreNatural.level, 'Original mejorado');
+  assert.equal(moreNatural.level, 'Tono original');
 
   const morePerfect = getMorePerfectSettings(DEFAULT_SMILE_SETTINGS);
   assert.equal(morePerfect.identity, 'Idealizado');
-  assert.equal(morePerfect.level, 'Natural');
+  assert.equal(morePerfect.level, 'Original mejorado');
 
   const lessWhite = getLessWhiteSettings(DEFAULT_SMILE_SETTINGS);
   assert.equal(lessWhite.identity, 'Equilibrado');
-  assert.equal(lessWhite.level, 'Original mejorado');
+  assert.equal(lessWhite.level, 'Tono original');
+});
+
+test('original shade forbids whitening and applies consistently across photo angles', () => {
+  const prompt = buildSmileDesignPrompt({
+    ...DEFAULT_SMILE_SETTINGS,
+    level: 'Tono original',
+  });
+
+  assert.match(prompt, /CERO BLANQUEAMIENTO/);
+  assert.match(prompt, /fotografías frontales, laterales y de tres cuartos/i);
+  assert.match(prompt, /no autoriza a blanquear más/i);
+  assert.match(prompt, /zonas de esmalte original sin reflejo especular/i);
 });
 
 test('faithful natural prompt preserves dimensions and avoids flat white', () => {

@@ -45,6 +45,7 @@ const IDENTITY_OPTIONS: { value: SmileIdentity; label: string; hint: string }[] 
   { value: 'Idealizado', label: 'Idealizado', hint: 'Mayor corrección, simetría y perfección estética.' },
 ];
 const LEVEL_OPTIONS: { value: SmileShade; label: string }[] = [
+  { value: 'Tono original', label: 'Tono original' },
   { value: 'Original mejorado', label: 'Original mejorado' },
   { value: 'Natural', label: 'Natural' },
   { value: 'Blanco estético', label: 'Blanco estético' },

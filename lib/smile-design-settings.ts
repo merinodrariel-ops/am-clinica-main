@@ -1,4 +1,5 @@
 export type SmileShade =
+  | 'Tono original'
   | 'Original mejorado'
   | 'Natural'
   | 'Blanco estético'
@@ -21,7 +22,7 @@ export interface SmileSettings {
 }
 
 export const DEFAULT_SMILE_SETTINGS: SmileSettings = {
-  level: 'Natural',
+  level: 'Original mejorado',
   identity: 'Equilibrado',
   edges: true,
   edgesIntensity: 'Medio',
@@ -32,6 +33,7 @@ export const DEFAULT_SMILE_SETTINGS: SmileSettings = {
 };
 
 const SHADE_ORDER: SmileShade[] = [
+  'Tono original',
   'Original mejorado',
   'Natural',
   'Blanco estético',

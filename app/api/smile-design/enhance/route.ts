@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
             'Natural Ultra White': 'Ultra blanco',
         };
         const allowedShades: SmileShade[] = [
+            'Tono original',
             'Original mejorado',
             'Natural',
             'Blanco estético',

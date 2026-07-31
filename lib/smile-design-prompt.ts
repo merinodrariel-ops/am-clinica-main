@@ -1,12 +1,18 @@
 import type { SmileSettings } from './smile-design-settings';
 
 const SHADE_PROMPTS: Record<SmileSettings['level'], string> = {
+  'Tono original': [
+    'CERO BLANQUEAMIENTO: copia el tono, valor, saturación y calidez de los dientes originales visibles en esta misma foto.',
+    'La mejora debe ser únicamente de forma, alineación y textura; no aclares el cuerpo dental ni neutralices amarillos o marfiles naturales.',
+    'Usa como referencia cromática las zonas de esmalte original sin reflejo especular, especialmente el tercio medio y cervical.',
+  ].join(' '),
   'Original mejorado': [
     'Conserva el tono base, la calidez y el carácter cromático de los dientes originales.',
-    'Mejora como máximo aproximadamente un tono, sin neutralizar el marfil natural.',
+    'Mejora como máximo medio tono, de forma apenas perceptible, sin neutralizar el marfil natural.',
+    'El resultado debe seguir leyéndose como el esmalte propio del paciente, no como un blanqueamiento ni como carillas blancas.',
   ].join(' '),
   Natural: [
-    'Usa un marfil natural luminoso, apenas más claro que el original y nunca blanco puro.',
+    'Usa un marfil natural luminoso, como máximo aproximadamente un tono más claro que el original y nunca blanco puro.',
     'Conserva calidez cervical y adapta el color a la temperatura de luz real de la escena.',
   ].join(' '),
   'Blanco estético': [
@@ -78,9 +84,15 @@ ${IDENTITY_PROMPTS[settings.identity]}
 PRIORIDAD 2 — COLOR DEL ESMALTE:
 ${SHADE_PROMPTS[settings.level]}
 
+CONSISTENCIA ENTRE ÁNGULOS:
+- Aplica exactamente la misma escala cromática en fotografías frontales, laterales y de tres cuartos.
+- Una toma frontal o una sonrisa más expuesta no autoriza a blanquear más los dientes.
+- Distingue el color real del esmalte de reflejos frontales, flash, exposición y balance de blancos de la fotografía.
+
 REALISMO ÓPTICO OBLIGATORIO:
 - Respeta la dirección, intensidad y temperatura de la iluminación original.
 - Evita blanco puro uniforme: los reflejos pueden ser claros, pero no todo el cuerpo dental.
+- No eleves la exposición, los blancos ni las altas luces de la zona dental para simular un tono más claro.
 - Conserva una zona cervical algo más cálida, cuerpo marfil, bordes incisales translúcidos y sombras interdentales.
 - Cada pieza debe conservar volumen propio; evita una franja blanca plana o aspecto de carillas pegadas.
 - Mantén textura del esmalte y variaciones suaves de luminosidad.
