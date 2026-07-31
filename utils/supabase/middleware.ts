@@ -135,6 +135,7 @@ export async function updateSession(request: NextRequest) {
         path !== '/patients' &&
         !path.startsWith('/patients/') &&
         !path.startsWith('/api/drive/file/') &&
+        path !== '/api/drive/upload-session' &&
         !path.startsWith('/auth')
     ) {
         const url = request.nextUrl.clone()

@@ -56,6 +56,7 @@ function normalizeCategoria(rawCategoria: unknown) {
         'asistente',
         'odontologo',
         'recaptacion',
+        'marketing',
         'contador',
         'socio'
     ]);
