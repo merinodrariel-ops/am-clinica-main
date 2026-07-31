@@ -67,7 +67,12 @@ import { saveSmileDesignResult, getSmileShareUrl, saveSmileMotionVideos } from '
 /**
  * Generates a side-by-side (before/after) base64 string for saving.
  */
-async function generateComparisonBase64(beforeUrl: string, afterDataUrl: string): Promise<string | null> {
+async function generateComparisonBase64(
+    beforeUrl: string,
+    afterDataUrl: string,
+    maxSide = 1600,
+    quality = 0.86
+): Promise<string | null> {
     return new Promise((resolve) => {
         const imgBefore = new Image();
         const imgAfter = new Image();
@@ -82,7 +87,6 @@ async function generateComparisonBase64(beforeUrl: string, afterDataUrl: string)
                     const h = imgBefore.naturalHeight || imgBefore.height;
                     
                     // Constrain for performance/safety
-                    const maxSide = 3200;
                     let scale = 1;
                     if (w > maxSide || h > maxSide) {
                         scale = maxSide / Math.max(w, h);
@@ -102,7 +106,7 @@ async function generateComparisonBase64(beforeUrl: string, afterDataUrl: string)
                     ctx.fillStyle = '#ffffff44';
                     ctx.fillRect(sw - 1, 0, 2, sh);
 
-                    const result = canvas.toDataURL('image/jpeg', 0.85);
+                    const result = canvas.toDataURL('image/jpeg', quality);
                     resolve(result.split(',')[1]);
                 } catch (e) {
                     console.error('Comparison generation failed:', e);
@@ -131,7 +135,13 @@ async function generateComparisonBase64(beforeUrl: string, afterDataUrl: string)
  * Generates a before/after slice image at a given divider position (0-100%).
  * The left portion draws "before" and the right portion draws "after".
  */
-async function generateSliceBase64(beforeUrl: string, afterDataUrl: string, pos: number): Promise<string | null> {
+async function generateSliceBase64(
+    beforeUrl: string,
+    afterDataUrl: string,
+    pos: number,
+    maxSide = 1600,
+    quality = 0.86
+): Promise<string | null> {
     return new Promise((resolve) => {
         const imgBefore = new Image();
         const imgAfter = new Image();
@@ -144,7 +154,6 @@ async function generateSliceBase64(beforeUrl: string, afterDataUrl: string, pos:
                     const canvas = document.createElement('canvas');
                     const w = imgBefore.naturalWidth || imgBefore.width;
                     const h = imgBefore.naturalHeight || imgBefore.height;
-                    const maxSide = 2400;
                     const scale = Math.min(1, maxSide / Math.max(w, h));
                     const sw = Math.round(w * scale);
                     const sh = Math.round(h * scale);
@@ -185,7 +194,7 @@ async function generateSliceBase64(beforeUrl: string, afterDataUrl: string, pos:
                     ctx.textAlign = 'right';
                     ctx.fillText('DESPUÉS', sw - 12, sh - 12);
 
-                    const result = canvas.toDataURL('image/jpeg', 0.88);
+                    const result = canvas.toDataURL('image/jpeg', quality);
                     resolve(result.split(',')[1]);
                 } catch (e) {
                     console.error('Slice generation failed:', e);
@@ -207,6 +216,65 @@ async function generateSliceBase64(beforeUrl: string, afterDataUrl: string, pos:
         imgBefore.src = beforeUrl;
         imgAfter.src = afterDataUrl;
     });
+}
+
+const MAX_SMILE_SAVE_PAYLOAD_CHARS = 3_600_000;
+
+async function encodeSmileSaveJpeg(
+    dataUrl: string,
+    maxSide: number,
+    quality: number
+): Promise<{ dataUrl: string; base64: string }> {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const candidate = new Image();
+        candidate.onload = () => resolve(candidate);
+        candidate.onerror = () => reject(new Error('No se pudo preparar una de las imágenes del Smile Design'));
+        candidate.src = dataUrl;
+    });
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) throw new Error('No se pudo preparar el guardado del Smile Design');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const output = canvas.toDataURL('image/jpeg', quality);
+    return { dataUrl: output, base64: output.split(',')[1] };
+}
+
+async function prepareSmileDesignSavePayload(beforeDataUrl: string, afterDataUrl: string) {
+    const presets = [
+        { maxSide: 1600, quality: 0.86 },
+        { maxSide: 1200, quality: 0.80 },
+        { maxSide: 900, quality: 0.74 },
+    ];
+
+    for (const preset of presets) {
+        const [before, after] = await Promise.all([
+            encodeSmileSaveJpeg(beforeDataUrl, preset.maxSide, preset.quality),
+            encodeSmileSaveJpeg(afterDataUrl, preset.maxSide, preset.quality),
+        ]);
+        const [comparisonBase64, sliceBase64] = await Promise.all([
+            generateComparisonBase64(before.dataUrl, after.dataUrl, preset.maxSide, preset.quality),
+            generateSliceBase64(before.dataUrl, after.dataUrl, 50, preset.maxSide, preset.quality),
+        ]);
+        if (!comparisonBase64 || !sliceBase64) continue;
+
+        const payloadChars = before.dataUrl.length + after.base64.length + comparisonBase64.length + sliceBase64.length;
+        if (payloadChars <= MAX_SMILE_SAVE_PAYLOAD_CHARS) {
+            return {
+                beforeDataUrl: before.dataUrl,
+                afterBase64: after.base64,
+                afterMime: 'image/jpeg',
+                comparisonBase64,
+                sliceBase64,
+            };
+        }
+    }
+
+    throw new Error('Las imágenes siguen siendo demasiado pesadas para guardar. Se conservaron sin cambios; volvé a intentar.');
 }
 
 
@@ -7147,27 +7215,20 @@ export default function PhotoStudioModal({
                                     });
                                     
                                     try {
-                                        const [comparisonBase64, sliceBase64] = await Promise.all([
-                                            generateComparisonBase64(
-                                                smileDesign.result.beforeDataUrl,
-                                                smileDesign.result.afterDataUrl
-                                            ),
-                                            generateSliceBase64(
-                                                smileDesign.result.beforeDataUrl,
-                                                smileDesign.result.afterDataUrl,
-                                                50
-                                            )
-                                        ]);
+                                        const prepared = await prepareSmileDesignSavePayload(
+                                            smileDesign.result.beforeDataUrl,
+                                            smileDesign.result.afterDataUrl
+                                        );
                                         
                                         // saveSmileDesignResult handles uploads to Drive AND DB records
                                         const saveResult = await saveSmileDesignResult({
                                             patientId: patientId || '',
                                             folderId: folderId || '',
-                                            beforeDataUrl: smileDesign.result.beforeDataUrl,
-                                            afterBase64: smileDesign.result.afterBase64,
-                                            afterMime: smileDesign.result.afterMime,
-                                            comparisonBase64: comparisonBase64 || undefined,
-                                            sliceBase64: sliceBase64 || undefined,
+                                            beforeDataUrl: prepared.beforeDataUrl,
+                                            afterBase64: prepared.afterBase64,
+                                            afterMime: prepared.afterMime,
+                                            comparisonBase64: prepared.comparisonBase64,
+                                            sliceBase64: prepared.sliceBase64,
                                             settings: smileDesign.settings,
                                         });
                                         
@@ -7180,7 +7241,8 @@ export default function PhotoStudioModal({
                                         }
                                     } catch (err) {
                                         console.error("[onSave] Smile Design error:", err);
-                                        toast.error("Error al generar imágenes del Smile Design", { id: saveToastId });
+                                        const message = err instanceof Error ? err.message : 'Error inesperado al guardar';
+                                        toast.error(`No se pudo guardar el Smile Design: ${message}`, { id: saveToastId });
                                     }
                                 }}
                                 onGenerateMotion={async () => {
