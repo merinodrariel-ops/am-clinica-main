@@ -1,13 +1,14 @@
 /**
- * Los server actions aceptan hasta 20 MB (next.config bodySizeLimit + validación
- * en la action). Una foto intraoral con el fondo removido se exporta como PNG sin
- * pérdida a resolución completa y supera ese límite con facilidad, por lo que la
- * subida fallaba y la foto "no se guardaba en ningún lado".
+ * Aunque Next permite configurar server actions de hasta 20 MB, Vercel corta el
+ * request antes de ejecutar la action cuando el payload total supera 4.5 MB.
+ * Una foto intraoral con el fondo removido suele quedar en ese falso margen y la
+ * UI parecía no hacer nada porque el backend de la aplicación nunca era invocado.
  *
  * Acá calculamos cuánto hay que reducir para entrar en el límite, preservando
  * transparencia (PNG/WebP soportan alpha; JPEG no).
  */
-export const MAX_UPLOAD_BYTES = 18 * 1024 * 1024; // margen bajo el límite real de 20 MB
+// Dejamos margen para el envelope multipart/FormData además de los bytes del archivo.
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 /** ¿El formato preserva canal alpha? */
 export function supportsAlpha(mime: string): boolean {

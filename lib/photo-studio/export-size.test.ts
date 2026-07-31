@@ -12,8 +12,13 @@ import {
 const MB = 1024 * 1024;
 
 test('no scaling when already under the limit', () => {
-    assert.equal(computeScaleForLimit(5 * MB), 1);
+    assert.equal(computeScaleForLimit(3 * MB), 1);
     assert.equal(computeScaleForLimit(MAX_UPLOAD_BYTES), 1);
+});
+
+test('keeps exported files below the Vercel function payload limit', () => {
+    assert.equal(MAX_UPLOAD_BYTES, 4 * MB);
+    assert.equal(isOverLimit(5 * MB), true);
 });
 
 test('scales down a 30 MB export enough to fit', () => {
@@ -49,7 +54,7 @@ test('opaque exports fall back to jpeg', () => {
 });
 
 test('isOverLimit uses the safe threshold', () => {
-    assert.equal(isOverLimit(19 * MB), true);
+    assert.equal(isOverLimit(5 * MB), true);
     assert.equal(isOverLimit(1 * MB), false);
 });
 

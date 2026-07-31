@@ -4283,9 +4283,9 @@ export default function PhotoStudioModal({
     }
 
     /**
-     * Deja el export por debajo del límite de subida (20 MB del server action).
-     * Un PNG con fondo removido a resolución completa lo supera facilmente; se
-     * reduce la resolución y, si hace falta, se pasa a WebP (mantiene alpha).
+     * Deja el export por debajo del límite real de transporte de Vercel (4.5 MB,
+     * incluyendo el envelope de FormData). El límite de 20 MB de Next no alcanza:
+     * Vercel puede rechazar antes el request y la server action nunca se ejecuta.
      */
     async function shrinkBlobForUpload(blob: Blob): Promise<Blob> {
         if (!isOverLimit(blob.size)) return blob;
@@ -5880,9 +5880,8 @@ export default function PhotoStudioModal({
                 canvasLayersForSave = await persistCanvasDocument(activeCanvas);
             }
             const rawBlob = canvasActive ? await exportCanvasToBlob() : await exportToBlob();
-            // Un PNG con transparencia a resolución completa supera el límite de 20 MB
-            // del server action y la subida fallaba sin guardar nada. Lo achicamos
-            // preservando el canal alpha antes de subir.
+            // Alinear el archivo con el límite real de Vercel antes de crear FormData;
+            // preservamos alpha y evitamos que el request muera antes del backend.
             const blob = await shrinkBlobForUpload(rawBlob);
             const isPng = blob.type === 'image/png';
             const ext = isPng ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
