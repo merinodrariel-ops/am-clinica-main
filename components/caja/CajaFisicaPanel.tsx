@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Banknote, CalendarClock, CheckCircle2, Loader2, LockKeyhole } from 'lucide-react';
+import { Banknote, CalendarClock, CheckCircle2, Loader2, LockKeyhole, MinusCircle, Receipt } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,8 @@ import {
     getSaldoCajaFisica,
     type SaldoCajaFisica,
 } from '@/lib/caja-fisica';
+import NuevoGastoForm from '@/components/caja/NuevoGastoForm';
+import TransferenciaAdmin from '@/components/caja/TransferenciaAdmin';
 
 interface CajaFisicaPanelProps {
     sucursalId: string;
@@ -35,6 +37,8 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
     const [contadoArs, setContadoArs] = useState(0);
     const [contadoUsd, setContadoUsd] = useState(0);
     const [observaciones, setObservaciones] = useState('');
+    const [showExpense, setShowExpense] = useState(false);
+    const [showWithdrawal, setShowWithdrawal] = useState(false);
 
     const usuario = useMemo(
         () => profile?.full_name || user?.email || 'Usuario de caja',
@@ -167,6 +171,19 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
                     </div>
                 </div>
 
+                {!waitingActivation && isOpen && canOperate && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setShowExpense(true)}>
+                            <Receipt size={17} className="mr-2" />
+                            Registrar gasto en efectivo
+                        </Button>
+                        <Button variant="outline" onClick={() => setShowWithdrawal(true)}>
+                            <MinusCircle size={17} className="mr-2" />
+                            Retirar efectivo
+                        </Button>
+                    </div>
+                )}
+
                 {waitingActivation && (
                     <div className="mt-4 flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
                         <CalendarClock size={19} className="mt-0.5 shrink-0" />
@@ -207,6 +224,19 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
                     </div>
                 )}
             </div>
+            <NuevoGastoForm
+                isOpen={showExpense}
+                onClose={() => setShowExpense(false)}
+                onSuccess={() => void load()}
+                bnaRate={tcBna || 0}
+            />
+            <TransferenciaAdmin
+                isOpen={showWithdrawal}
+                onClose={() => setShowWithdrawal(false)}
+                onSuccess={() => void load()}
+                bnaRate={tcBna || 0}
+                defaultTipo="RETIRO_EFECTIVO"
+            />
         </section>
     );
 }

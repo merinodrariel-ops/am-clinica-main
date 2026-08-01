@@ -16,7 +16,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 const { Client } = pg;
-const activationDate = '2026-08-01';
+const activationDate = '2026-07-31';
 
 function assert(condition, message) {
     if (!condition) throw new Error(message);
@@ -68,6 +68,7 @@ try {
         SELECT
             s.id AS sucursal_id,
             (SELECT id FROM profiles WHERE categoria = 'owner' AND is_active = TRUE LIMIT 1) AS owner_id,
+            (SELECT id FROM profiles WHERE categoria = 'admin' AND is_active = TRUE LIMIT 1) AS admin_id,
             (SELECT id FROM profiles WHERE categoria = 'reception' AND is_active = TRUE LIMIT 1) AS reception_id,
             (SELECT id FROM cuentas_financieras
              WHERE sucursal_id = s.id AND tipo_cuenta = 'EFECTIVO'
@@ -76,6 +77,7 @@ try {
         FROM sucursales s
         WHERE s.activa = TRUE
           AND s.moneda_local = 'ARS'
+          AND s.caja_unificada_desde IS NOT NULL
         ORDER BY s.nombre
         LIMIT 1
     `);
@@ -83,6 +85,7 @@ try {
     const ctx = context.rows[0];
     assert(ctx?.sucursal_id, 'No se encontró la sucursal Madero');
     assert(ctx?.owner_id, 'No se encontró un owner activo');
+    assert(ctx?.admin_id, 'No se encontró un admin activo');
     assert(ctx?.reception_id, 'No se encontró recepción activa');
     assert(ctx?.efectivo_usd_id, 'No se encontró cuenta Efectivo USD');
 
@@ -190,20 +193,27 @@ try {
 
     currentStep = 'permisos de retiro';
     await impersonate(ctx.reception_id);
-    await expectDatabaseError(
-        client,
-        'retiro_recepcion',
-        () => client.query(
-            `INSERT INTO transferencias_caja (
+    await client.query(
+        `INSERT INTO transferencias_caja (
                 usuario, moneda, monto, usd_equivalente, motivo, estado,
                 tipo_transferencia, caja_origen, caja_destino, fecha_movimiento
             ) VALUES (
-                'Prueba transaccional', 'USD', 10, 10, 'PRUEBA',
+                'Prueba transaccional', 'USD', 10, 10, 'PRUEBA TRANSACCIONAL',
                 'confirmada', 'RETIRO_EFECTIVO', 'RECEPCION', NULL, $1
             )`,
-            [activationDate],
-        ),
-        'solo pueden ser realizados por owner',
+        [activationDate],
+    );
+
+    await impersonate(ctx.admin_id);
+    await client.query(
+        `INSERT INTO transferencias_caja (
+            usuario, moneda, monto, usd_equivalente, motivo, estado,
+            tipo_transferencia, caja_origen, caja_destino, fecha_movimiento
+        ) VALUES (
+            'Prueba transaccional', 'USD', 10, 10, 'PRUEBA TRANSACCIONAL',
+            'confirmada', 'RETIRO_EFECTIVO', 'ADMIN', NULL, $1
+        )`,
+        [activationDate],
     );
 
     await impersonate(ctx.owner_id);
@@ -240,8 +250,8 @@ try {
     );
     const expected = result.rows[0].saldo;
     assert(
-        closeEnough(expected.usd, Number(initial.usd) - 150),
-        'El retiro owner no descontó USD',
+        closeEnough(expected.usd, Number(initial.usd) - 170),
+        'Los retiros de Recepción, Administración y Owner no descontaron USD',
     );
 
     currentStep = 'cierre';
@@ -274,13 +284,13 @@ try {
             (SELECT COUNT(*) FROM transferencias_caja
              WHERE motivo = 'PRUEBA TRANSACCIONAL' AND caja_arqueo_id = $1) AS retiros,
             (SELECT COUNT(*) FROM caja_transicion_snapshots
-             WHERE sucursal_id = $2 AND etiqueta = 'primera-apertura-2026-08-01') AS snapshots`,
+             WHERE sucursal_id = $2 AND etiqueta = 'primera-apertura-2026-07-31') AS snapshots`,
         [closed.rows[0].id, ctx.sucursal_id],
     );
 
     assert(Number(linked.rows[0].recepcion) === 2, 'No se vincularon movimientos de Recepción');
     assert(Number(linked.rows[0].administracion) === 1, 'No se vinculó el egreso administrativo');
-    assert(Number(linked.rows[0].retiros) === 1, 'No se vinculó el retiro');
+    assert(Number(linked.rows[0].retiros) === 3, 'No se vincularon los tres retiros');
     assert(Number(linked.rows[0].snapshots) === 1, 'No se creó el snapshot de primera apertura');
 
     currentStep = 'bloqueo post-cierre';
@@ -314,7 +324,8 @@ try {
             'recepcion gasta',
             'saldo negativo bloqueado',
             'liquidacion efectiva descuenta',
-            'retiro recepcion bloqueado',
+            'retiro recepcion descuenta',
+            'retiro administracion descuenta',
             'retiro owner descuenta',
             'traspaso interno bloqueado',
             'cierre sin diferencia',

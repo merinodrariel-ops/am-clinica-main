@@ -10,6 +10,7 @@ import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TransferenciaTipo = 'TRASPASO_INTERNO' | 'RETIRO_EFECTIVO';
 type CajaNodo = 'RECEPCION' | 'ADMIN';
@@ -50,6 +51,7 @@ export default function TransferenciaAdmin({
     defaultTipo = 'TRASPASO_INTERNO',
     fechaMovimiento,
 }: TransferenciaAdminProps) {
+    const { user, profile } = useAuth();
     const [monto, setMonto] = useState(0);
     const [moneda, setMoneda] = useState<'USD' | 'ARS'>('ARS');
     const [tipoTransferencia, setTipoTransferencia] = useState<TransferenciaTipo>(defaultTipo);
@@ -115,9 +117,10 @@ export default function TransferenciaAdmin({
                 caja_destino: tipoTransferencia === 'RETIRO_EFECTIVO' ? null : cajaDestino,
                 motivo,
                 observaciones: observaciones || null,
-                usuario: 'Recepcion',
+                usuario: profile?.full_name || user?.email || 'Usuario de caja',
                 estado: 'confirmada',
                 fecha_movimiento: finalFechaMovimiento,
+                comprobante_url: comprobanteUrl,
             };
 
             let { error } = await supabase
@@ -134,7 +137,7 @@ export default function TransferenciaAdmin({
                     usd_equivalente: usdEquivalente,
                     motivo: `${opsTag} ${motivo}`,
                     observaciones: observaciones || null,
-                    usuario: 'Recepcion',
+                    usuario: profile?.full_name || user?.email || 'Usuario de caja',
                     estado: 'confirmada',
                     fecha_movimiento: finalFechaMovimiento,
                 };
@@ -196,10 +199,10 @@ export default function TransferenciaAdmin({
                                 ? <Wallet size={20} className="text-orange-600 dark:text-orange-400" />
                                 : <ArrowRightLeft size={20} className="text-orange-600 dark:text-orange-400" />}
                         </div>
-                        <div>
+                        {false && <div>
                             <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
                             <p className="text-xs text-gray-500">{subtitle}</p>
-                        </div>
+                        </div>}
                     </div>
                     <Button
                         variant="ghost"
@@ -238,7 +241,7 @@ export default function TransferenciaAdmin({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {false && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Caja origen
@@ -268,7 +271,7 @@ export default function TransferenciaAdmin({
                                 </select>
                             </div>
                         )}
-                    </div>
+                    </div>}
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -354,7 +357,7 @@ export default function TransferenciaAdmin({
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                             {tipoTransferencia === 'RETIRO_EFECTIVO'
-                                ? `${cajaLabel(cajaOrigen)} -> Retiro externo`
+                                ? 'Caja física única → Retiro externo'
                                 : `${cajaLabel(cajaOrigen)} -> ${cajaLabel(cajaDestino)}`}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">Motivo: {motivo}</p>

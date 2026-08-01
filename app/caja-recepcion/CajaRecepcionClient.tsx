@@ -1177,14 +1177,14 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                             </div>
 
                             <div className="rounded-2xl border border-teal-500/20 bg-teal-500/10 px-5 py-4 text-sm text-teal-100">
-                                Esta pantalla registra únicamente ingresos. Los gastos y las liquidaciones se gestionan desde Administración.
+                                Desde esta pantalla también podés registrar gastos chicos y retiros sobre la caja física única. Las liquidaciones se gestionan desde Administración.
                             </div>
                         </div>
                     </div>}
 
                     {cajaFisicaActiva && (
                         <div className="mb-8 rounded-2xl border border-teal-500/20 bg-teal-500/10 px-5 py-4 text-sm text-teal-100">
-                            Caja Recepción muestra y registra únicamente ingresos. Gastos, retiros y liquidaciones están en Administración y liquidaciones.
+                            Recepción y Administración operan sobre la misma caja física. Acá podés registrar ingresos, gastos chicos y retiros; las liquidaciones siguen en Administración.
                         </div>
                     )}
 
