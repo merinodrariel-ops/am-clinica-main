@@ -642,19 +642,16 @@ export async function replaceEditedPhotoAction(
     }
 }
 
-/**
- * Repairs legacy Photo Studio outputs that were marked as edited locally but
- * remained in the general photo folder. Only explicit file IDs supplied by the
- * authenticated editor are moved.
- */
-export async function syncEditedPhotosToSelectionAction(
+/** Moves explicit, validated patient file IDs into that patient's Selección folder. */
+async function movePatientPhotosToSelection(
     patientFolderId: string,
-    fileIds: string[]
+    fileIds: string[],
+    actionLabel: string,
 ): Promise<{ moved: string[]; failed: Array<{ fileId: string; error: string }>; error?: string }> {
     const emptyResult = { moved: [], failed: [] as Array<{ fileId: string; error: string }> };
 
     try {
-        const roleCheck = await requireDriveManageRole('reconciliar fotos editadas con Selección');
+        const roleCheck = await requireDriveManageRole(actionLabel);
         if (roleCheck.error) return { ...emptyResult, error: roleCheck.error };
         if (!DRIVE_ID_RE.test(patientFolderId)) return { ...emptyResult, error: 'Carpeta del paciente inválida' };
 
@@ -685,6 +682,21 @@ export async function syncEditedPhotosToSelectionAction(
             error: error instanceof Error ? error.message : String(error),
         };
     }
+}
+
+export async function movePhotosToSelectionAction(
+    patientFolderId: string,
+    fileIds: string[]
+): Promise<{ moved: string[]; failed: Array<{ fileId: string; error: string }>; error?: string }> {
+    return movePatientPhotosToSelection(patientFolderId, fileIds, 'mover fotos a Selección');
+}
+
+/** Repairs legacy edited outputs that remained in the general photo folder. */
+export async function syncEditedPhotosToSelectionAction(
+    patientFolderId: string,
+    fileIds: string[]
+): Promise<{ moved: string[]; failed: Array<{ fileId: string; error: string }>; error?: string }> {
+    return movePatientPhotosToSelection(patientFolderId, fileIds, 'reconciliar fotos editadas con Selección');
 }
 
 /**

@@ -15,7 +15,7 @@ import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from 'sonner';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
-import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, deleteDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction, syncEditedPhotosToSelectionAction } from '@/app/actions/patient-files-drive';
+import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, deleteDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction, movePhotosToSelectionAction, syncEditedPhotosToSelectionAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import FabricCanvasStage from './FabricCanvasStage';
@@ -47,7 +47,7 @@ import {
     updateCanvasDocumentSelection,
 } from '@/lib/photo-studio/canvas-selection';
 import { buildDriveImageInfoTitle } from '@/lib/photo-studio/drive-image-info';
-import { getPendingEditedPhotoIds } from '@/lib/photo-studio-selection-reconciliation';
+import { getPendingEditedPhotoIds, isPhotoStudioSelectionFolder } from '@/lib/photo-studio-selection-reconciliation';
 import {
     getPhotoStudioPresentationPhotoIds,
     getPhotoStudioPresentationScope,
@@ -1630,8 +1630,12 @@ export default function PhotoStudioModal({
 
         return [...ordered, ...byId.values()];
     }, [baseImageFiles, imageOrderIds]);
-    const editedOutputFiles = useMemo(
-        () => imageFiles.filter(item => editedFileIds.has(item.id) || item.name.toLowerCase().includes('_editada')),
+    const selectionRailFiles = useMemo(
+        () => imageFiles.filter(item =>
+            isPhotoStudioSelectionFolder(item.parentName) ||
+            editedFileIds.has(item.id) ||
+            item.name.toLowerCase().includes('_editada')
+        ),
         [editedFileIds, imageFiles],
     );
     const legacySelectionSyncKeyRef = useRef('');
@@ -1773,6 +1777,9 @@ export default function PhotoStudioModal({
     const [shareFile, setShareFile] = useState<{ url: string; name: string; rawFile?: File } | null>(null);
     const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
     const [thumbnailDragId, setThumbnailDragId] = useState<string | null>(null);
+    const [librarySelectionDragId, setLibrarySelectionDragId] = useState<string | null>(null);
+    const [selectionDropActive, setSelectionDropActive] = useState(false);
+    const [selectionDropSavingId, setSelectionDropSavingId] = useState<string | null>(null);
     const [thumbnailDropIndicator, setThumbnailDropIndicator] = useState<{ id: string; edge: 'top' | 'bottom' } | null>(null);
     const thumbnailOrderRef = useRef<string[]>(imageOrderIds);
     const thumbnailDragMovedRef = useRef(false);
@@ -5908,6 +5915,48 @@ export default function PhotoStudioModal({
         if (shouldPersist) void persistThumbnailOrder(finalOrder);
     }
 
+    async function handleLibraryPhotoDropToSelection(fileId: string) {
+        setLibrarySelectionDragId(null);
+        setSelectionDropActive(false);
+        setThumbnailDragId(null);
+        setThumbnailDropIndicator(null);
+
+        if (!canSave) {
+            toast.error('No tenés permiso para mover fotos a Selección');
+            return;
+        }
+
+        const sourceFile = getFileById(fileId);
+        if (!sourceFile) {
+            toast.error('No se encontró la foto que querías mover');
+            return;
+        }
+        if (isPhotoStudioSelectionFolder(sourceFile.parentName)) {
+            toast.info('La foto ya está en Selección');
+            return;
+        }
+
+        setSelectionDropSavingId(fileId);
+        try {
+            const result = await movePhotosToSelectionAction(folderId, [fileId]);
+            const moveError = result.error || result.failed[0]?.error;
+
+            if (moveError) {
+                toast.error('No se pudo pasar la foto a Selección', { description: moveError });
+                return;
+            }
+
+            toast.success('Foto enviada a Selección');
+            onSaved({ silent: true });
+        } catch (error) {
+            toast.error('No se pudo pasar la foto a Selección', {
+                description: error instanceof Error ? error.message : 'Error inesperado',
+            });
+        } finally {
+            setSelectionDropSavingId(null);
+        }
+    }
+
     async function materializeCanvasLayersForSave(canvasDocument: CanvasDoc): Promise<CanvasLayer[]> {
         const { uploadCanvasLayerAssetAction } = await import('@/app/actions/patient-files-drive');
         const persisted: CanvasLayer[] = [];
@@ -6475,8 +6524,10 @@ export default function PhotoStudioModal({
                                                 return;
                                             }
                                             setThumbnailDragId(f.id);
+                                            setLibrarySelectionDragId(f.id);
                                             e.dataTransfer.effectAllowed = 'move';
                                             e.dataTransfer.setData('thumbnailReorderId', f.id);
+                                            e.dataTransfer.setData('selectionLibraryFileId', f.id);
                                         }}
                                         onDragOver={(e) => {
                                             if (canvasActive) return;
@@ -6498,6 +6549,8 @@ export default function PhotoStudioModal({
                                         }}
                                         onDragEnd={() => {
                                             setThumbnailDragId(null);
+                                            setLibrarySelectionDragId(null);
+                                            setSelectionDropActive(false);
                                             setThumbnailDropIndicator(null);
                                         }}
                                         onClick={(e) => handleThumbnailSelect(f, e)}
@@ -7081,19 +7134,32 @@ export default function PhotoStudioModal({
                         </div>
                     )}
 
-                    {/* Adobe Express-style project rail: editable canvases and edited outputs */}
-                    <div className="hidden md:flex h-[94px] flex-shrink-0 items-stretch border-t border-white/10 bg-[#111119]">
+                    {/* Editable canvases and photos curated in Selección */}
+                    <div className={`hidden md:flex h-[94px] flex-shrink-0 items-stretch border-t transition-colors ${
+                        selectionDropActive ? 'border-[#C9A96E] bg-[#C9A96E]/10' : 'border-white/10 bg-[#111119]'
+                    }`}>
                         <div className="flex w-36 flex-shrink-0 flex-col justify-center border-r border-white/10 px-4">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C9A96E]">Proyectos</span>
+                            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C9A96E]">Selección</span>
                             <span className="mt-1 text-[10px] leading-tight text-white/35">
-                                {selectedCanvasIds.length > 1
+                                {selectionDropSavingId
+                                    ? 'Moviendo foto...'
+                                    : selectionDropActive
+                                        ? 'Soltá para agregar'
+                                        : selectedCanvasIds.length > 1
                                     ? `${selectedCanvasIds.length} lienzos seleccionados`
-                                    : 'Lienzos editables y resultados'}
+                                    : 'Arrastrá fotos aquí'}
                             </span>
                         </div>
                         <div
                             className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto px-4 py-2 thin-scrollbar"
                             onDragOver={(event) => {
+                                const libraryFileId = event.dataTransfer.getData('selectionLibraryFileId') || librarySelectionDragId;
+                                if (libraryFileId) {
+                                    event.preventDefault();
+                                    event.dataTransfer.dropEffect = 'move';
+                                    setSelectionDropActive(true);
+                                    return;
+                                }
                                 if (!thumbnailDragId) return;
                                 event.preventDefault();
                                 event.dataTransfer.dropEffect = 'move';
@@ -7112,10 +7178,22 @@ export default function PhotoStudioModal({
                                 previewThumbnailReorder(thumbnailDragId, targetId, edge);
                             }}
                             onDrop={(event) => {
+                                const libraryFileId = event.dataTransfer.getData('selectionLibraryFileId') || librarySelectionDragId;
+                                if (libraryFileId) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    void handleLibraryPhotoDropToSelection(libraryFileId);
+                                    return;
+                                }
                                 if (!thumbnailDragId) return;
                                 event.preventDefault();
                                 event.stopPropagation();
                                 finishThumbnailReorder();
+                            }}
+                            onDragLeave={(event) => {
+                                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                                    setSelectionDropActive(false);
+                                }
                             }}
                         >
                             {canvases.map((cv) => {
@@ -7155,21 +7233,22 @@ export default function PhotoStudioModal({
                                     </button>
                                 </div>
                             )})}
-                            {editedOutputFiles.map((editedFile) => {
-                                const isEditedOutputSelected = selectedIds.has(editedFile.id);
-                                const showDropLeft = thumbnailDropIndicator?.id === editedFile.id && thumbnailDropIndicator.edge === 'top';
-                                const showDropRight = thumbnailDropIndicator?.id === editedFile.id && thumbnailDropIndicator.edge === 'bottom';
+                            {selectionRailFiles.map((selectionFile) => {
+                                const isEditedOutputSelected = selectedIds.has(selectionFile.id);
+                                const showDropLeft = thumbnailDropIndicator?.id === selectionFile.id && thumbnailDropIndicator.edge === 'top';
+                                const showDropRight = thumbnailDropIndicator?.id === selectionFile.id && thumbnailDropIndicator.edge === 'bottom';
                                 return (
                                 <button
-                                    key={`edited-${editedFile.id}`}
-                                    data-reorder-thumbnail-id={editedFile.id}
+                                    key={`selection-${selectionFile.id}`}
+                                    data-reorder-thumbnail-id={selectionFile.id}
                                     draggable
                                     onDragStart={(event) => {
-                                        preparePhotoStudioCanvasDrag(event.dataTransfer, editedFile.id);
-                                        event.dataTransfer.setData('thumbnailReorderId', editedFile.id);
+                                        preparePhotoStudioCanvasDrag(event.dataTransfer, selectionFile.id);
+                                        event.dataTransfer.setData('thumbnailReorderId', selectionFile.id);
                                         event.dataTransfer.effectAllowed = 'copyMove';
                                         thumbnailDragMovedRef.current = false;
-                                        setThumbnailDragId(editedFile.id);
+                                        setLibrarySelectionDragId(null);
+                                        setThumbnailDragId(selectionFile.id);
                                     }}
                                     onDragOver={(event) => {
                                         event.preventDefault();
@@ -7177,7 +7256,7 @@ export default function PhotoStudioModal({
                                         const rect = event.currentTarget.getBoundingClientRect();
                                         const edge = event.clientX < rect.left + rect.width / 2 ? 'top' : 'bottom';
                                         const draggedId = event.dataTransfer.getData('thumbnailReorderId') || thumbnailDragId;
-                                        if (draggedId) previewThumbnailReorder(draggedId, editedFile.id, edge);
+                                        if (draggedId) previewThumbnailReorder(draggedId, selectionFile.id, edge);
                                     }}
                                     onDrop={(event) => {
                                         event.preventDefault();
@@ -7185,23 +7264,23 @@ export default function PhotoStudioModal({
                                         finishThumbnailReorder();
                                     }}
                                     onDragEnd={finishThumbnailReorder}
-                                    onClick={(event) => handleThumbnailSelect(editedFile, event)}
-                                    onContextMenu={(event) => openThumbnailContextMenu(event, editedFile)}
+                                    onClick={(event) => handleThumbnailSelect(selectionFile, event)}
+                                    onContextMenu={(event) => openThumbnailContextMenu(event, selectionFile)}
                                     aria-pressed={isEditedOutputSelected}
                                     className={`relative flex flex-shrink-0 cursor-grab flex-col items-center gap-1 active:cursor-grabbing ${
-                                        isEditedOutputSelected || (!canvasActive && activeFile.id === editedFile.id) ? 'text-[#C9A96E]' : 'text-white/55'
-                                    } ${thumbnailDragId === editedFile.id ? 'opacity-60 scale-95' : ''}`}
-                                    title={`${buildDriveImageInfoTitle(editedFile)} · Arrastrá hacia los costados para ordenar`}
+                                        isEditedOutputSelected || (!canvasActive && activeFile.id === selectionFile.id) ? 'text-[#C9A96E]' : 'text-white/55'
+                                    } ${thumbnailDragId === selectionFile.id ? 'opacity-60 scale-95' : ''}`}
+                                    title={`${buildDriveImageInfoTitle(selectionFile)} · Arrastrá hacia los costados para ordenar`}
                                 >
                                     <span className={`relative block h-14 w-20 overflow-hidden rounded-lg border-2 ${
                                         isEditedOutputSelected
                                             ? 'border-[#C9A96E] shadow-[0_0_0_2px_rgba(201,169,110,0.35),0_0_18px_rgba(201,169,110,0.35)]'
-                                            : !canvasActive && activeFile.id === editedFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
+                                            : !canvasActive && activeFile.id === selectionFile.id ? 'border-[#C9A96E]' : 'border-white/10 hover:border-white/30'
                                     }`}>
                                         {showDropLeft && <span className="absolute -left-0.5 bottom-1 top-1 z-20 w-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
                                         {showDropRight && <span className="absolute -right-0.5 bottom-1 top-1 z-20 w-1 rounded-full bg-[#C9A96E] shadow-[0_0_10px_rgba(201,169,110,0.7)]" />}
-                                        {editedFile.thumbnailLink ? (
-                                            <img src={editedFile.thumbnailLink} alt="" referrerPolicy="no-referrer" draggable={false} className="pointer-events-none h-full w-full object-cover" />
+                                        {selectionFile.thumbnailLink ? (
+                                            <img src={selectionFile.thumbnailLink} alt="" referrerPolicy="no-referrer" draggable={false} className="pointer-events-none h-full w-full object-cover" />
                                         ) : (
                                             <span className="flex h-full w-full items-center justify-center bg-white/5"><ImageIcon size={16} /></span>
                                         )}
@@ -7212,7 +7291,7 @@ export default function PhotoStudioModal({
                                         )}
                                         <Sparkles size={10} className="absolute bottom-1 right-1 rounded-full bg-[#C9A96E] p-0.5 text-black" />
                                     </span>
-                                    <span className="max-w-20 truncate text-[9px]">{editedFile.name}</span>
+                                    <span className="max-w-20 truncate text-[9px]">{selectionFile.name}</span>
                                 </button>
                             )})}
                             <button
