@@ -199,10 +199,10 @@ export default function TransferenciaAdmin({
                                 ? <Wallet size={20} className="text-orange-600 dark:text-orange-400" />
                                 : <ArrowRightLeft size={20} className="text-orange-600 dark:text-orange-400" />}
                         </div>
-                        {false && <div>
+                        <div>
                             <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
                             <p className="text-xs text-gray-500">{subtitle}</p>
-                        </div>}
+                        </div>
                     </div>
                     <Button
                         variant="ghost"
@@ -215,32 +215,6 @@ export default function TransferenciaAdmin({
                 </div>
 
                 <div className="p-5 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Tipo de movimiento
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={() => setTipoTransferencia('TRASPASO_INTERNO')}
-                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${tipoTransferencia === 'TRASPASO_INTERNO'
-                                    ? 'bg-indigo-600 text-white border-indigo-500'
-                                    : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-                                    }`}
-                            >
-                                Traspaso interno
-                            </button>
-                            <button
-                                onClick={() => setTipoTransferencia('RETIRO_EFECTIVO')}
-                                className={`px-3 py-2 rounded-lg text-xs font-semibold border ${tipoTransferencia === 'RETIRO_EFECTIVO'
-                                    ? 'bg-orange-600 text-white border-orange-500'
-                                    : 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-                                    }`}
-                            >
-                                Retiro efectivo
-                            </button>
-                        </div>
-                    </div>
-
                     {false && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
