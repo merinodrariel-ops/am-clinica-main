@@ -10,7 +10,7 @@ test('videos use a direct Google Drive resumable session instead of the Vercel f
         if (String(input) === '/api/drive/upload-session') {
             return Response.json({ uploadUrl: 'https://www.googleapis.com/upload/drive/session-test' });
         }
-        return Response.json({ id: 'drive-file-id' });
+        return Response.json({ complete: true, fileId: 'drive-file-id' });
     };
 
     try {
@@ -24,9 +24,9 @@ test('videos use a direct Google Drive resumable session instead of the Vercel f
         assert.deepEqual(result.errors, []);
         assert.equal(calls.length, 2);
         assert.equal(calls[0].input, '/api/drive/upload-session');
-        assert.equal(calls[1].input, 'https://www.googleapis.com/upload/drive/session-test');
+        assert.equal(calls[1].input, '/api/drive/upload-chunk');
         assert.equal(calls[1].init?.method, 'PUT');
-        assert.equal(calls[1].init?.body, video);
+        assert.equal(calls[1].init?.headers && (calls[1].init.headers as Record<string, string>)['X-Drive-Upload-Url'], 'https://www.googleapis.com/upload/drive/session-test');
     } finally {
         globalThis.fetch = originalFetch;
     }
@@ -41,7 +41,7 @@ test('multiple PLY files use independent direct Drive uploads and preserve their
             const requestBody = JSON.parse(String(init?.body)) as { fileName: string };
             return Response.json({ uploadUrl: `https://www.googleapis.com/upload/drive/${requestBody.fileName}` });
         }
-        return Response.json({ id: 'drive-file-id' });
+        return Response.json({ complete: true, fileId: 'drive-file-id' });
     };
 
     try {
@@ -75,7 +75,9 @@ test('a missing Drive file id is reported for the exact PLY while later files st
             return Response.json({ uploadUrl: 'https://www.googleapis.com/upload/drive/session-test' });
         }
         directUploadCount++;
-        return directUploadCount === 1 ? Response.json({}) : Response.json({ id: 'second-file-id' });
+        return directUploadCount === 1
+            ? Response.json({ complete: true })
+            : Response.json({ complete: true, fileId: 'second-file-id' });
     };
 
     try {
@@ -99,4 +101,37 @@ test('only images receive the SEO upload prefix', () => {
     assert.match(getUploadName(image, 'paciente_archivos', 1), /^paciente_archivos_\d{4}-\d{2}_001\.jpg$/);
     assert.equal(getUploadName(model, 'paciente_archivos', 1), 'escaneo.ply');
     assert.equal(shouldUploadDirectlyToDrive(model), true);
+});
+
+test('large PLY files are split into Vercel-safe chunks with exact byte ranges', async () => {
+    const originalFetch = globalThis.fetch;
+    const chunkRanges: string[] = [];
+    globalThis.fetch = async (input, init) => {
+        if (String(input) === '/api/drive/upload-session') {
+            return Response.json({ uploadUrl: 'https://www.googleapis.com/upload/drive/session-test' });
+        }
+        const headers = init?.headers as Record<string, string>;
+        chunkRanges.push(headers['Content-Range']);
+        const isLast = chunkRanges.length === 2;
+        return Response.json(isLast
+            ? { complete: true, fileId: 'large-ply-id' }
+            : { complete: false });
+    };
+
+    try {
+        const file = new File([new Uint8Array(3 * 1024 * 1024 + 10)], 'escaneo-grande.ply');
+        const result = await uploadFilesToDrive([file], {
+            folderId: 'patient-folder-id',
+            patientId: 'patient-id',
+        });
+
+        assert.equal(result.successCount, 1);
+        assert.deepEqual(result.errors, []);
+        assert.deepEqual(chunkRanges, [
+            'bytes 0-3145727/3145738',
+            'bytes 3145728-3145737/3145738',
+        ]);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });

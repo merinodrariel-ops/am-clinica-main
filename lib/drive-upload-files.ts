@@ -21,6 +21,7 @@ export interface UploadToDriveResult {
 }
 
 const DIRECT_DRIVE_EXTENSIONS = new Set(['ply', 'stl', 'obj', 'dentalproject']);
+const DRIVE_UPLOAD_CHUNK_SIZE = 3 * 1024 * 1024;
 
 function getFileExtension(fileName: string): string {
     const dotIndex = fileName.lastIndexOf('.');
@@ -56,18 +57,37 @@ async function uploadDirectlyToDrive(file: File, uploadName: string, opts: Uploa
         throw new Error(session.error || 'No se pudo iniciar la subida directa a Google Drive');
     }
 
-    const uploadResponse = await fetch(session.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': mimeType },
-        body: file,
-    });
-    if (!uploadResponse.ok) {
-        const googleError = await uploadResponse.json().catch(() => null) as { error?: { message?: string } } | null;
-        throw new Error(googleError?.error?.message || `Google Drive no pudo completar la subida (código ${uploadResponse.status})`);
+    let confirmedFileId: string | undefined;
+    for (let start = 0; start < file.size; start += DRIVE_UPLOAD_CHUNK_SIZE) {
+        const endExclusive = Math.min(start + DRIVE_UPLOAD_CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, endExclusive);
+        let uploadResponse: Response;
+        try {
+            uploadResponse = await fetch('/api/drive/upload-chunk', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': mimeType,
+                    'X-Drive-Upload-Url': session.uploadUrl,
+                    'Content-Range': `bytes ${start}-${endExclusive - 1}/${file.size}`,
+                },
+                body: chunk,
+            });
+        } catch {
+            throw new Error('No se pudo conectar con el servidor de carga. Revisá la conexión e intentá nuevamente');
+        }
+
+        const chunkResult = await uploadResponse.json().catch(() => ({})) as {
+            complete?: boolean;
+            fileId?: string;
+            error?: string;
+        };
+        if (!uploadResponse.ok) {
+            throw new Error(chunkResult.error || `Google Drive rechazó una parte del archivo (código ${uploadResponse.status})`);
+        }
+        if (chunkResult.complete) confirmedFileId = chunkResult.fileId;
     }
 
-    const uploadedFile = await uploadResponse.json().catch(() => null) as { id?: string } | null;
-    if (!uploadedFile?.id) {
+    if (!confirmedFileId) {
         throw new Error('Google Drive recibió el archivo pero no confirmó su identificador');
     }
 }
