@@ -27,12 +27,12 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => null) as UploadSessionRequest | null;
     const fileName = body?.fileName?.trim();
-    const mimeType = body?.mimeType?.trim();
+    const mimeType = body?.mimeType?.trim() || 'application/octet-stream';
     const folderId = body?.folderId?.trim();
     const patientId = body?.patientId?.trim();
     const fileSize = body?.fileSize;
 
-    if (!profile || !fileName || !mimeType || !folderId || !patientId || !fileSize || fileSize <= 0) {
+    if (!profile || !fileName || !folderId || !patientId || !fileSize || fileSize <= 0) {
         return NextResponse.json({ error: 'Faltan datos para iniciar la subida' }, { status: 400 });
     }
     if (!canUploadPatientDriveMimeType(profile.categoria, mimeType)) {
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     const accessToken = await getDriveAccessToken();
     const googleResponse = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,name,webViewLink',
         {
             method: 'POST',
             headers: {

@@ -20,13 +20,32 @@ export interface UploadToDriveResult {
     errors: string[]; // "filename: message"
 }
 
-async function uploadVideoDirectlyToDrive(file: File, uploadName: string, opts: UploadToDriveOptions) {
+const DIRECT_DRIVE_EXTENSIONS = new Set(['ply', 'stl', 'obj', 'dentalproject']);
+
+function getFileExtension(fileName: string): string {
+    const dotIndex = fileName.lastIndexOf('.');
+    return dotIndex >= 0 ? fileName.slice(dotIndex + 1).toLowerCase() : '';
+}
+
+export function shouldUploadDirectlyToDrive(file: File): boolean {
+    return file.type.startsWith('video/')
+        || DIRECT_DRIVE_EXTENSIONS.has(getFileExtension(file.name));
+}
+
+export function getUploadName(file: File, fileNamePrefix: string | undefined, index: number): string {
+    if (!fileNamePrefix || !file.type.startsWith('image/')) return file.name;
+    const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
+    return buildSeoFileName(fileNamePrefix, index, ext);
+}
+
+async function uploadDirectlyToDrive(file: File, uploadName: string, opts: UploadToDriveOptions) {
+    const mimeType = file.type || 'application/octet-stream';
     const sessionResponse = await fetch('/api/drive/upload-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             fileName: uploadName,
-            mimeType: file.type,
+            mimeType,
             fileSize: file.size,
             folderId: opts.folderId,
             patientId: opts.patientId,
@@ -34,16 +53,22 @@ async function uploadVideoDirectlyToDrive(file: File, uploadName: string, opts: 
     });
     const session = await sessionResponse.json().catch(() => ({})) as { uploadUrl?: string; error?: string };
     if (!sessionResponse.ok || !session.uploadUrl) {
-        throw new Error(session.error || 'No se pudo iniciar la subida del video');
+        throw new Error(session.error || 'No se pudo iniciar la subida directa a Google Drive');
     }
 
     const uploadResponse = await fetch(session.uploadUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': file.type },
+        headers: { 'Content-Type': mimeType },
         body: file,
     });
     if (!uploadResponse.ok) {
-        throw new Error('Google Drive no pudo completar la subida del video');
+        const googleError = await uploadResponse.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(googleError?.error?.message || `Google Drive no pudo completar la subida (código ${uploadResponse.status})`);
+    }
+
+    const uploadedFile = await uploadResponse.json().catch(() => null) as { id?: string } | null;
+    if (!uploadedFile?.id) {
+        throw new Error('Google Drive recibió el archivo pero no confirmó su identificador');
     }
 }
 
@@ -75,13 +100,10 @@ export async function uploadFilesToDrive(
                 fileToUpload = compressed.blob;
             }
 
-            const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
-            const uploadName = opts.fileNamePrefix
-                ? buildSeoFileName(opts.fileNamePrefix, i + 1, ext)
-                : file.name;
+            const uploadName = getUploadName(file, opts.fileNamePrefix, i + 1);
 
-            if (file.type.startsWith('video/')) {
-                await uploadVideoDirectlyToDrive(file, uploadName, opts);
+            if (shouldUploadDirectlyToDrive(file)) {
+                await uploadDirectlyToDrive(file, uploadName, opts);
                 successCount++;
                 continue;
             }
@@ -92,9 +114,12 @@ export async function uploadFilesToDrive(
             formData.append('patientId', opts.patientId);
 
             const res = await fetch('/api/drive/upload', { method: 'POST', body: formData });
+            const responseBody = await res.json().catch(() => ({})) as { fileId?: string; error?: string };
             if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || 'Error al subir');
+                throw new Error(responseBody.error || `El servidor rechazó la carga (código ${res.status})`);
+            }
+            if (!responseBody.fileId) {
+                throw new Error('Google Drive recibió el archivo pero no confirmó su identificador');
             }
             successCount++;
         } catch (error) {

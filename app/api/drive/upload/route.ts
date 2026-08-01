@@ -4,6 +4,9 @@ import { getDriveClient } from '@/lib/google-drive';
 import { Readable } from 'stream';
 import { canUploadPatientDrive, canUploadPatientDriveMimeType } from '@/lib/patient-drive-access';
 
+export const runtime = 'nodejs';
+export const maxDuration = 180;
+
 function getDriveUploadErrorMessage(error: unknown): string {
     const fallback = error instanceof Error ? error.message : 'Error subiendo archivo';
 
@@ -79,6 +82,13 @@ export async function POST(request: Request) {
         });
 
         const fileId = response.data.id;
+
+        if (!fileId) {
+            return NextResponse.json(
+                { error: 'Google Drive recibió el archivo pero no confirmó su identificador' },
+                { status: 502 },
+            );
+        }
 
         // 4. Auto-set foto_perfil_url on first image upload for this patient
         if (patientId && fileId && file.type.startsWith('image/')) {
