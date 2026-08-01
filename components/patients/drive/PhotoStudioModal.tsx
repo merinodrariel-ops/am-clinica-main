@@ -7280,7 +7280,27 @@ export default function PhotoStudioModal({
                                         });
                                         
                                         if (saveResult.success) {
-                                            toast.success("Smile Design guardado exitosamente", { id: saveToastId });
+                                            if (saveResult.driveFileId && folderId) {
+                                                const selectionResult = await syncEditedPhotosToSelectionAction(
+                                                    folderId,
+                                                    [saveResult.driveFileId]
+                                                );
+                                                const selectionError = selectionResult.error || selectionResult.failed[0]?.error;
+
+                                                if (selectionError) {
+                                                    toast.warning("Smile Design guardado en el portal, pero no pudo pasar a Selección", {
+                                                        id: saveToastId,
+                                                        description: selectionError,
+                                                    });
+                                                } else {
+                                                    toast.success("Smile Design guardado en el portal y en Selección", { id: saveToastId });
+                                                }
+                                            } else {
+                                                toast.warning("Smile Design guardado en el portal, pero no pudo pasar a Selección", {
+                                                    id: saveToastId,
+                                                    description: "No se obtuvo el archivo de resultado en Drive",
+                                                });
+                                            }
                                             // Delay slightly to ensure Drive indexing is done before UI reloads
                                             setTimeout(() => onSaved(), 2000);
                                         } else {

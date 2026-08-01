@@ -19,3 +19,12 @@ test('Smile Design save reports the real preparation or server-action error', ()
   assert.match(source, /No se pudo guardar el Smile Design: \$\{message\}/);
   assert.doesNotMatch(source, /toast\.error\("Error al generar imágenes del Smile Design"/);
 });
+
+test('Smile Design save moves the final result to Selección after portal persistence', () => {
+  assert.match(
+    source,
+    /syncEditedPhotosToSelectionAction\(\s*folderId,\s*\[saveResult\.driveFileId\]\s*\)/
+  );
+  assert.match(source, /Smile Design guardado en el portal y en Selección/);
+  assert.match(source, /guardado en el portal, pero no pudo pasar a Selección/);
+});
