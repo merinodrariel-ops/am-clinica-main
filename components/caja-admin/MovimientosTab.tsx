@@ -76,6 +76,10 @@ import { Textarea } from "@/components/ui/Textarea";
 import MoneyInput from "@/components/ui/MoneyInput";
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
 import { calculateMonthlyAdminExpensesUsd } from '@/lib/caja-admin/expense-metrics';
+import {
+  cashWithdrawalLinesAreValid,
+  getAccountsForMovement,
+} from '@/lib/caja-admin/withdrawal-rules';
 
 interface Props {
   sucursal: Sucursal;
@@ -100,7 +104,7 @@ const TIPOS_MOVIMIENTO = [
   { value: "INGRESO_ADMIN", label: "Ingreso Administrativo" },
   { value: "INGRESO_PACIENTE", label: "Ingreso Paciente", onlyUnificada: true },
   { value: "CAMBIO_MONEDA", label: "Cambio de Moneda" },
-  { value: "RETIRO", label: "Retiro" },
+  { value: "RETIRO", label: "Retiro en efectivo" },
   { value: "TRANSFERENCIA", label: "Transferencia" },
   { value: "AJUSTE_CAJA", label: "Ajuste de Caja" },
   { value: "APORTE_CAPITAL", label: "Aporte de Capital (No Ingreso)" },
@@ -464,15 +468,46 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     .reduce((sum, m) => sum + (m.usd_equivalente_total || 0), 0);
 
   function addLinea() {
-    if (cuentas.length === 0) return;
+    const availableAccounts = getAccountsForMovement(
+      cuentas,
+      formData.tipo_movimiento,
+    );
+    if (availableAccounts.length === 0) {
+      setFormError(
+        formData.tipo_movimiento === "RETIRO"
+          ? "Falta configurar una cuenta de efectivo ARS o USD para registrar el retiro"
+          : "No hay cuentas financieras activas para registrar el movimiento",
+      );
+      return;
+    }
+    const defaultAccount = availableAccounts[0];
     setFormLineas([
       ...formLineas,
       {
-        cuenta_id: cuentas[0].id,
+        cuenta_id: defaultAccount.id,
         importe: 0,
-        moneda: cuentas[0].moneda,
+        moneda: defaultAccount.moneda,
       },
     ]);
+  }
+
+  function handleMovementTypeChange(nextType: string) {
+    setFormData((current) => ({
+      ...current,
+      tipo_movimiento: nextType,
+      subtipo: "",
+      liquidacion_id: "",
+      personal_id: "",
+    }));
+
+    if (nextType !== "RETIRO") return;
+
+    const cashAccounts = getAccountsForMovement(cuentas, nextType);
+    setFormLineas((currentLines) => currentLines.flatMap((line) => {
+      const cashAccount = cashAccounts.find((account) => account.moneda === line.moneda);
+      if (!cashAccount) return [];
+      return [{ ...line, cuenta_id: cashAccount.id, moneda: cashAccount.moneda }];
+    }));
   }
 
   function removeLinea(index: number) {
@@ -683,8 +718,15 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   }
 
   function addEditLinea() {
-    if (cuentas.length === 0) return;
-    const cuentaDefault = cuentas[0];
+    const availableAccounts = getAccountsForMovement(
+      cuentas,
+      editingMov?.tipo_movimiento,
+    );
+    if (availableAccounts.length === 0) {
+      setEditSaveError("Falta configurar una cuenta de efectivo ARS o USD para registrar el retiro.");
+      return;
+    }
+    const cuentaDefault = availableAccounts[0];
     const newLine: MovimientoLinea = {
       cuenta_id: cuentaDefault.id,
       moneda: cuentaDefault.moneda,
@@ -790,6 +832,11 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
             ? line.importe !== 0
             : line.importe > 0),
       );
+
+    if (!cashWithdrawalLinesAreValid(editingMov.tipo_movimiento, linesToSave, cuentas)) {
+      setEditSaveError("El retiro en efectivo solo puede utilizar cuentas Efectivo ARS o Efectivo USD.");
+      return;
+    }
 
     const normalizedLinesToSave = linesToSave.map((line) => {
       const importe = Number(line.importe || 0);
@@ -1117,6 +1164,11 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
         usd_equivalente: usdEquivalente,
       };
     });
+
+    if (!cashWithdrawalLinesAreValid(formData.tipo_movimiento, normalizedLineas, cuentas)) {
+      setFormError("El retiro en efectivo solo puede utilizar cuentas Efectivo ARS o Efectivo USD");
+      return;
+    }
 
     const hasArsWithoutUsdEq = normalizedLineas.some((line) => {
       if (line.moneda !== "ARS") return false;
@@ -1464,9 +1516,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
               </label>
               <select
                 value={formData.tipo_movimiento}
-                onChange={(e) =>
-                  setFormData({ ...formData, tipo_movimiento: e.target.value })
-                }
+                onChange={(e) => handleMovementTypeChange(e.target.value)}
                 className="w-full px-4 py-2.5 text-sm font-bold rounded-2xl border-none ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-slate-950 h-11 focus:ring-2 ring-indigo-500 transition-all shadow-sm"
               >
                 {tiposDisponibles.map((t) => (
@@ -1501,6 +1551,11 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                     <option value="" disabled>Sin categorías</option>
                   )}
                 </select>
+              </div>
+            )}
+            {formData.tipo_movimiento === "RETIRO" && (
+              <div className="md:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                El retiro siempre descuenta billetes de la caja física. Solo podés elegir Efectivo ARS o Efectivo USD.
               </div>
             )}
 
@@ -1824,22 +1879,28 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                     key={idx}
                     className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl"
                   >
-                    <select
-                      value={getMetodoForCuentaId(linea.cuenta_id)}
-                      onChange={(e) =>
-                        handleMetodoChangeForNewLine(
-                          idx,
-                          e.target.value as MetodoPagoUI,
-                        )
-                      }
-                      className="w-36 px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
-                      title="Metodo de pago"
-                    >
-                      <option value="EFECTIVO">Efectivo</option>
-                      <option value="TRANSFERENCIA">Transferencia</option>
-                      <option value="TARJETA">Tarjeta</option>
-                      <option value="OTRO">Otro</option>
-                    </select>
+                    {formData.tipo_movimiento === "RETIRO" ? (
+                      <div className="w-36 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2 text-center text-xs font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                        Efectivo
+                      </div>
+                    ) : (
+                      <select
+                        value={getMetodoForCuentaId(linea.cuenta_id)}
+                        onChange={(e) =>
+                          handleMetodoChangeForNewLine(
+                            idx,
+                            e.target.value as MetodoPagoUI,
+                          )
+                        }
+                        className="w-36 px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
+                        title="Metodo de pago"
+                      >
+                        <option value="EFECTIVO">Efectivo</option>
+                        <option value="TRANSFERENCIA">Transferencia</option>
+                        <option value="TARJETA">Tarjeta</option>
+                        <option value="OTRO">Otro</option>
+                      </select>
+                    )}
                     <select
                       value={linea.cuenta_id}
                       onChange={(e) =>
@@ -1847,7 +1908,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                       }
                       className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
                     >
-                      {cuentas.map((c) => (
+                      {getAccountsForMovement(cuentas, formData.tipo_movimiento).map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.nombre_cuenta} ({c.moneda})
                         </option>
@@ -2161,7 +2222,11 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                                 : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                           }`}
                       >
-                        {mov.tipo_movimiento === "GIRO_ACTIVO" ? "GIRO ACTIVO" : (mov.tipo_movimiento || "").replace("_", " ")}
+                        {mov.tipo_movimiento === "GIRO_ACTIVO"
+                          ? "GIRO ACTIVO"
+                          : mov.tipo_movimiento === "RETIRO"
+                            ? "RETIRO EN EFECTIVO"
+                            : (mov.tipo_movimiento || "").replace("_", " ")}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium">
@@ -2724,8 +2789,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                 </div>
                 <div className="space-y-3 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl max-h-48 overflow-y-auto">
                   <p className="text-[11px] text-slate-500">
-                    Para cambiar metodo de pago (ej. Efectivo a Transferencia),
-                    cambia la cuenta de la linea.
+                    {editingMov?.tipo_movimiento === "RETIRO"
+                      ? "El retiro en efectivo solo admite cuentas Efectivo ARS o Efectivo USD."
+                      : "Para cambiar metodo de pago (ej. Efectivo a Transferencia), cambia la cuenta de la linea."}
                   </p>
                   <p className="text-[11px] text-slate-400">
                     Las lineas con importe 0 se ignoran automaticamente al
@@ -2733,22 +2799,28 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                   </p>
                   {editData.lines.map((line, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <select
-                        value={getMetodoForCuentaId(line.cuenta_id)}
-                        onChange={(e) =>
-                          handleMetodoChangeForEditLine(
-                            idx,
-                            e.target.value as MetodoPagoUI,
-                          )
-                        }
-                        className="w-32 px-2 py-1 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
-                        title="Metodo de pago"
-                      >
-                        <option value="EFECTIVO">Efectivo</option>
-                        <option value="TRANSFERENCIA">Transferencia</option>
-                        <option value="TARJETA">Tarjeta</option>
-                        <option value="OTRO">Otro</option>
-                      </select>
+                      {editingMov?.tipo_movimiento === "RETIRO" ? (
+                        <div className="w-32 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-center text-xs font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                          Efectivo
+                        </div>
+                      ) : (
+                        <select
+                          value={getMetodoForCuentaId(line.cuenta_id)}
+                          onChange={(e) =>
+                            handleMetodoChangeForEditLine(
+                              idx,
+                              e.target.value as MetodoPagoUI,
+                            )
+                          }
+                          className="w-32 px-2 py-1 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
+                          title="Metodo de pago"
+                        >
+                          <option value="EFECTIVO">Efectivo</option>
+                          <option value="TRANSFERENCIA">Transferencia</option>
+                          <option value="TARJETA">Tarjeta</option>
+                          <option value="OTRO">Otro</option>
+                        </select>
+                      )}
                       <select
                         value={line.cuenta_id}
                         onChange={(e) =>
@@ -2756,7 +2828,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                         }
                         className="flex-1 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800"
                       >
-                        {cuentas.map((cuenta) => (
+                        {getAccountsForMovement(cuentas, editingMov?.tipo_movimiento).map((cuenta) => (
                           <option key={cuenta.id} value={cuenta.id}>
                             {cuenta.nombre_cuenta} ({cuenta.moneda})
                           </option>
