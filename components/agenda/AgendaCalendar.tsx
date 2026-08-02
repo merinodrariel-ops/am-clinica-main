@@ -15,18 +15,20 @@ import type {
 } from '@fullcalendar/core';
 import { getAppointments, updateAppointment, deleteAppointment, getDoctors, getTomorrowAppointments, sendBulkWhatsAppConfirmations, getAgendaBlocks } from '@/app/actions/agenda';
 import { createAllDoctorsAgendaShareLink, createDoctorAgendaRangeShareLink, createDoctorAgendaShareLink } from '@/app/actions/doctor-agenda';
-import type { TomorrowAppointment, AgendaBlock } from '@/app/actions/agenda';
+import type { TomorrowAppointment, AgendaBlock, AgendaPatientSearchResult, PatientAppointmentHistoryItem } from '@/app/actions/agenda';
 import AgendaBlockModal from './AgendaBlockModal';
 import NewAppointmentModal from './NewAppointmentModal';
 import DoctorResourceView from './DoctorResourceView';
+import PatientAppointmentHistoryPanel from './PatientAppointmentHistoryPanel';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus, BanIcon, AlertTriangle, Share2, SlidersHorizontal } from 'lucide-react';
+import { Users, Calendar, ChevronDown, X, Edit2, Phone, Mic, MicOff, Trash2, Send, CheckCircle2, CalendarPlus, BanIcon, AlertTriangle, Share2, SlidersHorizontal, Search } from 'lucide-react';
 import { useEffect, useRef as useRefCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { stripAppointmentMeta } from '@/lib/agenda-appointment-meta';
 import { canScheduleCleaningFollowupFromAppointment, getCleaningFollowupDate } from '@/lib/cleaning-followup-policy';
 import { useModalKeyboard } from '@/hooks/useModalKeyboard';
+import { canViewPatientRecords } from '@/lib/patient-access';
 
 interface AppointmentModalData {
     id?: string;
@@ -195,6 +197,8 @@ export default function AgendaCalendar() {
     const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; start: Date; end: Date } | null>(null);
     const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
     const [mobileShareMenuOpen, setMobileShareMenuOpen] = useState(false);
+    const [patientHistoryOpen, setPatientHistoryOpen] = useState(false);
+    const [pendingCalendarDate, setPendingCalendarDate] = useState<Date | null>(null);
     const { canEdit: canEditModule, categoria } = useAuth();
     const router = useRouter();
 
@@ -260,6 +264,14 @@ export default function AgendaCalendar() {
     useEffect(() => {
         getDoctors().then(setDoctors);
     }, []);
+
+    useEffect(() => {
+        if (!pendingCalendarDate || viewMode !== 'calendar') return;
+        const calendarApi = calendarRef.current?.getApi();
+        if (!calendarApi) return;
+        calendarApi.changeView('timeGridDay', pendingCalendarDate);
+        setPendingCalendarDate(null);
+    }, [pendingCalendarDate, viewMode]);
 
     // Detect if screen is mobile on mount and set calendar view to timeGridDay
     useEffect(() => {
@@ -642,6 +654,47 @@ export default function AgendaCalendar() {
 
     const isPortalUser = ['odontologo', 'asistente', 'laboratorio', 'dentist'].includes(categoria || '');
     const canEdit = canEditModule('turnos') && !isPortalUser;
+    const canSearchPatientHistory = canViewPatientRecords(categoria);
+
+    const handleOpenHistoricalAppointment = (
+        appointment: PatientAppointmentHistoryItem,
+        patient: AgendaPatientSearchResult,
+    ) => {
+        const start = new Date(appointment.start_time);
+        const end = new Date(appointment.end_time);
+        setPatientHistoryOpen(false);
+        setViewMode('calendar');
+        setCalendarView('timeGridDay');
+        setPendingCalendarDate(start);
+        setQuickPopup({
+            appointmentId: appointment.id,
+            title: appointment.title || patient.full_name,
+            patientName: patient.full_name,
+            doctorName: appointment.doctor?.full_name || '',
+            startTime: start.toLocaleTimeString('es-AR', {
+                timeZone: 'America/Argentina/Buenos_Aires',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            }),
+            currentStatus: appointment.status,
+            fullData: {
+                id: appointment.id,
+                title: appointment.title || '',
+                start,
+                end,
+                patientId: patient.id,
+                doctorId: appointment.doctor_id || '',
+                areaId: appointment.area_id || '',
+                status: appointment.status,
+                type: appointment.type,
+                modality: appointment.modality,
+                notes: appointment.notes || '',
+                patient: { full_name: patient.full_name },
+                doctor: appointment.doctor?.full_name ? { full_name: appointment.doctor.full_name } : undefined,
+            },
+        });
+    };
 
     function isAppointmentBlocked(aptStart: Date, aptEnd: Date, doctorId: string | undefined): boolean {
         return agendaBlocks.some(block => {
@@ -793,6 +846,17 @@ export default function AgendaCalendar() {
 
                     {/* Bulk confirm + Block buttons / Dropdown */}
                     <div className="flex items-center gap-2">
+                        {canSearchPatientHistory && (
+                            <button
+                                type="button"
+                                onClick={() => setPatientHistoryOpen(true)}
+                                className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition-all hover:border-blue-300 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:border-blue-800 dark:hover:bg-blue-900/50"
+                                title="Buscar todos los turnos de un paciente"
+                            >
+                                <Search size={14} />
+                                <span className="hidden sm:inline">Buscar paciente</span>
+                            </button>
+                        )}
                         {/* Desktop View: Actions displayed individually */}
                         <div className="hidden lg:flex items-center gap-2">
                             {canEdit && (
@@ -1288,6 +1352,12 @@ export default function AgendaCalendar() {
             )}
 
             {/* ── Confirmar Mañana Modal ────────────────────────────── */}
+            <PatientAppointmentHistoryPanel
+                open={patientHistoryOpen}
+                onClose={() => setPatientHistoryOpen(false)}
+                onOpenAppointment={handleOpenHistoricalAppointment}
+            />
+
             {confirmTomorrowOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
                     <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">

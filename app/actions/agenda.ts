@@ -5,6 +5,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { normalizeAppointmentModality, parseAppointmentModality, parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
 import { sendEmail } from '@/lib/email-service';
+import { canViewPatientRecords } from '@/lib/patient-access';
 
 // Service-role client bypasses RLS for agenda mutations.
 // Auth is still verified via SSR client before calling these.
@@ -678,11 +679,16 @@ export async function deleteAppointment(id: string) {
 
 export async function searchPatients(query: string) {
     const supabase = await createClient();
+    const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+    if (normalizedQuery.length < 2) return [];
+
     const { data, error } = await supabase
         .from('pacientes')
         .select('id_paciente, nombre, apellido, whatsapp, estado_paciente, origen_registro')
-        .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%`)
+        .ilike('full_name', `%${normalizedQuery}%`)
         .eq('is_deleted', false)
+        .order('apellido')
+        .order('nombre')
         .limit(10);
 
     if (error) {
@@ -704,6 +710,135 @@ export async function searchPatients(query: string) {
         status: p.estado_paciente || null,
         origin: p.origen_registro || null,
     }));
+}
+
+export type AgendaPatientSearchResult = {
+    id: string;
+    full_name: string;
+    phone: string;
+    status?: string | null;
+    origin?: string | null;
+};
+
+export type PatientAppointmentHistoryItem = {
+    id: string;
+    title: string | null;
+    start_time: string;
+    end_time: string;
+    status: string;
+    type: string;
+    modality: string;
+    notes: string | null;
+    doctor_id: string | null;
+    area_id: string | null;
+    doctor: { full_name?: string | null } | null;
+    area: { nombre?: string | null } | null;
+};
+
+const PATIENT_APPOINTMENT_HISTORY_PAGE_SIZE = 50;
+
+async function verifyPatientAppointmentHistoryAccess() {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('categoria')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (error || !profile || !canViewPatientRecords(profile.categoria)) {
+        throw new Error('No tenés permisos para consultar el historial de pacientes');
+    }
+
+    return supabase;
+}
+
+export async function getPatientAppointmentHistory(patientId: string, offset = 0): Promise<{
+    success: boolean;
+    appointments: PatientAppointmentHistoryItem[];
+    total: number;
+    nextOffset: number | null;
+    error?: string;
+}> {
+    const normalizedPatientId = patientId.trim();
+    const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalizedPatientId)) {
+        return { success: false, appointments: [], total: 0, nextOffset: null, error: 'Paciente inválido' };
+    }
+
+    try {
+        const supabase = await verifyPatientAppointmentHistoryAccess();
+        const { data, error, count } = await supabase
+            .from('agenda_appointments')
+            .select(`
+                id,
+                title,
+                start_time,
+                end_time,
+                status,
+                type,
+                modality,
+                notes,
+                doctor_id,
+                area_id,
+                doctor_data:doctor_id (full_name),
+                area_data:area_id (nombre)
+            `, { count: 'exact' })
+            .eq('patient_id', normalizedPatientId)
+            .order('start_time', { ascending: false })
+            .range(safeOffset, safeOffset + PATIENT_APPOINTMENT_HISTORY_PAGE_SIZE - 1);
+
+        if (error) {
+            console.error('Error fetching patient appointment history:', error.message);
+            return { success: false, appointments: [], total: 0, nextOffset: null, error: 'No se pudo cargar el historial' };
+        }
+
+        const now = new Date();
+        const appointments = (data || []).map(appointment => {
+            const doctor = Array.isArray(appointment.doctor_data) ? appointment.doctor_data[0] : appointment.doctor_data;
+            const area = Array.isArray(appointment.area_data) ? appointment.area_data[0] : appointment.area_data;
+            const isPast = new Date(appointment.end_time) < now;
+            const virtualStatus = isPast && !['cancelled', 'no_show'].includes(appointment.status)
+                ? 'completed'
+                : appointment.status;
+
+            return {
+                id: appointment.id,
+                title: appointment.title,
+                start_time: appointment.start_time,
+                end_time: appointment.end_time,
+                status: virtualStatus,
+                type: appointment.type,
+                modality: normalizeAppointmentModality(appointment.modality),
+                notes: appointment.notes,
+                doctor_id: appointment.doctor_id,
+                area_id: appointment.area_id,
+                doctor: doctor || null,
+                area: area || null,
+            } satisfies PatientAppointmentHistoryItem;
+        });
+
+        const total = count || 0;
+        const loadedUntil = safeOffset + appointments.length;
+
+        return {
+            success: true,
+            appointments,
+            total,
+            nextOffset: loadedUntil < total ? loadedUntil : null,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            appointments: [],
+            total: 0,
+            nextOffset: null,
+            error: error instanceof Error ? error.message : 'No se pudo cargar el historial',
+        };
+    }
 }
 
 export async function getDoctors() {
