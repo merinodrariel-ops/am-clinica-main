@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+    getPatientNameTokenKey,
     getPatientSearchTokens,
+    patientNameTokensLookEquivalent,
     patientMatchesSearch,
     shouldUseOnlyWithPhotosFilter,
 } from './patient-search';
@@ -20,6 +22,15 @@ test('patient search matches first-name last-name even when the stored fields ar
     assert.equal(patientMatchesSearch(invertedPatient, getPatientSearchTokens('Zapata Tamara')), true);
 });
 
+test('patient name token key detects likely inverted duplicate names', () => {
+    const stored = { nombre: 'Anaí', apellido: 'Yañez' };
+    const incoming = { nombre: 'Yanez', apellido: 'Anahi' };
+
+    assert.equal(getPatientNameTokenKey({ nombre: 'Anahí', apellido: 'Yañez' }), getPatientNameTokenKey(incoming));
+    assert.equal(patientNameTokensLookEquivalent(stored, incoming), true);
+    assert.equal(patientNameTokensLookEquivalent(stored, { nombre: 'Yañes', apellido: 'Anahi' }), true);
+});
+
 test('patient search ignores accents and punctuation across name tokens', () => {
     const patient = {
         nombre: 'José Luis',
@@ -31,6 +42,19 @@ test('patient search ignores accents and punctuation across name tokens', () => 
 
     assert.equal(patientMatchesSearch(patient, getPatientSearchTokens('garcia jose')), true);
     assert.equal(patientMatchesSearch(patient, getPatientSearchTokens('Jose Perez')), true);
+});
+
+test('patient search tolerates short first-name spelling variants when the surname matches', () => {
+    const patient = {
+        nombre: 'Anahí',
+        apellido: 'Yañez',
+        email: null,
+        documento: null,
+        whatsapp: null,
+    };
+
+    assert.equal(patientMatchesSearch(patient, getPatientSearchTokens('Anaí Yanez')), true);
+    assert.equal(patientMatchesSearch(patient, getPatientSearchTokens('Yanez Anais')), true);
 });
 
 test('only-with-photos filter is disabled while searching so unlinked patients remain findable', () => {

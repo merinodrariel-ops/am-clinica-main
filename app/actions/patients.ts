@@ -6,8 +6,10 @@ import { Paciente, softDeletePaciente, updatePaciente } from '@/lib/patients';
 import { buildFreeTextHistoriaEntry } from '@/lib/clinical-history';
 import { canManagePatients, canViewPatientContactData, canViewPatientRecords } from '@/lib/patient-access';
 import {
+    getPatientNameTokenKey,
     getPatientSearchTokens,
     normalizePatientSearchText,
+    patientNameTokensLookEquivalent,
     patientMatchesSearch,
     shouldUseOnlyWithPhotosFilter,
 } from '@/lib/patient-search';
@@ -427,17 +429,36 @@ export async function upsertPatientAction(patientData: Partial<Paciente>): Promi
         // Last resort: name match when neither DNI nor email were provided
         if (!existingId && !cleanedPatientData.documento && !cleanedPatientData.email &&
             cleanedPatientData.nombre && cleanedPatientData.apellido) {
-            const { data: byName, error: nameError } = await supabase
+            const nameTokens = getPatientSearchTokens(`${cleanedPatientData.nombre} ${cleanedPatientData.apellido}`);
+            const { data: nameCandidates, error: nameError } = await supabase
                 .from('pacientes')
                 .select('*')
                 .eq('is_deleted', false)
-                .ilike('nombre', cleanedPatientData.nombre.trim())
-                .ilike('apellido', cleanedPatientData.apellido.trim())
-                .limit(1)
-                .maybeSingle();
-            if (!nameError && byName) {
-                existingId = (byName as Paciente).id_paciente;
-                existingData = byName as Paciente;
+                .or(buildSearchOrClause(nameTokens, false))
+                .limit(25);
+
+            if (nameError) throw new Error(nameError.message);
+
+            const candidates = (nameCandidates || []) as Paciente[];
+            const exactNameMatch = candidates.find((candidate) => namesLookLikeSamePatient(candidate, cleanedPatientData));
+            if (exactNameMatch) {
+                existingId = exactNameMatch.id_paciente;
+                existingData = exactNameMatch;
+            } else {
+                const incomingNameKey = getPatientNameTokenKey(cleanedPatientData);
+                const invertedNameMatch = incomingNameKey
+                    ? candidates.find((candidate) =>
+                        getPatientNameTokenKey(candidate) === incomingNameKey ||
+                        patientNameTokensLookEquivalent(candidate, cleanedPatientData)
+                    )
+                    : null;
+
+                if (invertedNameMatch) {
+                    return {
+                        success: false,
+                        error: `Encontramos una ficha existente con el nombre posiblemente invertido: ${patientDisplayName(invertedNameMatch)}. Seleccionala desde la búsqueda y editá esa ficha en vez de crear otra.`,
+                    };
+                }
             }
         }
 

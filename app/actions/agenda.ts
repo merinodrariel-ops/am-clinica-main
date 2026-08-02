@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { normalizeAppointmentModality, parseAppointmentModality, parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
 import { sendEmail } from '@/lib/email-service';
 import { canViewPatientRecords } from '@/lib/patient-access';
+import { getPatientSearchTokens, patientMatchesSearch } from '@/lib/patient-search';
 
 // Service-role client bypasses RLS for agenda mutations.
 // Auth is still verified via SSR client before calling these.
@@ -40,6 +41,10 @@ function addDaysToDateString(dateString: string, days: number) {
 
 function formatPatientName(patient?: { nombre?: string | null; apellido?: string | null } | null) {
     return `${patient?.apellido || ''}, ${patient?.nombre || ''}`.replace(/^,\s*|\s*,\s*$/g, '').trim() || 'Paciente';
+}
+
+function escapeAgendaPatientSearchTerm(term: string): string {
+    return term.replace(/[%_,]/g, '\\$&');
 }
 
 async function logDetailedDayWorkflowNotification(params: {
@@ -680,30 +685,49 @@ export async function deleteAppointment(id: string) {
 export async function searchPatients(query: string) {
     const supabase = await createClient();
     const normalizedQuery = query.trim().replace(/\s+/g, ' ');
-    if (normalizedQuery.length < 2) return [];
+    const searchTokens = getPatientSearchTokens(normalizedQuery);
+    if (normalizedQuery.length < 2 || searchTokens.length === 0) return [];
+    const searchTerm = `%${escapeAgendaPatientSearchTerm(normalizedQuery)}%`;
+    const tokenTerms = Array.from(new Set(searchTokens.flatMap((token) => [
+        token,
+        token.length >= 4 ? token.slice(0, 3) : token,
+    ])));
+    const tokenClauses = tokenTerms
+        .map((token) => `%${escapeAgendaPatientSearchTerm(token)}%`)
+        .flatMap((term) => [
+            `nombre.ilike.${term}`,
+            `apellido.ilike.${term}`,
+            `whatsapp.ilike.${term}`,
+            `full_name.ilike.${term}`,
+        ]);
 
     const { data, error } = await supabase
         .from('pacientes')
         .select('id_paciente, nombre, apellido, whatsapp, estado_paciente, origen_registro')
-        .ilike('full_name', `%${normalizedQuery}%`)
+        .or([`full_name.ilike.${searchTerm}`, ...tokenClauses].join(','))
         .eq('is_deleted', false)
         .order('apellido')
         .order('nombre')
-        .limit(10);
+        .limit(searchTokens.length > 1 ? 1000 : 10);
 
     if (error) {
         console.error('Error searching patients:', error);
         return [];
     }
 
-    return (data || []).map((p: {
+    const patients = (data || []) as {
         id_paciente: string;
         nombre: string;
         apellido: string;
         whatsapp: string | null;
         estado_paciente: string | null;
         origen_registro: string | null;
-    }) => ({
+    }[];
+
+    return patients
+        .filter((patient) => searchTokens.length <= 1 || patientMatchesSearch(patient, searchTokens))
+        .slice(0, 10)
+        .map((p) => ({
         id: p.id_paciente,
         full_name: `${p.nombre} ${p.apellido}`,
         phone: p.whatsapp || '',

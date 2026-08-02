@@ -18,12 +18,14 @@ test('patient history is authorized and queried by the selected patient id', () 
     assert.doesNotMatch(historyAction, /getAdminClient\(\)/);
 });
 
-test('patient lookup searches the generated complete name instead of calendar titles', () => {
+test('patient lookup searches patient tokens instead of calendar titles', () => {
     const start = actionSource.indexOf('export async function searchPatients');
     const end = actionSource.indexOf('export type AgendaPatientSearchResult', start);
     const searchAction = actionSource.slice(start, end);
 
-    assert.match(searchAction, /\.ilike\('full_name', `%\$\{normalizedQuery\}%`\)/);
+    assert.match(searchAction, /getPatientSearchTokens\(normalizedQuery\)/);
+    assert.match(searchAction, /patientMatchesSearch\(patient, searchTokens\)/);
+    assert.match(searchAction, /full_name\.ilike/);
     assert.doesNotMatch(searchAction, /agenda_appointments/);
 });
 
