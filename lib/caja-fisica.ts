@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/client';
 import { getLocalISODate } from '@/lib/local-date';
 import {
     normalizeSaldoCajaFisica,
+    resolveSaldoCajaFisicaForDate,
     type SaldoCajaFisica,
 } from '@/lib/caja-fisica-model';
 
@@ -38,7 +39,20 @@ export async function getSaldoCajaFisica(
     });
 
     if (error) throw new Error(error.message);
-    return normalizeSaldoCajaFisica(data as Partial<SaldoCajaFisica> | null);
+    const saldo = normalizeSaldoCajaFisica(data as Partial<SaldoCajaFisica> | null);
+
+    // caja_saldo_fisico conserva el último cierre para calcular el saldo base.
+    // Si ese cierre pertenece a un día anterior, operativamente hoy está sin abrir.
+    if (saldo.estado !== 'cerrado' || !saldo.arqueo_id) return saldo;
+
+    const { data: arqueo, error: arqueoError } = await supabase
+        .from('caja_arqueos')
+        .select('fecha')
+        .eq('id', saldo.arqueo_id)
+        .maybeSingle();
+
+    if (arqueoError) throw new Error(arqueoError.message);
+    return resolveSaldoCajaFisicaForDate(saldo, arqueo?.fecha, fecha);
 }
 
 export async function abrirCajaFisica(params: {

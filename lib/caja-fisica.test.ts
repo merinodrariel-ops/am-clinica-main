@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeSaldoCajaFisica } from './caja-fisica-model';
+import {
+    normalizeSaldoCajaFisica,
+    resolveSaldoCajaFisicaForDate,
+} from './caja-fisica-model';
 
 describe('caja física unificada', () => {
     it('normaliza a números el saldo devuelto por Postgres', () => {
@@ -27,5 +30,45 @@ describe('caja física unificada', () => {
             ars: 0,
             usd: 0,
         }));
+    });
+
+    it('permite abrir un nuevo día después del cierre anterior', () => {
+        const saldo = normalizeSaldoCajaFisica({
+            activa: true,
+            estado: 'cerrado',
+            arqueo_id: 'arqueo-viernes',
+            ars: 93310,
+            usd: 3810,
+        });
+
+        expect(resolveSaldoCajaFisicaForDate(
+            saldo,
+            '2026-07-31',
+            '2026-08-03',
+        )).toMatchObject({
+            estado: 'sin_abrir',
+            arqueo_id: null,
+            ars: 93310,
+            usd: 3810,
+        });
+    });
+
+    it('mantiene cerrado cuando el cierre pertenece al mismo día', () => {
+        const saldo = normalizeSaldoCajaFisica({
+            activa: true,
+            estado: 'cerrado',
+            arqueo_id: 'arqueo-lunes',
+            ars: 93310,
+            usd: 3810,
+        });
+
+        expect(resolveSaldoCajaFisicaForDate(
+            saldo,
+            '2026-08-03',
+            '2026-08-03',
+        )).toMatchObject({
+            estado: 'cerrado',
+            arqueo_id: 'arqueo-lunes',
+        });
     });
 });

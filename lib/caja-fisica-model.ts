@@ -33,3 +33,23 @@ export function normalizeSaldoCajaFisica(
         movimientos_admin_usd: Number(raw?.movimientos_admin_usd || 0),
     };
 }
+
+export function resolveSaldoCajaFisicaForDate(
+    saldo: SaldoCajaFisica,
+    arqueoFecha: string | null | undefined,
+    requestedFecha: string,
+): SaldoCajaFisica {
+    if (
+        saldo.estado === 'cerrado'
+        && arqueoFecha
+        && arqueoFecha < requestedFecha
+    ) {
+        return {
+            ...saldo,
+            estado: 'sin_abrir',
+            arqueo_id: null,
+        };
+    }
+
+    return saldo;
+}
