@@ -22,7 +22,7 @@ import {
     resolverRegistro,
     anularRegistro
 } from '@/lib/caja-admin';
-import { inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
+import { calculateWorkedHours, inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -50,6 +50,13 @@ const METODOS_LABELS: Record<MetodoVerificacion, string> = {
     Testigo: 'Testimonio de Tercero',
     Otro: 'Otro',
 };
+
+function formatDuration(hours: number): string {
+    const totalMinutes = Math.round(hours * 60);
+    const wholeHours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${wholeHours} h ${String(minutes).padStart(2, '0')} min`;
+}
 
 function getSlaInfo(registro: RegistroHoras): {
     text: string;
@@ -105,6 +112,17 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
     });
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const hasCompleteCorrectedSchedule = Boolean(resolucionForm.hora_ingreso && resolucionForm.hora_egreso);
+    const correctedExitIsNextDay = hasCompleteCorrectedSchedule && inferSalidaDiaSiguiente(
+        resolucionForm.hora_ingreso,
+        resolucionForm.hora_egreso
+    );
+    const correctedDuration = hasCompleteCorrectedSchedule
+        ? calculateWorkedHours({
+            horaIngreso: resolucionForm.hora_ingreso,
+            horaEgreso: resolucionForm.hora_egreso,
+        })
+        : 0;
 
     async function loadData() {
         setLoading(true);
@@ -464,7 +482,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Hora Ingreso Corregida
+                                            Hora Ingreso Corregida (formato 24 h)
                                         </label>
                                         <Input
                                             type="time"
@@ -475,7 +493,7 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Hora Egreso Corregida
+                                            Hora Egreso Corregida (formato 24 h)
                                         </label>
                                         <Input
                                             type="time"
@@ -485,6 +503,23 @@ export default function ObservadosTab({ mes, initialPersonalId, onCountChange }:
                                         />
                                     </div>
                                 </div>
+
+                                {hasCompleteCorrectedSchedule && (
+                                    <div className={`rounded-xl border p-3 text-sm ${correctedExitIsNextDay
+                                        ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200'
+                                        : 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
+                                        }`}>
+                                        <p className="font-semibold">
+                                            Interpretación: {resolucionForm.hora_ingreso} → {resolucionForm.hora_egreso}
+                                            {correctedExitIsNextDay ? ' del día siguiente' : ' del mismo día'} · {formatDuration(correctedDuration)}
+                                        </p>
+                                        {correctedExitIsNextDay && (
+                                            <p className="mt-1 text-xs">
+                                                Si la salida fue a las 9:27 PM del mismo día, cargá 21:27.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">

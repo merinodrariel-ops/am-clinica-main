@@ -20,3 +20,11 @@ test('inferSalidaDiaSiguiente detects exits after midnight', () => {
     assert.equal(inferSalidaDiaSiguiente('22:15', '00:45'), true);
     assert.equal(inferSalidaDiaSiguiente('08:00', '16:00'), false);
 });
+
+test('distinguishes 9:27 PM from 9:27 AM on the following day', () => {
+    assert.equal(calculateWorkedHours({ horaIngreso: '11:01', horaEgreso: '21:27' }), 10.43);
+    assert.equal(inferSalidaDiaSiguiente('11:01', '21:27'), false);
+
+    assert.equal(calculateWorkedHours({ horaIngreso: '11:01', horaEgreso: '09:27' }), 22.43);
+    assert.equal(inferSalidaDiaSiguiente('11:01', '09:27'), true);
+});
