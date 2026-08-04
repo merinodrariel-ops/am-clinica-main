@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    canOpenCajaFisica,
     normalizeSaldoCajaFisica,
     resolveSaldoCajaFisicaForDate,
 } from './caja-fisica-model';
@@ -70,5 +71,29 @@ describe('caja física unificada', () => {
             estado: 'cerrado',
             arqueo_id: 'arqueo-lunes',
         });
+    });
+
+    it('permite a admin reabrir una caja cerrada durante el mismo día', () => {
+        const saldo = normalizeSaldoCajaFisica({
+            activa: true,
+            estado: 'cerrado',
+            arqueo_id: 'arqueo-hoy',
+            ars: 1000,
+            usd: 100,
+        });
+
+        expect(canOpenCajaFisica(saldo, 'admin')).toBe(true);
+    });
+
+    it('no permite abrir caja a perfiles sin permiso operativo', () => {
+        const saldo = normalizeSaldoCajaFisica({
+            activa: true,
+            estado: 'sin_abrir',
+            ars: 1000,
+            usd: 100,
+        });
+
+        expect(canOpenCajaFisica(saldo, 'partner_viewer')).toBe(false);
+        expect(canOpenCajaFisica(saldo, null)).toBe(false);
     });
 });

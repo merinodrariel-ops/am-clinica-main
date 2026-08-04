@@ -53,3 +53,12 @@ export function resolveSaldoCajaFisicaForDate(
 
     return saldo;
 }
+
+export function canOpenCajaFisica(
+    saldo: Pick<SaldoCajaFisica, 'activa' | 'estado'>,
+    categoria: string | null | undefined,
+): boolean {
+    return saldo.activa
+        && saldo.estado !== 'abierto'
+        && ['owner', 'admin', 'reception', 'developer'].includes(categoria || '');
+}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import {
     abrirCajaFisica,
+    canOpenCajaFisica,
     cerrarCajaFisica,
     getSaldoCajaFisica,
     type SaldoCajaFisica,
@@ -120,6 +121,7 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
         || categoria === 'admin'
         || categoria === 'reception'
         || categoria === 'developer';
+    const canOpen = canOpenCajaFisica(saldo, categoria);
 
     return (
         <section className="rounded-2xl border border-emerald-500/20 bg-slate-950 text-white shadow-xl overflow-hidden">
@@ -150,10 +152,10 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
                                     <LockKeyhole size={17} className="mr-2" />
                                     Cerrar caja
                                 </Button>
-                            ) : saldo.estado !== 'cerrado' ? (
+                            ) : canOpen ? (
                                 <Button onClick={handleOpen} disabled={submitting}>
                                     {submitting ? <Loader2 size={17} className="mr-2 animate-spin" /> : <CheckCircle2 size={17} className="mr-2" />}
-                                    Abrir caja
+                                    {saldo.estado === 'cerrado' ? 'Reabrir caja' : 'Abrir caja'}
                                 </Button>
                             ) : null}
                         </div>

@@ -7,6 +7,7 @@ import {
 } from '@/lib/caja-fisica-model';
 
 export type { EstadoCajaFisica, SaldoCajaFisica } from '@/lib/caja-fisica-model';
+export { canOpenCajaFisica } from '@/lib/caja-fisica-model';
 
 export interface CajaFisicaArqueo {
     id: string;
