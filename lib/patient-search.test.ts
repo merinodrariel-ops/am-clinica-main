@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+    filterAndRankPatientSearchResults,
     getPatientNameTokenKey,
+    getPatientSearchCandidateTokens,
     getPatientSearchTokens,
     patientNameTokensLookEquivalent,
     patientMatchesSearch,
@@ -61,4 +63,44 @@ test('only-with-photos filter is disabled while searching so unlinked patients r
     assert.equal(shouldUseOnlyWithPhotosFilter(true, ''), true);
     assert.equal(shouldUseOnlyWithPhotosFilter(true, 'Tamara Zapata'), false);
     assert.equal(shouldUseOnlyWithPhotosFilter(false, 'Tamara Zapata'), false);
+});
+
+test('single-token candidate search does not expand to noisy three-letter prefixes', () => {
+    assert.deepEqual(getPatientSearchCandidateTokens(getPatientSearchTokens('Perren')), ['perren']);
+    assert.deepEqual(getPatientSearchCandidateTokens(getPatientSearchTokens('Gustavo')), ['gustavo']);
+    assert.deepEqual(getPatientSearchCandidateTokens(getPatientSearchTokens('Gustavo Vargas')), [
+        'gustavo',
+        'gus',
+        'vargas',
+        'var',
+    ]);
+});
+
+test('agenda-style search removes prefix noise before limiting results', () => {
+    const noisyCandidates = [
+        { nombre: 'Agustín', apellido: 'Aguilar' },
+        { nombre: 'Agustina', apellido: 'Bolla' },
+        { nombre: 'Gustavo', apellido: 'Oro' },
+        { nombre: 'Gustavo', apellido: 'Vargas' },
+    ];
+
+    assert.deepEqual(
+        filterAndRankPatientSearchResults(noisyCandidates, 'Gustavo').map((patient) => `${patient.nombre} ${patient.apellido}`),
+        ['Gustavo Oro', 'Gustavo Vargas']
+    );
+});
+
+test('agenda-style search keeps an exact patient even after ten broader prefix candidates', () => {
+    const prefixNoise = [
+        'Peralta', 'Pereira', 'Perelman', 'Perez', 'Perretta',
+        'Peralta Dos', 'Pereira Dos', 'Perelman Dos', 'Perez Dos', 'Perretta Dos',
+    ].map((apellido, index) => ({ nombre: `Paciente ${index}`, apellido }));
+    const candidates = [...prefixNoise, { nombre: 'Fernando', apellido: 'Perren' }];
+
+    assert.deepEqual(filterAndRankPatientSearchResults(candidates, 'Perren'), [
+        { nombre: 'Fernando', apellido: 'Perren' },
+    ]);
+    assert.deepEqual(filterAndRankPatientSearchResults(candidates, 'Fernando Perren'), [
+        { nombre: 'Fernando', apellido: 'Perren' },
+    ]);
 });

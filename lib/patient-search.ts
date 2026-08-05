@@ -24,6 +24,47 @@ export function getPatientSearchTokens(search?: string): string[] {
         .filter(Boolean);
 }
 
+export function getPatientSearchCandidateTokens(tokens: string[]): string[] {
+    const usePrefixExpansion = tokens.length > 1;
+
+    return Array.from(new Set(tokens.flatMap((token) => {
+        if (!usePrefixExpansion || token.length < 4) return [token];
+        return [token, token.slice(0, 3)];
+    })));
+}
+
+export function filterAndRankPatientSearchResults<T extends PatientSearchFields>(
+    patients: T[],
+    search: string,
+    limit = 10
+): T[] {
+    const query = normalizePatientSearchText(search);
+    const tokens = getPatientSearchTokens(query);
+
+    return patients
+        .filter((patient) => patientMatchesSearch(patient, tokens))
+        .map((patient, index) => {
+            const naturalName = normalizePatientSearchText(`${patient.nombre || ''} ${patient.apellido || ''}`);
+            const invertedName = normalizePatientSearchText(`${patient.apellido || ''} ${patient.nombre || ''}`);
+            const exactName = naturalName === query || invertedName === query;
+            const startsWithQuery = naturalName.startsWith(query) || invertedName.startsWith(query);
+
+            return {
+                patient,
+                index,
+                score: exactName ? 0 : startsWithQuery ? 1 : 2,
+                name: naturalName,
+            };
+        })
+        .sort((left, right) => (
+            left.score - right.score ||
+            left.name.localeCompare(right.name, 'es') ||
+            left.index - right.index
+        ))
+        .slice(0, limit)
+        .map(({ patient }) => patient);
+}
+
 export function getPatientNameTokenKey(patient: Pick<PatientSearchFields, 'nombre' | 'apellido'>): string {
     return getPatientSearchTokens(`${patient.nombre || ''} ${patient.apellido || ''}`)
         .sort((a, b) => a.localeCompare(b))

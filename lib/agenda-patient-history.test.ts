@@ -24,7 +24,8 @@ test('patient lookup searches patient tokens instead of calendar titles', () => 
     const searchAction = actionSource.slice(start, end);
 
     assert.match(searchAction, /getPatientSearchTokens\(normalizedQuery\)/);
-    assert.match(searchAction, /patientMatchesSearch\(patient, searchTokens\)/);
+    assert.match(searchAction, /getPatientSearchCandidateTokens\(searchTokens\)/);
+    assert.match(searchAction, /filterAndRankPatientSearchResults\(patients, normalizedQuery\)/);
     assert.match(searchAction, /full_name\.ilike/);
     assert.doesNotMatch(searchAction, /agenda_appointments/);
 });

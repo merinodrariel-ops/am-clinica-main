@@ -6,7 +6,11 @@ import { revalidatePath } from 'next/cache';
 import { normalizeAppointmentModality, parseAppointmentModality, parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
 import { sendEmail } from '@/lib/email-service';
 import { canViewPatientRecords } from '@/lib/patient-access';
-import { getPatientSearchTokens, patientMatchesSearch } from '@/lib/patient-search';
+import {
+    filterAndRankPatientSearchResults,
+    getPatientSearchCandidateTokens,
+    getPatientSearchTokens,
+} from '@/lib/patient-search';
 
 // Service-role client bypasses RLS for agenda mutations.
 // Auth is still verified via SSR client before calling these.
@@ -688,10 +692,7 @@ export async function searchPatients(query: string) {
     const searchTokens = getPatientSearchTokens(normalizedQuery);
     if (normalizedQuery.length < 2 || searchTokens.length === 0) return [];
     const searchTerm = `%${escapeAgendaPatientSearchTerm(normalizedQuery)}%`;
-    const tokenTerms = Array.from(new Set(searchTokens.flatMap((token) => [
-        token,
-        token.length >= 4 ? token.slice(0, 3) : token,
-    ])));
+    const tokenTerms = getPatientSearchCandidateTokens(searchTokens);
     const tokenClauses = tokenTerms
         .map((token) => `%${escapeAgendaPatientSearchTerm(token)}%`)
         .flatMap((term) => [
@@ -708,7 +709,7 @@ export async function searchPatients(query: string) {
         .eq('is_deleted', false)
         .order('apellido')
         .order('nombre')
-        .limit(searchTokens.length > 1 ? 1000 : 10);
+        .limit(1000);
 
     if (error) {
         console.error('Error searching patients:', error);
@@ -724,9 +725,7 @@ export async function searchPatients(query: string) {
         origen_registro: string | null;
     }[];
 
-    return patients
-        .filter((patient) => searchTokens.length <= 1 || patientMatchesSearch(patient, searchTokens))
-        .slice(0, 10)
+    return filterAndRankPatientSearchResults(patients, normalizedQuery)
         .map((p) => ({
         id: p.id_paciente,
         full_name: `${p.nombre} ${p.apellido}`,
