@@ -23,6 +23,11 @@ test('bottom-strip dragging still supports copying an edited photo into a canvas
 
 test('a library photo can be dropped onto the bottom Selección rail without replacing reorder behavior', () => {
     assert.match(source, /e\.dataTransfer\.setData\('selectionLibraryFileId', f\.id\)/);
+    assert.match(
+        source,
+        /setData\('selectionLibraryFileId', f\.id\);\s*if \(canvasActive\) \{\s*preparePhotoStudioCanvasDrag/,
+    );
+    assert.match(source, /canvasActive[\s\S]*?effectAllowed = 'copyMove'/);
     assert.match(source, /handleLibraryPhotoDropToSelection\(libraryFileId\)/);
     assert.match(source, /movePhotosToSelectionAction\(folderId, \[fileId\]\)/);
     assert.match(source, /isPhotoStudioSelectionFolder\(item\.parentName\)/);

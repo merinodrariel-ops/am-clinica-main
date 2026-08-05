@@ -173,18 +173,13 @@ async function generateSliceBase64(
                     ctx.drawImage(imgBefore, 0, 0, sw, sh);
                     ctx.restore();
 
-                    // Draw divider line
-                    ctx.fillStyle = 'rgba(168,85,247,0.9)'; // purple-500
-                    ctx.fillRect(splitX - 1, 0, 3, sh);
-
-                    // Draw handle circle
-                    const cx = splitX;
-                    const cy = Math.round(sh / 2);
-                    const r = Math.round(sw * 0.022);
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(168,85,247,1)';
-                    ctx.fill();
+                    // Minimal white divider that matches the on-screen comparator.
+                    ctx.save();
+                    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+                    ctx.shadowBlur = Math.max(2, Math.round(sw * 0.003));
+                    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+                    ctx.fillRect(splitX, 0, Math.max(1, Math.round(sw * 0.001)), sh);
+                    ctx.restore();
 
                     // Labels
                     const fontSize = Math.max(14, Math.round(sw * 0.018));
@@ -244,7 +239,7 @@ async function encodeSmileSaveJpeg(
     return { dataUrl: output, base64: output.split(',')[1] };
 }
 
-async function prepareSmileDesignSavePayload(beforeDataUrl: string, afterDataUrl: string) {
+async function prepareSmileDesignSavePayload(beforeDataUrl: string, afterDataUrl: string, slicePos: number) {
     const presets = [
         { maxSide: 1600, quality: 0.86 },
         { maxSide: 1200, quality: 0.80 },
@@ -258,7 +253,7 @@ async function prepareSmileDesignSavePayload(beforeDataUrl: string, afterDataUrl
         ]);
         const [comparisonBase64, sliceBase64] = await Promise.all([
             generateComparisonBase64(before.dataUrl, after.dataUrl, preset.maxSide, preset.quality),
-            generateSliceBase64(before.dataUrl, after.dataUrl, 50, preset.maxSide, preset.quality),
+            generateSliceBase64(before.dataUrl, after.dataUrl, slicePos, preset.maxSide, preset.quality),
         ]);
         if (!comparisonBase64 || !sliceBase64) continue;
 
@@ -270,6 +265,7 @@ async function prepareSmileDesignSavePayload(beforeDataUrl: string, afterDataUrl
                 afterMime: 'image/jpeg',
                 comparisonBase64,
                 sliceBase64,
+                slicePos,
             };
         }
     }
@@ -6518,16 +6514,16 @@ export default function PhotoStudioModal({
                                         title={buildDriveImageInfoTitle(f)}
                                         onContextMenu={(e) => openThumbnailContextMenu(e, f)}
                                         onDragStart={(e) => {
+                                            setLibrarySelectionDragId(f.id);
+                                            e.dataTransfer.setData('selectionLibraryFileId', f.id);
                                             if (canvasActive) {
                                                 preparePhotoStudioCanvasDrag(e.dataTransfer, f.id);
-                                                e.dataTransfer.effectAllowed = 'copy';
+                                                e.dataTransfer.effectAllowed = 'copyMove';
                                                 return;
                                             }
                                             setThumbnailDragId(f.id);
-                                            setLibrarySelectionDragId(f.id);
                                             e.dataTransfer.effectAllowed = 'move';
                                             e.dataTransfer.setData('thumbnailReorderId', f.id);
-                                            e.dataTransfer.setData('selectionLibraryFileId', f.id);
                                         }}
                                         onDragOver={(e) => {
                                             if (canvasActive) return;
@@ -7343,7 +7339,8 @@ export default function PhotoStudioModal({
                                     try {
                                         const prepared = await prepareSmileDesignSavePayload(
                                             smileDesign.result.beforeDataUrl,
-                                            smileDesign.result.afterDataUrl
+                                            smileDesign.result.afterDataUrl,
+                                            slicePosRef.current
                                         );
                                         
                                         // saveSmileDesignResult handles uploads to Drive AND DB records
@@ -7355,24 +7352,31 @@ export default function PhotoStudioModal({
                                             afterMime: prepared.afterMime,
                                             comparisonBase64: prepared.comparisonBase64,
                                             sliceBase64: prepared.sliceBase64,
+                                            slicePos: prepared.slicePos,
                                             settings: smileDesign.settings,
                                         });
                                         
                                         if (saveResult.success) {
-                                            if (saveResult.driveFileId && folderId) {
+                                            const selectionDriveFileIds = [
+                                                saveResult.driveFileId,
+                                                saveResult.beforeAfterDriveFileId,
+                                            ].filter((fileId): fileId is string => Boolean(fileId));
+                                            const selectionFilesComplete = selectionDriveFileIds.length === 2;
+
+                                            if (selectionDriveFileIds.length > 0 && folderId) {
                                                 const selectionResult = await syncEditedPhotosToSelectionAction(
                                                     folderId,
-                                                    [saveResult.driveFileId]
+                                                    selectionDriveFileIds
                                                 );
                                                 const selectionError = selectionResult.error || selectionResult.failed[0]?.error;
 
-                                                if (selectionError) {
+                                                if (selectionError || !selectionFilesComplete) {
                                                     toast.warning("Smile Design guardado en el portal, pero no pudo pasar a Selección", {
                                                         id: saveToastId,
-                                                        description: selectionError,
+                                                        description: selectionError || "No se obtuvo el resultado o el antes/después en Drive",
                                                     });
                                                 } else {
-                                                    toast.success("Smile Design guardado en el portal y en Selección", { id: saveToastId });
+                                                    toast.success("Resultado y antes/después guardados en el portal y en Selección", { id: saveToastId });
                                                 }
                                             } else {
                                                 toast.warning("Smile Design guardado en el portal, pero no pudo pasar a Selección", {

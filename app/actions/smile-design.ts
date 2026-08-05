@@ -31,6 +31,7 @@ export interface SaveSmileDesignResult {
   error?: string;
   afterUrl?: string;
   driveFileId?: string;
+  beforeAfterDriveFileId?: string;
 }
 
 export async function saveSmileDesignResult(
@@ -131,6 +132,7 @@ export async function saveSmileDesignResult(
 
     // Upload to Google Drive if folderId is provided
     let driveFileId: string | undefined;
+    let beforeAfterDriveFileId: string | undefined;
     if (params.folderId) {
       console.log(`[saveSmileDesignResult] Uploading to Google Drive folder: ${params.folderId}`);
       
@@ -169,13 +171,16 @@ export async function saveSmileDesignResult(
       // 4. Upload Slice
       if (sliceBytes) {
         const slicePos = params.slicePos ?? 50;
-        const sliceFileName = `Smile Design - Slice ${Math.round(slicePos)}pct - ${label}.jpg`;
-        await uploadFileToFolder(
+        const sliceFileName = `Smile Design - Antes y Después ${Math.round(slicePos)}pct - ${label}.jpg`;
+        const beforeAfterDriveUpload = await uploadFileToFolder(
           params.folderId,
           sliceFileName,
           sliceBytes,
           'image/jpeg'
         );
+        if (beforeAfterDriveUpload.success) {
+          beforeAfterDriveFileId = beforeAfterDriveUpload.fileId;
+        }
       }
     }
 
@@ -219,7 +224,7 @@ export async function saveSmileDesignResult(
       records.push({
         patient_id: params.patientId,
         file_type: 'photo_comparison',
-        label: `${label} – Slice (${Math.round(slicePos)}%)`,
+        label: `${label} – Antes y después (${Math.round(slicePos)}%)`,
         file_url: sliceUrl + cacheBuster,
         is_visible_to_patient: true,
       });
@@ -235,7 +240,8 @@ export async function saveSmileDesignResult(
     return { 
       success: true, 
       afterUrl: afterUrl + cacheBuster,
-      driveFileId
+      driveFileId,
+      beforeAfterDriveFileId,
     };
   } catch (err) {
     console.error('[saveSmileDesignResult] UNCAUGHT ERROR:', err);

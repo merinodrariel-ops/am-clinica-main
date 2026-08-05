@@ -18,29 +18,34 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
   }, [onPosChange]);
   const [scale, setScale] = useState(1);
   const [origin, setOrigin] = useState({ x: 50, y: 50 }); // % from top-left
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const lastTouch = useRef<{ x: number; y: number } | null>(null);
   const lastDist = useRef<number | null>(null);
 
-  const getRelX = (clientX: number) => {
+  const getRelX = useCallback((clientX: number) => {
     const el = containerRef.current;
     if (!el) return 50;
     const rect = el.getBoundingClientRect();
     return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-  };
+  }, []);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     dragging.current = true;
+    setIsDragging(true);
     updatePos(getRelX(e.clientX));
-  }, [updatePos]);
+  }, [getRelX, updatePos]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging.current) return;
     updatePos(getRelX(e.clientX));
-  }, [updatePos]);
+  }, [getRelX, updatePos]);
 
-  const onMouseUp = useCallback(() => { dragging.current = false; }, []);
+  const onMouseUp = useCallback(() => {
+    dragging.current = false;
+    setIsDragging(false);
+  }, []);
 
   // Pinch-to-zoom / scroll zoom
   const onWheel = useCallback((e: React.WheelEvent) => {
@@ -61,15 +66,17 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       dragging.current = true;
+      setIsDragging(true);
       lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       updatePos(getRelX(e.touches[0].clientX));
     } else if (e.touches.length === 2) {
       dragging.current = false;
+      setIsDragging(false);
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastDist.current = Math.sqrt(dx * dx + dy * dy);
     }
-  }, []);
+  }, [getRelX, updatePos]);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
@@ -83,10 +90,11 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
       setScale(prev => Math.max(1, Math.min(5, prev * ratio)));
       lastDist.current = dist;
     }
-  }, []);
+  }, [getRelX, updatePos]);
 
   const onTouchEnd = useCallback(() => {
     dragging.current = false;
+    setIsDragging(false);
     lastDist.current = null;
   }, []);
 
@@ -102,7 +110,7 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
         left: `${maxOriginX - (maxOriginX * scale)}%`, 
         top: `${maxOriginY - (maxOriginY * scale)}%`,
         position: 'absolute' as const,
-        transition: dragging.current ? 'none' : 'all 0.05s ease-out'
+        transition: isDragging ? 'none' : 'all 0.05s ease-out'
       }
     : { 
         width: '100%', 
@@ -152,18 +160,14 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
       </div>
 
       {/* Labels */}
-      <div className="absolute bottom-2 left-3 text-[10px] text-white/60 font-medium pointer-events-none z-10">ANTES</div>
-      <div className="absolute bottom-2 right-3 text-[10px] text-white/80 font-medium pointer-events-none z-10">DESPUÉS</div>
+      <div className="absolute bottom-3 left-3 z-10 rounded-full border border-white/15 bg-black/35 px-2.5 py-1 text-[9px] font-medium tracking-[0.14em] text-white/75 backdrop-blur-sm pointer-events-none">ANTES</div>
+      <div className="absolute bottom-3 right-3 z-10 rounded-full border border-white/15 bg-black/35 px-2.5 py-1 text-[9px] font-medium tracking-[0.14em] text-white/85 backdrop-blur-sm pointer-events-none">DESPUÉS</div>
 
-      {/* Divider line + handle (positioned relative to unscaled container) */}
+      {/* Minimal divider (positioned relative to unscaled container) */}
       <div
-        className="absolute top-0 bottom-0 w-0.5 bg-purple-500 z-20 pointer-events-none"
+        className="absolute top-0 bottom-0 z-20 w-px bg-white/85 shadow-[0_0_5px_rgba(0,0,0,0.35)] pointer-events-none"
         style={{ left: `${pos}%`, transform: 'translateX(-50%)' }}
-      >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs shadow-lg shadow-purple-500/50">
-          ↔
-        </div>
-      </div>
+      />
 
       {/* Zoom controls */}
       <div className="absolute top-2 right-2 flex flex-col gap-1 z-30 pointer-events-auto">
@@ -183,7 +187,7 @@ export default function BeforeAfterSlider({ beforeSrc, afterSrc, className = '',
           <button
             onMouseDown={e => e.stopPropagation()}
             onClick={e => { e.stopPropagation(); resetZoom(); }}
-            className="w-6 h-6 rounded bg-purple-700/80 text-white text-[9px] flex items-center justify-center hover:bg-purple-700"
+            className="w-6 h-6 rounded bg-black/60 text-white text-[9px] flex items-center justify-center hover:bg-black/80"
             title="Reset zoom"
           >↺</button>
         )}
