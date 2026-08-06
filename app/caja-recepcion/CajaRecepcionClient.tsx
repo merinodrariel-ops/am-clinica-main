@@ -457,9 +457,16 @@ function CajaRecepcionContent() {
                 }
             }
 
-            const { data: aperturaRaw } = await supabase
-                .from('caja_recepcion_arqueos')
-                .select('fecha, usuario, hora_inicio, created_at, estado')
+            const aperturaQuery = cajaFisicaActiva && sucursalCaja
+                ? supabase
+                    .from('caja_arqueos')
+                    .select('fecha, usuario:usuario_apertura, hora_inicio:hora_apertura, created_at, estado')
+                    .eq('sucursal_id', sucursalCaja.id)
+                : supabase
+                    .from('caja_recepcion_arqueos')
+                    .select('fecha, usuario, hora_inicio, created_at, estado');
+
+            const { data: aperturaRaw } = await aperturaQuery
                 .eq('fecha', today)
                 .order('created_at', { ascending: false })
                 .limit(1)
@@ -508,7 +515,7 @@ function CajaRecepcionContent() {
         } catch (error) {
             console.error('Error loading data:', error);
         }
-    }, [mesActual, today]);
+    }, [cajaFisicaActiva, mesActual, sucursalCaja, today]);
 
     useEffect(() => {
         loadData();
