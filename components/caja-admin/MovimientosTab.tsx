@@ -1321,7 +1321,11 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     <div className="space-y-6">
 
       {/* La misma caja física que ve Recepción: una sola fuente para ambos sectores. */}
-      <CajaFisicaPanel sucursalId={sucursal.id} tcBna={tcBna} />
+      <CajaFisicaPanel
+        sucursalId={sucursal.id}
+        tcBna={tcBna}
+        onStateChange={() => void loadData()}
+      />
 
       {/* Resumen administrativo: informa egresos, sin calcular un segundo saldo de caja. */}
       {balanceVivo && (

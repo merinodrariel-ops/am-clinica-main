@@ -20,6 +20,7 @@ interface CajaFisicaPanelProps {
     sucursalId: string;
     tcBna?: number | null;
     compact?: boolean;
+    onStateChange?: () => void;
 }
 
 const formatArs = (value: number) =>
@@ -28,7 +29,7 @@ const formatArs = (value: number) =>
 const formatUsd = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
-export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: CajaFisicaPanelProps) {
+export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, onStateChange }: CajaFisicaPanelProps) {
     const { user, profile, categoria } = useAuth();
     const [saldo, setSaldo] = useState<SaldoCajaFisica | null>(null);
     const [loading, setLoading] = useState(true);
@@ -72,6 +73,7 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
         try {
             await abrirCajaFisica({ sucursalId, usuario, tcBna });
             await load();
+            onStateChange?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo abrir la caja.');
         } finally {
@@ -90,9 +92,11 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
                 contadoUsd,
                 tcBna,
                 observaciones,
+                fecha: saldo?.arqueo_fecha || undefined,
             });
             setShowClose(false);
             await load();
+            onStateChange?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo cerrar la caja.');
         } finally {
@@ -117,6 +121,8 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
 
     const waitingActivation = !saldo.activa;
     const isOpen = saldo.estado === 'abierto';
+    const hasStaleOpen = saldo.estado === 'abierto_anterior';
+    const canClose = isOpen || hasStaleOpen;
     const canOperate = categoria === 'owner'
         || categoria === 'admin'
         || categoria === 'reception'
@@ -138,6 +144,8 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
                                     ? `Se activa el ${saldo.fecha_activacion ? new Date(`${saldo.fecha_activacion}T12:00:00`).toLocaleDateString('es-AR') : 'día configurado'}`
                                     : isOpen
                                         ? 'Caja abierta'
+                                        : hasStaleOpen
+                                            ? `Caja del ${new Date(`${saldo.arqueo_fecha}T12:00:00`).toLocaleDateString('es-AR')} pendiente de cierre`
                                         : saldo.estado === 'cerrado'
                                             ? 'Caja cerrada'
                                             : 'Caja pendiente de apertura'}
@@ -147,10 +155,10 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
 
                     {!waitingActivation && canOperate && (
                         <div className="flex gap-2">
-                            {isOpen ? (
+                            {canClose ? (
                                 <Button variant="outline" onClick={() => setShowClose((value) => !value)} disabled={submitting}>
                                     <LockKeyhole size={17} className="mr-2" />
-                                    Cerrar caja
+                                    {hasStaleOpen ? 'Cerrar caja anterior' : 'Cerrar caja'}
                                 </Button>
                             ) : canOpen ? (
                                 <Button onClick={handleOpen} disabled={submitting}>
@@ -186,6 +194,16 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
                     </div>
                 )}
 
+                {hasStaleOpen && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                        <CalendarClock size={19} className="mt-0.5 shrink-0" />
+                        <div>
+                            <p className="font-semibold">La caja abierta corresponde a un día anterior.</p>
+                            <p className="mt-1 text-amber-100/80">Cerrala con el conteo físico real. Después podrás abrir la caja de hoy y registrar movimientos.</p>
+                        </div>
+                    </div>
+                )}
+
                 {waitingActivation && (
                     <div className="mt-4 flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
                         <CalendarClock size={19} className="mt-0.5 shrink-0" />
@@ -195,10 +213,10 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false }: 
 
                 {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
 
-                {showClose && isOpen && (
+                {showClose && canClose && (
                     <div className="mt-5 rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
                         <div>
-                            <h3 className="font-semibold">Conteo físico final</h3>
+                            <h3 className="font-semibold">{hasStaleOpen ? 'Cierre pendiente del día anterior' : 'Conteo físico final'}</h3>
                             <p className="text-sm text-slate-400">Ingresá los billetes realmente contados en la única caja.</p>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

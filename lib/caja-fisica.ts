@@ -42,9 +42,9 @@ export async function getSaldoCajaFisica(
     if (error) throw new Error(error.message);
     const saldo = normalizeSaldoCajaFisica(data as Partial<SaldoCajaFisica> | null);
 
-    // caja_saldo_fisico conserva el último cierre para calcular el saldo base.
-    // Si ese cierre pertenece a un día anterior, operativamente hoy está sin abrir.
-    if (saldo.estado !== 'cerrado' || !saldo.arqueo_id) return saldo;
+    // caja_saldo_fisico conserva el último arqueo para calcular el saldo base.
+    // La fecha real permite detectar tanto cierres como aperturas arrastradas.
+    if (!saldo.arqueo_id) return saldo;
 
     const { data: arqueo, error: arqueoError } = await supabase
         .from('caja_arqueos')

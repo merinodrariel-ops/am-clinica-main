@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
     canOpenCajaFisica,
     normalizeSaldoCajaFisica,
@@ -7,7 +8,7 @@ import {
 
 describe('caja física unificada', () => {
     it('normaliza a números el saldo devuelto por Postgres', () => {
-        expect(normalizeSaldoCajaFisica({
+        const saldo = normalizeSaldoCajaFisica({
             activa: true,
             fecha_activacion: '2026-08-01',
             estado: 'abierto',
@@ -15,22 +16,22 @@ describe('caja física unificada', () => {
             usd: '725.50' as unknown as number,
             movimientos_recepcion_ars: '50000' as unknown as number,
             movimientos_admin_ars: '-10000' as unknown as number,
-        })).toMatchObject({
-            activa: true,
-            ars: 150000,
-            usd: 725.5,
-            movimientos_recepcion_ars: 50000,
-            movimientos_admin_ars: -10000,
         });
+
+        assert.equal(saldo.activa, true);
+        assert.equal(saldo.ars, 150000);
+        assert.equal(saldo.usd, 725.5);
+        assert.equal(saldo.movimientos_recepcion_ars, 50000);
+        assert.equal(saldo.movimientos_admin_ars, -10000);
     });
 
     it('usa un saldo seguro cuando la RPC no devuelve valores', () => {
-        expect(normalizeSaldoCajaFisica(null)).toEqual(expect.objectContaining({
-            activa: false,
-            estado: 'no_configurada',
-            ars: 0,
-            usd: 0,
-        }));
+        const saldo = normalizeSaldoCajaFisica(null);
+
+        assert.equal(saldo.activa, false);
+        assert.equal(saldo.estado, 'no_configurada');
+        assert.equal(saldo.ars, 0);
+        assert.equal(saldo.usd, 0);
     });
 
     it('permite abrir un nuevo día después del cierre anterior', () => {
@@ -42,16 +43,17 @@ describe('caja física unificada', () => {
             usd: 3810,
         });
 
-        expect(resolveSaldoCajaFisicaForDate(
+        const resolved = resolveSaldoCajaFisicaForDate(
             saldo,
             '2026-07-31',
             '2026-08-03',
-        )).toMatchObject({
-            estado: 'sin_abrir',
-            arqueo_id: null,
-            ars: 93310,
-            usd: 3810,
-        });
+        );
+
+        assert.equal(resolved.estado, 'sin_abrir');
+        assert.equal(resolved.arqueo_id, null);
+        assert.equal(resolved.arqueo_fecha, '2026-07-31');
+        assert.equal(resolved.ars, 93310);
+        assert.equal(resolved.usd, 3810);
     });
 
     it('mantiene cerrado cuando el cierre pertenece al mismo día', () => {
@@ -63,14 +65,36 @@ describe('caja física unificada', () => {
             usd: 3810,
         });
 
-        expect(resolveSaldoCajaFisicaForDate(
+        const resolved = resolveSaldoCajaFisicaForDate(
             saldo,
             '2026-08-03',
             '2026-08-03',
-        )).toMatchObject({
-            estado: 'cerrado',
-            arqueo_id: 'arqueo-lunes',
+        );
+
+        assert.equal(resolved.estado, 'cerrado');
+        assert.equal(resolved.arqueo_id, 'arqueo-lunes');
+        assert.equal(resolved.arqueo_fecha, '2026-08-03');
+    });
+
+    it('marca una apertura anterior como pendiente de cierre', () => {
+        const saldo = normalizeSaldoCajaFisica({
+            activa: true,
+            estado: 'abierto',
+            arqueo_id: 'arqueo-martes',
+            ars: 1008860,
+            usd: 10460,
         });
+
+        const resolved = resolveSaldoCajaFisicaForDate(
+            saldo,
+            '2026-08-05',
+            '2026-08-06',
+        );
+
+        assert.equal(resolved.estado, 'abierto_anterior');
+        assert.equal(resolved.arqueo_id, 'arqueo-martes');
+        assert.equal(resolved.arqueo_fecha, '2026-08-05');
+        assert.equal(canOpenCajaFisica(resolved, 'owner'), false);
     });
 
     it('permite a admin reabrir una caja cerrada durante el mismo día', () => {
@@ -82,7 +106,7 @@ describe('caja física unificada', () => {
             usd: 100,
         });
 
-        expect(canOpenCajaFisica(saldo, 'admin')).toBe(true);
+        assert.equal(canOpenCajaFisica(saldo, 'admin'), true);
     });
 
     it('no permite abrir caja a perfiles sin permiso operativo', () => {
@@ -93,7 +117,7 @@ describe('caja física unificada', () => {
             usd: 100,
         });
 
-        expect(canOpenCajaFisica(saldo, 'partner_viewer')).toBe(false);
-        expect(canOpenCajaFisica(saldo, null)).toBe(false);
+        assert.equal(canOpenCajaFisica(saldo, 'partner_viewer'), false);
+        assert.equal(canOpenCajaFisica(saldo, null), false);
     });
 });
