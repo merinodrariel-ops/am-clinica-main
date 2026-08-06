@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon, Plus, Trash2, Layout, CreditCard } from 'lucide-react';
+import { X, Search, User, DollarSign, Check, Loader2, Calendar, FileText, ImageIcon, Plus, Trash2, Layout, CreditCard, AlertTriangle } from 'lucide-react';
 import { ComprobanteUpload } from '@/components/caja/ComprobanteUpload';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -1138,6 +1138,42 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                                                     ))}
                                                 </div>
                                             </div>
+
+                                            {formData.es_cuota && baseInstallmentAmount > 0 && (() => {
+                                                const surcharge = getPaymentSurcharge(formData.metodo_pago as MetodoPagoCuota);
+                                                const selectedMethod = METODOS_PAGO.find(method => method.value === formData.metodo_pago)?.label || formData.metodo_pago;
+                                                const quotedAmount = convertUsdToCurrency(getRequiredSingleInstallmentUsd(), formData.moneda);
+
+                                                return (
+                                                    <div
+                                                        role="alert"
+                                                        className={clsx(
+                                                            'rounded-2xl border-2 p-4 shadow-sm animate-in fade-in zoom-in-95 duration-300',
+                                                            surcharge > 0
+                                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-800/60 dark:bg-emerald-950/25 dark:text-emerald-100'
+                                                                : 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/25 dark:text-amber-100',
+                                                        )}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="text-xs font-black uppercase tracking-wider">Antes de informar el monto</p>
+                                                                <p className="mt-1 text-xs font-semibold leading-relaxed">
+                                                                    Confirmá cómo va a pagar el paciente. Efectivo está seleccionado por defecto y no lleva recargo; Transferencia y Mercado Pago suman 10%; tarjetas suman 15%.
+                                                                </p>
+                                                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-current/15 bg-white/55 px-3 py-2 dark:bg-black/15">
+                                                                    <span className="text-[10px] font-black uppercase tracking-wider">
+                                                                        {selectedMethod} · {surcharge > 0 ? `Recargo ${Math.round(surcharge * 100)}% incluido` : 'Sin recargo'}
+                                                                    </span>
+                                                                    <span className="text-sm font-black tabular-nums">
+                                                                        Monto a informar: {formatPaymentAmount(quotedAmount, formData.moneda)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
 
                                                         {/* Simplified Payment Method Selection directly in Step 1 */}
                                             <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-400">
