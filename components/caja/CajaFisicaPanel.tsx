@@ -20,7 +20,7 @@ interface CajaFisicaPanelProps {
     sucursalId: string;
     tcBna?: number | null;
     compact?: boolean;
-    onStateChange?: () => void;
+    onSaldoChange?: (saldo: SaldoCajaFisica) => void;
 }
 
 const formatArs = (value: number) =>
@@ -29,7 +29,7 @@ const formatArs = (value: number) =>
 const formatUsd = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
-export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, onStateChange }: CajaFisicaPanelProps) {
+export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, onSaldoChange }: CajaFisicaPanelProps) {
     const { user, profile, categoria } = useAuth();
     const [saldo, setSaldo] = useState<SaldoCajaFisica | null>(null);
     const [loading, setLoading] = useState(true);
@@ -53,6 +53,7 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
         try {
             const current = await getSaldoCajaFisica(sucursalId);
             setSaldo(current);
+            onSaldoChange?.(current);
             setContadoArs(current.ars);
             setContadoUsd(current.usd);
         } catch (err) {
@@ -73,7 +74,6 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
         try {
             await abrirCajaFisica({ sucursalId, usuario, tcBna });
             await load();
-            onStateChange?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo abrir la caja.');
         } finally {
@@ -96,7 +96,6 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
             });
             setShowClose(false);
             await load();
-            onStateChange?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo cerrar la caja.');
         } finally {

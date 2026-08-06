@@ -46,7 +46,6 @@ import {
   getCuentas,
   getPersonal,
   createMovimiento,
-  getAperturaAdminDelDia,
   getArqueosForMonth,
   getCurrentBalanceAdmin,
   logMovimientoEdit,
@@ -166,8 +165,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
     nota: "",
   });
 
-  const [aperturaHoy, setAperturaHoy] = useState<CajaAdminArqueo | null>(null);
-  const isCajaAbierta = aperturaHoy?.estado === "Abierto";
+  const [isCajaAbierta, setIsCajaAbierta] = useState(false);
   const [arqueos, setArqueos] = useState<CajaAdminArqueo[]>([]);
   const [showArqueos, setShowArqueos] = useState(false);
   const [balanceVivo, setBalanceVivo] = useState<{
@@ -283,7 +281,6 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       const movData = await getMovimientos({ sucursalId: sucursal.id, mes: mesActual });
       const cuentasData = await getCuentas(sucursal.id);
       const categoriasData = await getCategorias(sucursal.id);
-      const aperturaHoy = await getAperturaAdminDelDia(sucursal.id);
       const arqueosData = await getArqueosForMonth(sucursal.id, mesActual);
       const balanceData = await getCurrentBalanceAdmin(sucursal.id);
       const personalData = await getPersonal();
@@ -311,7 +308,6 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       setCategorias((categoriasData || []).filter(c => c.activo));
       setPersonalLiquidacion((personalData || []).filter(p => p.activo !== false && ['horas', 'prestaciones', 'mensual'].includes(p.modelo_pago)));
       setLiquidacionesPendientes(liquidacionesPendientesData || []);
-      setAperturaHoy(aperturaHoy);
       setArqueos(arqueosData || []);
       setBalanceVivo(balanceData);
     } catch (error) {
@@ -1324,7 +1320,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       <CajaFisicaPanel
         sucursalId={sucursal.id}
         tcBna={tcBna}
-        onStateChange={() => void loadData()}
+        onSaldoChange={(saldo) => setIsCajaAbierta(saldo.estado === "abierto")}
       />
 
       {/* Resumen administrativo: informa egresos, sin calcular un segundo saldo de caja. */}
