@@ -3,12 +3,41 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const source = readFileSync('components/patients/drive/PhotoStudioModal.tsx', 'utf8');
+const canvasActionSource = readFileSync('app/actions/patient-canvases.ts', 'utf8');
 
 test('canvas status stays saving while the debounced write is pending', () => {
     const scheduling = source.indexOf('setCanvasSaving(true);', source.indexOf('// ── Auto-save active canvas'));
     const timeout = source.indexOf('saveTimerRef.current = setTimeout', scheduling);
     assert.ok(scheduling > -1);
     assert.ok(timeout > scheduling);
+});
+
+test('canvas autosave reports persistence errors instead of failing silently', () => {
+    const autosaveStart = source.indexOf('// ── Auto-save active canvas');
+    const autosaveEnd = source.indexOf('const [canvasSelectedId', autosaveStart);
+    const autosaveBlock = source.slice(autosaveStart, autosaveEnd);
+
+    assert.match(autosaveBlock, /if \(result\.error\) throw new Error\(result\.error\)/);
+    assert.match(autosaveBlock, /No se pudo guardar el lienzo editable/);
+});
+
+test('new canvas creation never falls back to a disposable local document', () => {
+    const createStart = source.indexOf('async function handleNewCanvas');
+    const createEnd = source.indexOf('async function handleDeleteCanvasDocuments', createStart);
+    const createBlock = source.slice(createStart, createEnd);
+
+    assert.doesNotMatch(createBlock, /temp-/);
+    assert.match(createBlock, /No se pudo crear un lienzo guardable/);
+});
+
+test('canvas save rejects an update that matched no persisted document', () => {
+    const saveStart = canvasActionSource.indexOf('export async function savePatientCanvasAction');
+    const saveEnd = canvasActionSource.indexOf('/** Delete a canvas */', saveStart);
+    const saveBlock = canvasActionSource.slice(saveStart, saveEnd);
+
+    assert.match(saveBlock, /\.select\('id'\)/);
+    assert.match(saveBlock, /if \(!data\)/);
+    assert.match(saveBlock, /El lienzo ya no existe/);
 });
 
 test('closing and switching canvases flush the exact active document', () => {

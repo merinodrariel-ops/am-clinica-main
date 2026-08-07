@@ -84,14 +84,19 @@ export async function savePatientCanvasAction(params: {
   if (params.name !== undefined) update.name = params.name;
   if (params.bgColor !== undefined) update.bg_color = params.bgColor;
 
-  const { error } = await admin
+  const { data, error } = await admin
     .from('patient_canvases')
     .update(update)
-    .eq('id', params.id);
+    .eq('id', params.id)
+    .select('id')
+    .maybeSingle();
 
   if (error) {
     console.error('[savePatientCanvas]', error);
     return { error: error.message };
+  }
+  if (!data) {
+    return { error: 'El lienzo ya no existe. Volvé a abrir el estudio antes de continuar.' };
   }
   return {};
 }

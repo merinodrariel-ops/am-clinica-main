@@ -1040,14 +1040,23 @@ export default function PhotoStudioModal({
         // closing/switching the canvas would cancel the pending write.
         setCanvasSaving(true);
         saveTimerRef.current = setTimeout(async () => {
-            const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
-            await savePatientCanvasAction({
-                id: activeCanvasId,
-                layers: activeCanvas.layers.map(l => ({ ...l, img: undefined })),
-                ratio: activeCanvas.ratio,
-                bgColor: activeCanvas.bgColor,
-            });
-            setCanvasSaving(false);
+            try {
+                const { savePatientCanvasAction } = await import('@/app/actions/patient-canvases');
+                const result = await savePatientCanvasAction({
+                    id: activeCanvasId,
+                    layers: activeCanvas.layers.map(l => ({ ...l, img: undefined })),
+                    ratio: activeCanvas.ratio,
+                    bgColor: activeCanvas.bgColor,
+                });
+                if (result.error) throw new Error(result.error);
+            } catch (error) {
+                toast.error('No se pudo guardar el lienzo editable', {
+                    id: 'canvas-autosave-error',
+                    description: error instanceof Error ? error.message : 'Error inesperado',
+                });
+            } finally {
+                setCanvasSaving(false);
+            }
         }, 2000);
         return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
     }, [activeCanvasId, activeCanvas]);
@@ -4147,13 +4156,11 @@ export default function PhotoStudioModal({
             setActiveCanvasId(data.id);
             setSelectedCanvasIds([data.id]);
         } catch (err) {
-            console.error('[handleNewCanvas] error, falling back to local:', err);
-            // Fallback: create locally with temp ID
-            const tempId = 'temp-' + Date.now();
-            const newCanvas: CanvasDoc = { id: tempId, name, ratio: '1:1', layers: [], bgColor: '#ffffff' };
-            setCanvases(prev => [...prev, newCanvas]);
-            setActiveCanvasId(tempId);
-            setSelectedCanvasIds([tempId]);
+            console.error('[handleNewCanvas]', err);
+            toast.error('No se pudo crear un lienzo guardable', {
+                description: err instanceof Error ? err.message : 'Volvé a intentarlo',
+            });
+            return;
         }
         setCanvasActive(true);
         setHasCanvas(true);
