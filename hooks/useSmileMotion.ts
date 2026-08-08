@@ -1,26 +1,23 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 export type MotionState = 'idle' | 'generating' | 'ready' | 'error';
 
 export interface MotionResult {
-  beforeVideoUrl: string;
   afterVideoUrl: string;
 }
 
 export interface UseSmileMotionReturn {
-  generate: (
-    beforeDataUrl: string,
-    afterDataUrl: string,
-    patientId: string,
-    baseName: string
-  ) => Promise<void>;
+  generate: (afterDataUrl: string, patientId: string, baseName: string) => Promise<void>;
   state: MotionState;
   result: MotionResult | null;
   error: string | null;
   reset: () => void;
 }
+
+const POLL_INTERVAL_MS = 10_000;
+const MAX_POLL_ATTEMPTS = 42;
 
 async function compressForMotion(dataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,18 +30,16 @@ async function compressForMotion(dataUrl: string): Promise<string> {
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('No se pudo preparar la imagen')); return; }
       ctx.drawImage(img, 0, 0, w, h);
       canvas.toBlob(
-        (b) => {
-          if (!b) { reject(new Error('compression failed')); return; }
+        (blob) => {
+          if (!blob) { reject(new Error('No se pudo comprimir la imagen')); return; }
           const reader = new FileReader();
-          reader.onload = () => {
-            const dataUrl = reader.result as string;
-            resolve(dataUrl.split(',')[1]); // raw base64, no prefix
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(b);
+          reader.onload = () => resolve(String(reader.result).split(',')[1]);
+          reader.onerror = () => reject(new Error('No se pudo leer la imagen comprimida'));
+          reader.readAsDataURL(blob);
         },
         'image/jpeg',
         0.85
@@ -55,52 +50,70 @@ async function compressForMotion(dataUrl: string): Promise<string> {
   });
 }
 
+async function responseJson(response: Response): Promise<Record<string, unknown>> {
+  return response.json().catch(() => ({})) as Promise<Record<string, unknown>>;
+}
+
+function errorMessage(data: Record<string, unknown>, fallback: string): string {
+  return typeof data.error === 'string' ? data.error : fallback;
+}
+
 export function useSmileMotion(): UseSmileMotionReturn {
   const [state, setState] = useState<MotionState>('idle');
   const [result, setResult] = useState<MotionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const generationIdRef = useRef(0);
 
-  const generate = useCallback(async (
-    beforeDataUrl: string,
-    afterDataUrl: string,
-    patientId: string,
-    baseName: string
-  ) => {
+  const generate = useCallback(async (afterDataUrl: string, patientId: string, baseName: string) => {
+    const generationId = ++generationIdRef.current;
     setError(null);
+    setResult(null);
     setState('generating');
 
     try {
-      // Compress both images to ≤1024px before sending
-      const [compBefore, compAfter] = await Promise.all([
-        compressForMotion(beforeDataUrl),
-        compressForMotion(afterDataUrl),
-      ]);
-
-      const res = await fetch('/api/smile-design/motion', {
+      const afterBase64 = await compressForMotion(afterDataUrl);
+      const startResponse = await fetch('/api/smile-design/motion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          beforeBase64: compBefore,
-          afterBase64: compAfter,
-          mimeType: 'image/jpeg',
-          patientId,
-          baseName,
-        }),
+        body: JSON.stringify({ afterBase64, mimeType: 'image/jpeg', patientId, baseName }),
       });
+      const startData = await responseJson(startResponse);
+      if (!startResponse.ok) throw new Error(errorMessage(startData, `Error HTTP ${startResponse.status}`));
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
-      if (data.error) throw new Error(data.error);
+      const operationName = typeof startData.operationName === 'string' ? startData.operationName : '';
+      const safeBaseName = typeof startData.baseName === 'string' ? startData.baseName : baseName;
+      if (!operationName) throw new Error('Google no inició la generación del video');
 
-      setResult({ beforeVideoUrl: data.beforeVideoUrl, afterVideoUrl: data.afterVideoUrl });
-      setState('ready');
+      for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+        if (generationIdRef.current !== generationId) return;
+
+        const pollResponse = await fetch('/api/smile-design/motion', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operationName, patientId, baseName: safeBaseName }),
+        });
+        const pollData = await responseJson(pollResponse);
+        if (!pollResponse.ok && pollResponse.status !== 202) {
+          throw new Error(errorMessage(pollData, `Error HTTP ${pollResponse.status}`));
+        }
+        if (pollData.status === 'ready' && typeof pollData.afterVideoUrl === 'string') {
+          setResult({ afterVideoUrl: pollData.afterVideoUrl });
+          setState('ready');
+          return;
+        }
+      }
+
+      throw new Error('Google demoró más de 7 minutos. Intentá nuevamente en unos minutos.');
     } catch (err) {
+      if (generationIdRef.current !== generationId) return;
       setError(err instanceof Error ? err.message : 'Error al generar video');
       setState('error');
     }
   }, []);
 
   const reset = useCallback(() => {
+    generationIdRef.current += 1;
     setState('idle');
     setResult(null);
     setError(null);

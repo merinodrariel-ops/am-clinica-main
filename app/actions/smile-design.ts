@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
 import { uploadFileToFolder } from '@/lib/google-drive';
+import { canManagePatientDrive } from '@/lib/patient-drive-access';
 
 export interface SaveSmileDesignParams {
   patientId: string;
@@ -249,43 +250,76 @@ export async function saveSmileDesignResult(
   }
 }
 
-export async function saveSmileMotionVideos(params: {
+export async function saveSmileMotionVideo(params: {
   patientId: string;
-  beforeVideoUrl: string;
   afterVideoUrl: string;
   baseName: string;
+  folderId: string;
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'No autenticado' };
 
   const adminClient = createAdminClient();
-  const { patientId, beforeVideoUrl, afterVideoUrl, baseName } = params;
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('categoria')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (!canManagePatientDrive(profile?.categoria || user.user_metadata?.categoria)) {
+    return { error: 'Sin permiso para guardar videos de pacientes' };
+  }
 
-  const records = [
-    {
+  const { patientId, afterVideoUrl, baseName, folderId } = params;
+  if (!/^[0-9a-f-]{36}$/i.test(patientId) || !/^[a-zA-Z0-9_-]{10,}$/.test(folderId)) {
+    return { error: 'Paciente o carpeta inválidos' };
+  }
+
+  let parsedVideoUrl: URL;
+  let configuredSupabaseUrl: URL;
+  try {
+    parsedVideoUrl = new URL(afterVideoUrl);
+    configuredSupabaseUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '');
+  } catch {
+    return { error: 'URL de video inválida' };
+  }
+  const expectedPath = `/storage/v1/object/public/patient-portal-files/portal/${patientId}/`;
+  if (parsedVideoUrl.origin !== configuredSupabaseUrl.origin || !parsedVideoUrl.pathname.startsWith(expectedPath)) {
+    return { error: 'El video no pertenece al almacenamiento clínico autorizado' };
+  }
+
+  const response = await fetch(parsedVideoUrl);
+  if (!response.ok) return { error: `No se pudo descargar el video (${response.status})` };
+  const videoBytes = Buffer.from(await response.arrayBuffer());
+  if (videoBytes.length === 0 || videoBytes.length > 30 * 1024 * 1024) {
+    return { error: 'El video está vacío o supera 30 MB' };
+  }
+
+  const safeBaseName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'smile_motion';
+  const fileName = `${safeBaseName}_motion_despues.mp4`;
+  const driveUpload = await uploadFileToFolder(folderId, fileName, videoBytes, 'video/mp4');
+  if (!driveUpload.success) return { error: driveUpload.error || 'No se pudo guardar el video en Drive' };
+
+  const { data: existing } = await adminClient
+    .from('patient_files')
+    .select('id')
+    .eq('patient_id', patientId)
+    .eq('file_type', 'smile_motion')
+    .eq('file_url', afterVideoUrl)
+    .maybeSingle();
+
+  if (!existing) {
+    const { error } = await adminClient.from('patient_files').insert({
       patient_id: patientId,
       file_type: 'smile_motion',
-      label: `${baseName}_Antes_Motion`,
-      file_url: beforeVideoUrl,
-      is_visible_to_patient: true,
-    },
-    {
-      patient_id: patientId,
-      file_type: 'smile_motion',
-      label: `${baseName}_Despues_Motion`,
+      label: `${safeBaseName}_Despues_Motion`,
       file_url: afterVideoUrl,
       is_visible_to_patient: true,
-    },
-  ];
-
-  const { error } = await adminClient
-    .from('patient_files')
-    .insert(records);
-
-  if (error) {
-    console.error('[saveSmileMotionVideos]', error);
-    return { error: error.message };
+    });
+    if (error) {
+      console.error('[saveSmileMotionVideo]', error);
+      return { error: error.message };
+    }
   }
   return {};
 }

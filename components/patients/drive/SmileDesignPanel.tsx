@@ -355,7 +355,7 @@ export default function SmileDesignPanel({
             )}
             {motionState === 'generating' && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs text-slate-400 text-center">⟳ Generando video... (~60s)</p>
+                <p className="text-xs text-slate-400 text-center">⟳ Google está generando el video del resultado… Puede tardar varios minutos.</p>
                 <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                   <div className="h-full bg-purple-500 rounded-full animate-pulse" style={{ width: '60%' }} />
                 </div>
@@ -363,12 +363,12 @@ export default function SmileDesignPanel({
             )}
             {motionState === 'ready' && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs text-emerald-400 text-center">✓ Video listo</p>
+                <p className="text-xs text-emerald-400 text-center">✓ Video del resultado listo</p>
                 <button
                   onClick={onSaveMotion}
                   className="w-full py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-sm md:text-base font-medium transition-all flex items-center justify-center gap-2"
                 >
-                  💾 Guardar videos en Drive
+                  💾 Guardar video en Drive
                 </button>
                 <button
                   onClick={onShareLink}
