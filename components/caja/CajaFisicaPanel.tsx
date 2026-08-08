@@ -27,7 +27,7 @@ const formatArs = (value: number) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(value);
 
 const formatUsd = (value: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    `USD ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(value)}`;
 
 export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, onSaldoChange }: CajaFisicaPanelProps) {
     const { user, profile, categoria } = useAuth();
@@ -169,14 +169,19 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-xs uppercase tracking-wider text-slate-400">Billetes ARS disponibles</p>
-                        <p className="text-2xl font-mono font-bold mt-1">{formatArs(saldo.ars)}</p>
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1.35fr_1fr]">
+                    <div className="relative overflow-hidden rounded-2xl border border-emerald-400/30 bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent p-5 sm:p-6">
+                        <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-emerald-400/10 blur-2xl" />
+                        <p className="relative text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Dólares en caja</p>
+                        <p className="relative mt-2 break-words font-mono text-4xl font-black tracking-tight text-white sm:text-5xl">
+                            {formatUsd(saldo.usd)}
+                        </p>
+                        <p className="relative mt-2 text-xs text-emerald-100/70">Billetes físicos disponibles</p>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-xs uppercase tracking-wider text-slate-400">Billetes USD disponibles</p>
-                        <p className="text-2xl font-mono font-bold mt-1">{formatUsd(saldo.usd)}</p>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Pesos en caja · ARS</p>
+                        <p className="mt-2 break-words font-mono text-2xl font-bold text-slate-100 sm:text-3xl">{formatArs(saldo.ars)}</p>
+                        <p className="mt-2 text-xs text-slate-500">Billetes físicos disponibles</p>
                     </div>
                 </div>
 

@@ -2206,6 +2206,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
             usd_equivalente_total,
             subtipo,
             fecha_hora,
+            fecha_movimiento,
             caja_admin_movimiento_lineas (
                 cuenta_id,
                 importe,
@@ -2233,6 +2234,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
             tipo_movimiento: string;
             usd_equivalente_total: number | null;
             subtipo: string | null;
+            fecha_movimiento: string;
             caja_admin_movimiento_lineas: MovimientoLinea[];
         }) => {
             const tipo = m.tipo_movimiento;
@@ -2252,7 +2254,7 @@ export async function getCurrentBalanceAdmin(sucursalId: string, upToDate?: stri
             }
 
             // Track total gastos in USD (excludes GIRO_ACTIVO due to return above)
-            if (tipo === 'EGRESO' && m.usd_equivalente_total) {
+            if (tipo === 'EGRESO' && m.fecha_movimiento === today && m.usd_equivalente_total) {
                 gastosTotalesUsd += Number(m.usd_equivalente_total);
             }
 

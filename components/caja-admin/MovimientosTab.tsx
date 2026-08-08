@@ -74,7 +74,10 @@ import { getLocalISODate } from "@/lib/local-date";
 import { Textarea } from "@/components/ui/Textarea";
 import MoneyInput from "@/components/ui/MoneyInput";
 import { shouldSubmitOnEnter, useModalKeyboard } from '@/hooks/useModalKeyboard';
-import { calculateMonthlyAdminExpensesUsd } from '@/lib/caja-admin/expense-metrics';
+import {
+  calculateDailyAdminExpenseSummaryUsd,
+  calculateMonthlyAdminExpensesUsd,
+} from '@/lib/caja-admin/expense-metrics';
 import {
   cashWithdrawalLinesAreValid,
   getAccountsForMovement,
@@ -1305,6 +1308,13 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
   // Gastos operativos: solo EGRESO. Retiros, traspasos y cambios de moneda
   // mueven fondos, pero no representan consumo real de dinero.
   const totalGastosMesUsd = calculateMonthlyAdminExpensesUsd(movimientos);
+  const gastosHoy = calculateDailyAdminExpenseSummaryUsd(
+    movimientos,
+    cuentas,
+    getLocalISODate(),
+  );
+  const formatExpenseUsd = (value: number) =>
+    `USD ${new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 
 
   // --- Helper for Privacy Mode ---
@@ -1325,22 +1335,32 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
 
       {/* Resumen administrativo: informa egresos, sin calcular un segundo saldo de caja. */}
       {balanceVivo && (
-        <div className="glass-card rounded-xl border border-red-500/15 bg-red-500/5 p-4 shadow-sm">
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-red-400">
-            Resumen de egresos
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-red-400">Gastos hoy</p>
-              <p className="mt-1 text-sm font-bold text-red-400">
-                {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(balanceVivo.gastosTotalesUsd)}`)}
+        <div className="glass-card overflow-hidden rounded-2xl border border-red-500/20 bg-gradient-to-br from-red-500/10 via-transparent to-slate-950/20 shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr]">
+            <div className="border-b border-white/10 p-5 sm:p-6 lg:border-b-0 lg:border-r">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-red-400">Gastos de hoy · equivalente en USD</p>
+              <p className="mt-2 break-words font-mono text-4xl font-black tracking-tight text-white sm:text-5xl">
+                {formatPrivacy(formatExpenseUsd(gastosHoy.totalUsd))}
               </p>
+              <p className="mt-2 text-xs text-slate-400">Solo egresos con fecha operativa de hoy. No incluye retiros ni traspasos.</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Gastos mes</p>
-              <p className="mt-1 text-sm font-bold text-slate-300">
-                {formatPrivacy(`−${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalGastosMesUsd)}`)}
-              </p>
+            <div className="grid grid-cols-2 gap-px bg-white/10">
+              <div className="bg-slate-950/70 p-4 sm:p-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-300">Desde banco</p>
+                <p className="mt-1 font-mono text-lg font-bold text-white">{formatPrivacy(formatExpenseUsd(gastosHoy.bankUsd))}</p>
+                <p className="mt-1 text-[11px] text-slate-500">No descuenta billetes</p>
+              </div>
+              <div className="bg-slate-950/70 p-4 sm:p-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">Desde caja física</p>
+                <p className="mt-1 font-mono text-lg font-bold text-white">{formatPrivacy(formatExpenseUsd(gastosHoy.cashUsd))}</p>
+                <p className="mt-1 text-[11px] text-slate-500">Sí descuenta billetes</p>
+              </div>
+              <div className="col-span-2 bg-slate-950/70 p-4 sm:p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Gastos del mes</p>
+                  <p className="font-mono text-xl font-bold text-slate-200">{formatPrivacy(formatExpenseUsd(totalGastosMesUsd))}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
