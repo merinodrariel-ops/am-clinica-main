@@ -2949,7 +2949,7 @@ export default function PhotoStudioModal({
         canvas.height = editedCanvas?.height ?? img!.naturalHeight;
         const ctx = canvas.getContext('2d')!;
         if (bgColor === 'white' || bgColor === 'black') {
-            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#111111';
+            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         ctx.drawImage(editedCanvas ?? img!, 0, 0);

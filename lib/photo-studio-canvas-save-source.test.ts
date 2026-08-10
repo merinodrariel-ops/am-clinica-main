@@ -81,3 +81,12 @@ test('background confirmation exports the edited pixel canvas, not the stale ima
     assert.match(confirmBlock, /ctx\.drawImage\(editedCanvas \?\? img!/);
     assert.match(confirmBlock, /return newUrl/);
 });
+
+test('black background confirmation uses absolute black pixels', () => {
+    const confirmStart = source.indexOf('async function handleConfirmBg');
+    const confirmEnd = source.indexOf('function handleUndoBgRemoval', confirmStart);
+    const confirmBlock = source.slice(confirmStart, confirmEnd);
+
+    assert.match(confirmBlock, /bgColor === 'white' \? '#ffffff' : '#000000'/);
+    assert.doesNotMatch(confirmBlock, /#111111/);
+});
