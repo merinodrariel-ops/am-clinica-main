@@ -142,7 +142,7 @@ Fondo:
 [⬜ Blanco]  [⬛ Negro]  [▥ Transparente]
 ```
 - Changing bg color is instant (CSS only, no reprocessing)
-- Canvas container gets `background: white` / `background: #111` / `background: url(checkerboard)`
+- Canvas container gets `background: white` / `background: #000000` / `background: url(checkerboard)`
 
 ### Reset
 - Small ghost button at bottom of panel
@@ -198,7 +198,7 @@ async function exportToBlob(): Promise<Blob> {
 
     // Background fill (only when bg removal done)
     if (bgDone && bgColor !== 'transparent') {
-        ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#111111';
+        ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#000000';
         ctx.fillRect(0, 0, outW, outH);
     }
 

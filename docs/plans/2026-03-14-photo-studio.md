@@ -317,7 +317,7 @@ export default function PhotoStudioModal({
 
         // Background fill (only when bg removed + non-transparent)
         if (bgDone && bgColor !== 'transparent') {
-            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#111111';
+            ctx.fillStyle = bgColor === 'white' ? '#ffffff' : '#000000';
             ctx.fillRect(0, 0, outW, outH);
         }
 
@@ -412,7 +412,7 @@ export default function PhotoStudioModal({
         ? bgColor === 'white'
             ? 'bg-white'
             : bgColor === 'black'
-            ? 'bg-[#111]'
+            ? 'bg-black'
             : 'bg-[url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\'%3E%3Crect width=\'8\' height=\'8\' fill=\'%23ccc\'/%3E%3Crect x=\'8\' y=\'8\' width=\'8\' height=\'8\' fill=\'%23ccc\'/%3E%3C/svg%3E")]'
         : 'bg-[#0D0D12]';
 
@@ -758,7 +758,7 @@ function ToolsPanel({
                             {([
                                 { value: 'transparent', label: '▥', title: 'Transparente', cls: 'bg-white/10' },
                                 { value: 'white', label: '⬜', title: 'Blanco', cls: 'bg-white' },
-                                { value: 'black', label: '⬛', title: 'Negro', cls: 'bg-[#111]' },
+                                { value: 'black', label: '⬛', title: 'Negro', cls: 'bg-black' },
                             ] as const).map(opt => (
                                 <button
                                     key={opt.value}

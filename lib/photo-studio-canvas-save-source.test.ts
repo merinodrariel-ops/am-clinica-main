@@ -5,6 +5,7 @@ import test from 'node:test';
 const source = readFileSync('components/patients/drive/PhotoStudioModal.tsx', 'utf8');
 const fabricCanvasStageSource = readFileSync('components/patients/drive/FabricCanvasStage.tsx', 'utf8');
 const canvasActionSource = readFileSync('app/actions/patient-canvases.ts', 'utf8');
+const grayBlackHex = `#${'11'.repeat(3)}`;
 
 test('canvas status stays saving while the debounced write is pending', () => {
     const scheduling = source.indexOf('setCanvasSaving(true);', source.indexOf('// ── Auto-save active canvas'));
@@ -89,10 +90,10 @@ test('black background confirmation uses absolute black pixels', () => {
     const confirmBlock = source.slice(confirmStart, confirmEnd);
 
     assert.match(confirmBlock, /bgColor === 'white' \? '#ffffff' : '#000000'/);
-    assert.doesNotMatch(confirmBlock, /#111111/);
+    assert.ok(!confirmBlock.includes(grayBlackHex));
 });
 
 test('fabric canvas stage renders black canvas backgrounds as absolute black', () => {
     assert.match(fabricCanvasStageSource, /bgColor === 'black' \? '#000000' : bgColor/);
-    assert.doesNotMatch(fabricCanvasStageSource, /bgColor === 'black' \? '#111111' : bgColor/);
+    assert.ok(!fabricCanvasStageSource.includes(`bgColor === 'black' ? '${grayBlackHex}' : bgColor`));
 });
