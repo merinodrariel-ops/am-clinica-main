@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const source = readFileSync('components/patients/drive/PhotoStudioModal.tsx', 'utf8');
+const fabricCanvasStageSource = readFileSync('components/patients/drive/FabricCanvasStage.tsx', 'utf8');
 const canvasActionSource = readFileSync('app/actions/patient-canvases.ts', 'utf8');
 
 test('canvas status stays saving while the debounced write is pending', () => {
@@ -89,4 +90,9 @@ test('black background confirmation uses absolute black pixels', () => {
 
     assert.match(confirmBlock, /bgColor === 'white' \? '#ffffff' : '#000000'/);
     assert.doesNotMatch(confirmBlock, /#111111/);
+});
+
+test('fabric canvas stage renders black canvas backgrounds as absolute black', () => {
+    assert.match(fabricCanvasStageSource, /bgColor === 'black' \? '#000000' : bgColor/);
+    assert.doesNotMatch(fabricCanvasStageSource, /bgColor === 'black' \? '#111111' : bgColor/);
 });

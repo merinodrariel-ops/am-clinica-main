@@ -282,7 +282,7 @@ export default function FabricCanvasStage({
             else canvas.discardActiveObject();
             canvas.backgroundColor = bgColor === 'transparent'
                 ? ''
-                : bgColor === 'black' ? '#111111' : bgColor;
+                : bgColor === 'black' ? '#000000' : bgColor;
             canvas.requestRenderAll();
             syncingRef.current = false;
         });
