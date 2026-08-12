@@ -107,7 +107,7 @@ const TIPOS_MOVIMIENTO = [
   { value: "INGRESO_PACIENTE", label: "Ingreso Paciente", onlyUnificada: true },
   { value: "CAMBIO_MONEDA", label: "Cambio de Moneda" },
   { value: "RETIRO", label: "Retiro en efectivo" },
-  { value: "TRANSFERENCIA", label: "Transferencia" },
+  { value: "TRANSFERENCIA", label: "Traspaso interno" },
   { value: "AJUSTE_CAJA", label: "Ajuste de Caja" },
   { value: "APORTE_CAPITAL", label: "Aporte de Capital (No Ingreso)" },
   { value: "GIRO_ACTIVO", label: "Giro Activo (Deuda Externa)" },
@@ -2246,7 +2246,9 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
                           ? "GIRO ACTIVO"
                           : mov.tipo_movimiento === "RETIRO"
                             ? "RETIRO EN EFECTIVO"
-                            : (mov.tipo_movimiento || "").replace("_", " ")}
+                            : mov.tipo_movimiento === "TRANSFERENCIA"
+                              ? "TRASPASO INTERNO"
+                              : (mov.tipo_movimiento || "").replace("_", " ")}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium">
