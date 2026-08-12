@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors, getAgendaClinicalAreas, type AgendaClinicalArea } from '@/app/actions/agenda';
-import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle, UserPlus } from 'lucide-react';
+import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle, UserPlus, Video } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -73,6 +73,7 @@ const APPOINTMENT_TYPE_OPTIONS = [
     { value: 'cementado', label: 'Cementado' },
     { value: 'botox', label: 'Botox' },
     { value: 'control', label: 'Control general / urgencia' },
+    { value: 'reunion', label: 'Reunión / Google Meet' },
     { value: 'recordatorio_interno', label: '📞 Recordatorio interno' },
 ] as const;
 
@@ -90,7 +91,10 @@ const TYPE_DURATIONS_MIN: Record<string, number> = {
     botox:     30,
     cementado: 240,
     tallado:   240,
+    reunion:   30,
 };
+
+const PATIENT_OPTIONAL_TYPES = new Set(['recordatorio_interno', 'reunion']);
 
 const APPOINTMENT_PRESETS = [
     { key: 'primera_presencial', label: 'Primera presencial', type: 'consulta', modality: 'presencial' as AppointmentModality, durationMin: 60 },
@@ -255,6 +259,13 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         setEndFromStart(preset.durationMin);
     }, [setEndFromStart]);
 
+    const applyMeetingPreset = useCallback(() => {
+        setType('reunion');
+        setModality('virtual');
+        setEndFromStart(TYPE_DURATIONS_MIN.reunion);
+        if (!title.trim()) setTitle('Reunión');
+    }, [setEndFromStart, title]);
+
     useEffect(() => {
         if (!initialData?.id) return;
         if (!doctorId || doctorSearch.trim().length > 0) return;
@@ -332,7 +343,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const handleSubmit = useCallback(async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (loading || isSubmitting.current) return;
-        if (type !== 'recordatorio_interno' && !patientId) {
+        if (!PATIENT_OPTIONAL_TYPES.has(type) && !patientId) {
             alert('Seleccioná un paciente existente o precargá uno pendiente de formulario antes de agendar.');
             return;
         }
@@ -472,7 +483,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        {initialData?.id ? 'Editar Cita' : 'Nueva Cita'}
+                        {initialData?.id ? 'Editar agenda' : 'Nueva agenda'}
                     </h2>
                     <Button variant="ghost" size="icon" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-200/50 transition-colors">
                         <X size={20} />
@@ -492,7 +503,9 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
 
                     {/* Patient Search - Hero Field */}
                     <div className="relative group">
-                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Paciente</label>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">
+                            Paciente{PATIENT_OPTIONAL_TYPES.has(type) ? ' (opcional)' : ''}
+                        </label>
                         {selectedPatientName ? (
                             <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/30 group-hover:border-blue-200 transition-colors">
                                 <div className="flex items-center gap-3">
@@ -797,6 +810,19 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 );
                             })}
                         </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={applyMeetingPreset}
+                            className={`mt-2 w-full justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all h-auto ${
+                                type === 'reunion'
+                                    ? 'bg-cyan-50 text-cyan-700 border-cyan-200 ring-2 ring-cyan-100 dark:bg-cyan-950/30 dark:text-cyan-200 dark:border-cyan-800'
+                                    : 'bg-white dark:bg-gray-800 text-gray-600 border-gray-200 hover:border-gray-300'
+                            }`}
+                        >
+                            <Video size={14} />
+                            <span>Reunión virtual con Google Meet</span>
+                        </Button>
                     </div>
 
                     {/* Doctor & Type Row */}
@@ -908,6 +934,11 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                     Solo visible para recepción y admin — no aparece como turno de paciente
                                 </p>
                             )}
+                            {type === 'reunion' && modality === 'virtual' && (
+                                <p className="text-[11px] text-cyan-600 font-semibold mt-1.5 pl-1">
+                                    No requiere paciente y se sincroniza con link de Google Meet
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -1007,7 +1038,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed h-auto border-none"
                             >
                                 {loading ? <Loader2 className="animate-spin h-4 w-4" /> : <Check size={18} />}
-                                <span>Guardar Cita</span>
+                                <span>Guardar</span>
                             </Button>
                         </div>
                     </div>

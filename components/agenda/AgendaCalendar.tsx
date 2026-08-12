@@ -480,6 +480,7 @@ export default function AgendaCalendar() {
                 const isSurgery = SURGERY_APPOINTMENT_TYPES.has(apt.type);
                 const isDetailedDay = DETAILED_DAY_APPOINTMENT_TYPES.has(apt.type);
                 const isInternal = apt.type === 'recordatorio_interno';
+                const isMeeting = apt.type === 'reunion';
 
                 // Recordatorios internos: color naranja distintivo, sin lógica de doctor/cirugía
                 if (isInternal) {
@@ -496,6 +497,32 @@ export default function AgendaCalendar() {
                             status: apt.status,
                             type: apt.type,
                             modality: apt.modality || 'presencial',
+                            notes: apt.notes || '',
+                            patient_id: apt.patient_id || '',
+                            doctor_id: apt.doctor_id || '',
+                            area_id: apt.area_id || '',
+                            start_time: apt.start_time,
+                            patient: apt.patient || undefined,
+                            doctor: apt.doctor || undefined,
+                            conflict: false,
+                        }
+                    };
+                }
+
+                if (isMeeting) {
+                    return {
+                        id: apt.id,
+                        title: apt.title || 'Reunión',
+                        start: apt.start_time,
+                        end: apt.end_time,
+                        backgroundColor: '#0891b2',
+                        borderColor: '#0e7490',
+                        textColor: '#ffffff',
+                        className: 'premium-event reunion-event',
+                        extendedProps: {
+                            status: apt.status,
+                            type: apt.type,
+                            modality: apt.modality || 'virtual',
                             notes: apt.notes || '',
                             patient_id: apt.patient_id || '',
                             doctor_id: apt.doctor_id || '',
@@ -1154,6 +1181,7 @@ export default function AgendaCalendar() {
                                         end: safeEnd,
                                         status: props.status || 'confirmed',
                                         type: props.type || 'consulta',
+                                        modality: props.modality || 'presencial',
                                         notes: props.notes || '',
                                         patientId: props.patient_id || '',
                                         doctorId: props.doctor_id || '',
@@ -1199,6 +1227,7 @@ export default function AgendaCalendar() {
                             const isBlocked = isAppointmentBlocked(aptStart, aptEnd, props.doctor_id);
                             const isCancelled = props.status === 'cancelled';
                             const TYPE_LABELS: Record<string, string> = {
+                                reunion: 'Reunión',
                                 control: 'Control / urgencia',
                                 control_carilla_inmediato: 'Ctrl carilla inmediato',
                                 control_carilla_anual: 'Ctrl carilla anual',

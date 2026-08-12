@@ -5,6 +5,114 @@ import { buildGoogleAuth } from './google-calendar-sync';
 // Google Calendar ID from environment or fallback to 'primary'
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID ?? 'primary';
 
+const GOOGLE_MEET_NOTE_REGEX = /(?:^|\n)Google Meet: https:\/\/meet\.google\.com\/[a-z-]+/i;
+
+type GoogleOutboundAppointment = {
+  id: string;
+  title?: string | null;
+  notes?: string | null;
+  modality?: string | null;
+  start_time: string;
+  end_time: string;
+  status?: string | null;
+  type?: string | null;
+  patient?: {
+    nombre?: string | null;
+    apellido?: string | null;
+    email?: string | null;
+    whatsapp?: string | null;
+  } | null;
+  doctor?: {
+    full_name?: string | null;
+  } | null;
+};
+
+function isVirtualAppointment(apt: { modality?: string | null; notes?: string | null }) {
+  return apt.modality === 'virtual' || (apt.notes || '').includes('[APPOINTMENT_MODALITY:virtual]');
+}
+
+function getGoogleErrorCode(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error
+    ? Number((error as { code?: unknown }).code)
+    : null;
+}
+
+function buildGoogleEventBody(apt: GoogleOutboundAppointment) {
+  const patientName = apt.patient ? `${apt.patient.nombre ?? ''} ${apt.patient.apellido ?? ''}`.trim() : null;
+  const summary = apt.title || (patientName ? `Consulta - ${patientName}` : 'Reunión AM Clínica');
+
+  let description = apt.notes || '';
+  if (apt.patient) {
+    description += `\n\n--- Información del Paciente ---`;
+    description += `\nPaciente: ${patientName || 'N/A'}`;
+    if (apt.patient.whatsapp) description += `\nTeléfono: ${apt.patient.whatsapp}`;
+    if (apt.patient.email) description += `\nEmail: ${apt.patient.email}`;
+  }
+  if (apt.doctor) {
+    description += `\nOdontólogo: ${apt.doctor.full_name}`;
+  }
+  if (apt.type) {
+    description += `\nTipo de Turno: ${apt.type}`;
+  }
+
+  const startISO = new Date(apt.start_time).toISOString();
+  const endISO = new Date(apt.end_time).toISOString();
+
+  const eventBody: {
+    summary: string;
+    description: string;
+    start: { dateTime: string };
+    end: { dateTime: string };
+    status?: string;
+    attendees?: Array<{ email: string; displayName: string | null }>;
+    conferenceData?: {
+      createRequest: {
+        requestId: string;
+        conferenceSolutionKey: { type: 'hangoutsMeet' };
+      };
+    };
+  } = {
+    summary,
+    description,
+    start: { dateTime: startISO },
+    end: { dateTime: endISO },
+  };
+
+  if (apt.status) {
+    eventBody.status = apt.status === 'cancelled' ? 'cancelled' : 'confirmed';
+  }
+
+  if (apt.patient?.email) {
+    eventBody.attendees = [{ email: apt.patient.email, displayName: patientName }];
+  }
+
+  if (isVirtualAppointment(apt)) {
+    eventBody.conferenceData = {
+      createRequest: {
+        requestId: `am-clinica-${apt.id}`,
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    };
+  }
+
+  return eventBody;
+}
+
+async function persistGoogleMeetLink(appointmentId: string, currentNotes: string | null | undefined, meetLink: string | null | undefined) {
+  if (!meetLink || GOOGLE_MEET_NOTE_REGEX.test(currentNotes || '')) return;
+
+  const supabase = createAdminClient();
+  const notes = [currentNotes?.trim(), `Google Meet: ${meetLink}`].filter(Boolean).join('\n\n');
+  const { error } = await supabase
+    .from('agenda_appointments')
+    .update({ notes, updated_at: new Date().toISOString() })
+    .eq('id', appointmentId);
+
+  if (error) {
+    console.error(`[GoogleOutbound] Failed to persist Meet link for appointment ${appointmentId}:`, error);
+  }
+}
+
 /**
  * Creates an event in Google Calendar for a given appointment ID.
  * Updates the appointment's external_id and sets source to 'google_calendar'.
@@ -38,44 +146,11 @@ export async function createGoogleEvent(appointmentId: string): Promise<string |
     const auth = buildGoogleAuth();
     const calendar = google.calendar({ version: 'v3', auth });
 
-    // 2. Prepare event metadata
-    const patientName = apt.patient ? `${apt.patient.nombre ?? ''} ${apt.patient.apellido ?? ''}`.trim() : null;
-    const summary = apt.title || (patientName ? `Consulta - ${patientName}` : 'Consulta Odontológica');
-    
-    // Build description with notes, patient info, etc.
-    let description = apt.notes || '';
-    if (apt.patient) {
-      description += `\n\n--- Información del Paciente ---`;
-      description += `\nPaciente: ${patientName || 'N/A'}`;
-      if (apt.patient.whatsapp) description += `\nTeléfono: ${apt.patient.whatsapp}`;
-      if (apt.patient.email) description += `\nEmail: ${apt.patient.email}`;
-    }
-    if (apt.doctor) {
-      description += `\nOdontólogo: ${apt.doctor.full_name}`;
-    }
-    if (apt.type) {
-      description += `\nTipo de Turno: ${apt.type}`;
-    }
-
-    const startISO = new Date(apt.start_time).toISOString();
-    const endISO = new Date(apt.end_time).toISOString();
-
-    // 3. Create Google Calendar Event
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const eventBody: any = {
-      summary,
-      description,
-      start: { dateTime: startISO },
-      end: { dateTime: endISO },
-    };
-
-    // Add attendees if patient has an email
-    if (apt.patient?.email) {
-      eventBody.attendees = [{ email: apt.patient.email, displayName: patientName }];
-    }
+    const eventBody = buildGoogleEventBody(apt);
 
     const response = await calendar.events.insert({
       calendarId: CALENDAR_ID,
+      conferenceDataVersion: 1,
       requestBody: eventBody,
     });
 
@@ -96,6 +171,8 @@ export async function createGoogleEvent(appointmentId: string): Promise<string |
     if (updateErr) {
       console.error(`[GoogleOutbound] Failed to update appointment ${appointmentId} with external_id ${eventId}:`, updateErr);
     }
+
+    await persistGoogleMeetLink(appointmentId, apt.notes, response.data.hangoutLink);
 
     console.log(`[GoogleOutbound] Successfully synchronized appointment ${appointmentId} to Google Calendar event ${eventId}`);
     return eventId;
@@ -138,52 +215,24 @@ export async function updateGoogleEvent(appointmentId: string): Promise<string |
     const auth = buildGoogleAuth();
     const calendar = google.calendar({ version: 'v3', auth });
 
-    // 2. Prepare event metadata
-    const patientName = apt.patient ? `${apt.patient.nombre ?? ''} ${apt.patient.apellido ?? ''}`.trim() : null;
-    const summary = apt.title || (patientName ? `Consulta - ${patientName}` : 'Consulta Odontológica');
-    
-    let description = apt.notes || '';
-    if (apt.patient) {
-      description += `\n\n--- Información del Paciente ---`;
-      description += `\nPaciente: ${patientName || 'N/A'}`;
-      if (apt.patient.whatsapp) description += `\nTeléfono: ${apt.patient.whatsapp}`;
-      if (apt.patient.email) description += `\nEmail: ${apt.patient.email}`;
-    }
-    if (apt.doctor) {
-      description += `\nOdontólogo: ${apt.doctor.full_name}`;
-    }
-    if (apt.type) {
-      description += `\nTipo de Turno: ${apt.type}`;
-    }
-
-    const startISO = new Date(apt.start_time).toISOString();
-    const endISO = new Date(apt.end_time).toISOString();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const eventBody: any = {
-      summary,
-      description,
-      start: { dateTime: startISO },
-      end: { dateTime: endISO },
-      status: apt.status === 'cancelled' ? 'cancelled' : 'confirmed',
-    };
-
-    if (apt.patient?.email) {
-      eventBody.attendees = [{ email: apt.patient.email, displayName: patientName }];
-    }
+    const eventBody = buildGoogleEventBody(apt);
 
     // 3. Update the event on Google Calendar using external_id
-    await calendar.events.patch({
+    const response = await calendar.events.patch({
       calendarId: CALENDAR_ID,
       eventId: apt.external_id,
+      conferenceDataVersion: 1,
       requestBody: eventBody,
     });
 
+    await persistGoogleMeetLink(appointmentId, apt.notes, response.data.hangoutLink);
+
     console.log(`[GoogleOutbound] Successfully updated Google Calendar event ${apt.external_id} for appointment ${appointmentId}`);
     return apt.external_id;
-  } catch (err: any) {
+  } catch (err: unknown) {
     // If the event was deleted on Google Calendar (404/410), clear the external_id and recreate
-    if (err.code === 404 || err.code === 410) {
+    const errorCode = getGoogleErrorCode(err);
+    if (errorCode === 404 || errorCode === 410) {
       console.warn(`[GoogleOutbound] Event ${apt.external_id} not found on Google Calendar (deleted). Recreating...`);
       // Clear external_id first
       await supabase
@@ -216,9 +265,10 @@ export async function deleteGoogleEvent(externalId: string): Promise<boolean> {
 
     console.log(`[GoogleOutbound] Successfully deleted Google Calendar event ${externalId}`);
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     // If it's already deleted or doesn't exist, we can ignore the error
-    if (err.code === 404 || err.code === 410) {
+    const errorCode = getGoogleErrorCode(err);
+    if (errorCode === 404 || errorCode === 410) {
       console.warn(`[GoogleOutbound] Event ${externalId} was already deleted or not found on Google Calendar.`);
       return true;
     }

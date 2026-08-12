@@ -22,6 +22,7 @@ function getAdminClient() {
 }
 
 const DETAILED_DAY_APPOINTMENT_TYPES = new Set(['turno_detallado', 'tallado']);
+const PATIENT_OPTIONAL_APPOINTMENT_TYPES = new Set(['recordatorio_interno', 'reunion']);
 const DETAILED_DAY_WORKFLOW_NAME = 'Diseño de Sonrisa';
 const DETAILED_DAY_LAB_RECIPIENTS =
     process.env.WORKFLOW_LAB_NOTIFICATION_RECIPIENTS ||
@@ -433,7 +434,7 @@ export async function createAppointment(formData: FormData) {
     const modality = normalizeAppointmentModality(formData.get('modality') as string | null);
     const notes = formData.get('notes') as string;
 
-    if (type !== 'recordatorio_interno' && !patientId) {
+    if (!PATIENT_OPTIONAL_APPOINTMENT_TYPES.has(type) && !patientId) {
         return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
     }
 
@@ -498,11 +499,28 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
         safeUpdates.modality = normalizeAppointmentModality(safeUpdates.modality);
     }
 
-    if (safeUpdates.type !== 'recordatorio_interno' && safeUpdates.patient_id === null) {
-        return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
-    }
-
     const adminClient = getAdminClient();
+
+    if (safeUpdates.patient_id === null) {
+        let appointmentType = safeUpdates.type || null;
+        if (!appointmentType) {
+            const { data: currentAppointment, error: currentAppointmentError } = await adminClient
+                .from('agenda_appointments')
+                .select('type')
+                .eq('id', id)
+                .single();
+
+            if (currentAppointmentError) {
+                console.error('Error checking appointment type before patient removal:', currentAppointmentError);
+                return { success: false, error: currentAppointmentError.message };
+            }
+            appointmentType = currentAppointment?.type || null;
+        }
+
+        if (!PATIENT_OPTIONAL_APPOINTMENT_TYPES.has(appointmentType || '')) {
+            return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
+        }
+    }
 
     const { error } = await adminClient
         .from('agenda_appointments')
