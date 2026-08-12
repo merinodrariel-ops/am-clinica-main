@@ -60,6 +60,29 @@ assert.equal(
     findRecentDuplicateJobApplication(
         [
             {
+                id: 'ba-application',
+                created_at: '2026-06-29T02:57:12.477Z',
+                email: 'emiboca72@gmail.com',
+                full_name: 'Emilio Vallejos',
+                area: 'Asistente Dental',
+                source: 'web_public',
+            },
+        ],
+        {
+            email: 'emiboca72@gmail.com',
+            fullName: 'Emilio Vallejos',
+            area: 'Asistente Dental',
+            source: 'web_uy',
+        },
+        new Date('2026-06-29T02:57:15.383Z'),
+    ),
+    null,
+);
+
+assert.equal(
+    findRecentDuplicateJobApplication(
+        [
+            {
                 id: 'old',
                 created_at: '2026-06-29T02:30:00.000Z',
                 email: 'emiboca72@gmail.com',
@@ -117,6 +140,30 @@ assert.deepEqual(
         { id: 'different-area', area: 'Recepción - Secretaría', isDuplicate: false },
         { id: 'dupe', area: 'Asistente Dental', isDuplicate: true },
     ],
+);
+
+const groupedBySource = groupJobApplicationsByCandidate([
+    {
+        id: 'ba',
+        created_at: '2026-06-29T03:00:00.000Z',
+        email: 'emiboca72@gmail.com',
+        full_name: 'Emilio Vallejos',
+        area: 'Asistente Dental',
+        source: 'web_public',
+    },
+    {
+        id: 'uy',
+        created_at: '2026-06-29T03:01:00.000Z',
+        email: 'emiboca72@gmail.com',
+        full_name: 'Emilio Vallejos',
+        area: 'Asistente Dental',
+        source: 'web_uy',
+    },
+]);
+
+assert.deepEqual(
+    groupedBySource.map((row) => row.id),
+    ['uy', 'ba'],
 );
 
 assert.ok(ALLOWED_JOB_APPLICATION_MIME_TYPES.includes('application/pdf'));

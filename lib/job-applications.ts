@@ -10,8 +10,19 @@ export const JOB_APPLICATION_AREAS = [
     'Cirugía Implantes',
     'Ortodoncia',
     'Especialista en Prótesis Fija - Rehabilitación',
+    'Arquitectura & Proyecto',
+    'Edición de Video & Contenido',
+    'Marketing & Redes',
     'Otros',
 ] as const;
+
+export const JOB_APPLICATION_SOURCES = ['web_public', 'web_uy'] as const;
+export type JobApplicationSource = typeof JOB_APPLICATION_SOURCES[number];
+
+export const JOB_APPLICATION_SOURCE_LABELS: Record<JobApplicationSource, string> = {
+    web_public: 'Buenos Aires',
+    web_uy: 'Uruguay',
+};
 
 export const JOB_APPLICATION_STATUSES = ['nuevo', 'preseleccionado', 'entrevista', 'descartado', 'contratado'] as const;
 
@@ -48,6 +59,7 @@ export type JobApplicationDuplicateComparable = {
     full_name: string;
     area: string;
     other_area?: string | null;
+    source?: string | null;
 };
 
 export type GroupedJobApplication<T extends JobApplicationDuplicateComparable> = T & {
@@ -78,6 +90,10 @@ function normalizeComparableName(value: string) {
 
 export function isJobApplicationStatus(value: string): value is JobApplicationStatus {
     return JOB_APPLICATION_STATUSES.includes(value as JobApplicationStatus);
+}
+
+export function isJobApplicationSource(value: string): value is JobApplicationSource {
+    return JOB_APPLICATION_SOURCES.includes(value as JobApplicationSource);
 }
 
 export function sanitizeJobApplicationFileName(fileName: string) {
@@ -145,6 +161,7 @@ export function findRecentDuplicateJobApplication(
         email: string;
         fullName: string;
         area: string;
+        source?: string | null;
     },
     now = new Date(),
     windowMs = 10 * 60 * 1000,
@@ -152,12 +169,14 @@ export function findRecentDuplicateJobApplication(
     const normalizedEmail = normalizeEmail(incoming.email);
     const normalizedName = normalizeComparableName(incoming.fullName);
     const normalizedArea = sanitizeText(incoming.area, 180);
+    const normalizedSource = incoming.source || 'web_public';
     const nowTime = now.getTime();
 
     return recentRows.find((row) => {
         if (normalizeEmail(row.email) !== normalizedEmail) return false;
         if (normalizeComparableName(row.full_name) !== normalizedName) return false;
         if (sanitizeText(row.area, 180) !== normalizedArea) return false;
+        if ((row.source || 'web_public') !== normalizedSource) return false;
 
         const createdAtTime = new Date(row.created_at).getTime();
         return Number.isFinite(createdAtTime) && nowTime - createdAtTime >= 0 && nowTime - createdAtTime <= windowMs;
@@ -174,12 +193,14 @@ export function collapseDuplicateJobApplications<T extends JobApplicationDuplica
         const rowEmail = normalizeEmail(row.email);
         const rowName = normalizeComparableName(row.full_name);
         const rowArea = sanitizeText(row.area, 180);
+        const rowSource = row.source || 'web_public';
         const rowTime = new Date(row.created_at).getTime();
 
         const duplicate = keptRows.find((keptRow) => {
             if (normalizeEmail(keptRow.email) !== rowEmail) return false;
             if (normalizeComparableName(keptRow.full_name) !== rowName) return false;
             if (sanitizeText(keptRow.area, 180) !== rowArea) return false;
+            if ((keptRow.source || 'web_public') !== rowSource) return false;
 
             const keptTime = new Date(keptRow.created_at).getTime();
             return Number.isFinite(keptTime) && Number.isFinite(rowTime) && keptTime >= rowTime && keptTime - rowTime <= windowMs;
@@ -194,7 +215,7 @@ export function collapseDuplicateJobApplications<T extends JobApplicationDuplica
 }
 
 function getCandidateGroupingKey(row: JobApplicationDuplicateComparable) {
-    return `${normalizeEmail(row.email)}::${normalizeComparableName(row.full_name)}`;
+    return `${row.source || 'web_public'}::${normalizeEmail(row.email)}::${normalizeComparableName(row.full_name)}`;
 }
 
 function getApplicationAreaKey(row: JobApplicationDuplicateComparable) {

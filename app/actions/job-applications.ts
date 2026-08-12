@@ -14,6 +14,8 @@ import {
     isLikelyUrl,
     isValidEmail,
     JOB_APPLICATION_AREAS,
+    type JobApplicationSource,
+    isJobApplicationSource,
     type JobApplicationStatus,
     normalizeEmail,
     sanitizeJobApplicationFileName,
@@ -51,6 +53,7 @@ export type JobApplicationRow = {
     review_notes: string | null;
     reviewed_at: string | null;
     reviewed_by: string | null;
+    source: JobApplicationSource;
 };
 
 export type GroupedJobApplicationRow = GroupedJobApplication<JobApplicationRow>;
@@ -132,6 +135,7 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
 
     const areas = formData.getAll('areas').map(a => sanitizeText(a, 180)).filter(Boolean);
 
+    const rawSource = sanitizeText(formData.get('source'), 80);
     const payload = {
         fullName: sanitizeText(formData.get('full_name'), 180),
         areas,
@@ -142,6 +146,9 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
         location: sanitizeText(formData.get('location'), 240),
         whyChooseYou: getRequiredText(formData, 'why_choose_you'),
         consent: String(formData.get('consent') || ''),
+        source: isJobApplicationSource(rawSource)
+            ? rawSource as JobApplicationSource
+            : 'web_public' as JobApplicationSource,
     };
 
     const validationError = validateTextPayload(payload);
@@ -175,7 +182,7 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
     const duplicateWindowStart = new Date(Date.now() - DUPLICATE_SUBMISSION_WINDOW_MS).toISOString();
     const { data: recentCandidates, error: duplicateCheckError } = await admin
         .from('job_applications')
-        .select('id, created_at, email, full_name, area')
+        .select('id, created_at, email, full_name, area, source')
         .eq('email', payload.email)
         .gte('created_at', duplicateWindowStart)
         .order('created_at', { ascending: false })
@@ -188,11 +195,12 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
 
     const duplicate = payload.areas.some((area) =>
         findRecentDuplicateJobApplication(
-            (recentCandidates || []) as Array<{ id: string; created_at: string; email: string; full_name: string; area: string }>,
+            (recentCandidates || []) as Array<{ id: string; created_at: string; email: string; full_name: string; area: string; source?: string | null }>,
             {
                 email: payload.email,
                 fullName: payload.fullName,
                 area: area,
+                source: payload.source,
             },
         )
     );
@@ -236,6 +244,7 @@ export async function submitJobApplication(formData: FormData): Promise<SubmitJo
         cv_original_filename: sanitizeJobApplicationFileName(cv.name),
         cv_mime_type: cv.type,
         cv_size_bytes: cv.size,
+        source: payload.source,
         ip_hash: ipHash,
         user_agent_hash: userAgentHash,
     }));
@@ -260,7 +269,7 @@ export async function listJobApplications(filters?: { status?: string; area?: st
 
     let query = admin
         .from('job_applications')
-        .select('id, created_at, full_name, area, other_area, experience, area_responsibilities, instagram_url, email, location, teamwork_answer, learning_interest, long_term_goals, team_contribution, why_choose_you, cv_storage_path, cv_original_filename, cv_mime_type, cv_size_bytes, status, review_notes, reviewed_at, reviewed_by')
+        .select('id, created_at, full_name, area, other_area, experience, area_responsibilities, instagram_url, email, location, teamwork_answer, learning_interest, long_term_goals, team_contribution, why_choose_you, cv_storage_path, cv_original_filename, cv_mime_type, cv_size_bytes, status, review_notes, reviewed_at, reviewed_by, source')
         .order('created_at', { ascending: false })
         .limit(200);
 

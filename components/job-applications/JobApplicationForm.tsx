@@ -14,12 +14,16 @@ const AREAS = [
     'Cirugía Implantes',
     'Ortodoncia',
     'Especialista en Prótesis Fija - Rehabilitación',
+    'Arquitectura & Proyecto',
+    'Edición de Video & Contenido',
+    'Marketing & Redes',
     'Otros',
 ];
 
 const inputClass = 'w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition focus:border-white/30 placeholder:text-white/25';
 const textareaClass = `${inputClass} min-h-28 resize-y`;
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.18em] text-white/45';
+type JobApplicationFormSource = 'web_public' | 'web_uy';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -30,8 +34,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-export default function JobApplicationForm() {
+export default function JobApplicationForm({ initialSource = 'web_public' }: { initialSource?: JobApplicationFormSource }) {
     const [area, setArea] = useState('');
+    const [source, setSource] = useState<JobApplicationFormSource>(initialSource);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
@@ -43,7 +48,13 @@ export default function JobApplicationForm() {
         if (areaParam && AREAS.includes(areaParam)) {
             setArea(areaParam);
         }
+        const sourceParam = params.get('source') || params.get('origen') || params.get('pais');
+        if (sourceParam === 'uy' || sourceParam === 'uruguay' || sourceParam === 'web_uy') {
+            setSource('web_uy');
+        }
     }, []);
+
+    const isUruguay = source === 'web_uy';
 
     async function handleSubmit(formData: FormData) {
         setIsSubmitting(true);
@@ -84,13 +95,15 @@ export default function JobApplicationForm() {
                 <header className="mb-10 grid gap-8 border-b border-white/10 pb-10 md:grid-cols-[1fr_0.72fr] md:items-end">
                     <div>
                         <p className="mb-5 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.32em] text-white/45">
-                            <Briefcase size={14} /> Team AM
+                            <Briefcase size={14} /> {isUruguay ? 'AM Uruguay' : 'Team AM'}
                         </p>
                         <h1 className="max-w-3xl text-4xl font-light leading-tight tracking-tight md:text-6xl">
-                            Trabajá con nosotros.
+                            {isUruguay ? 'Sumate al equipo de AM Uruguay.' : 'Trabajá con nosotros.'}
                         </h1>
                         <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/62 md:text-lg">
-                            Completá tus datos, contanos por qué querés sumarte y adjuntá tu CV. Revisamos las postulaciones cuando abrimos búsquedas o detectamos un perfil compatible.
+                            {isUruguay
+                                ? 'Estamos armando la base de talentos para la sede de Carrasco: odontólogos, asistentes, laboratorio, arquitectura, edición, marketing y perfiles operativos. Completá tus datos y adjuntá tu CV.'
+                                : 'Completá tus datos, contanos por qué querés sumarte y adjuntá tu CV. Revisamos las postulaciones cuando abrimos búsquedas o detectamos un perfil compatible.'}
                         </p>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
@@ -105,6 +118,7 @@ export default function JobApplicationForm() {
 
                 <form action={handleSubmit} className="grid gap-8">
                     <input type="hidden" name="form_started_at" value={startedAt} />
+                    <input type="hidden" name="source" value={source} />
                     <input className="hidden" tabIndex={-1} autoComplete="off" name="company" />
 
                     <div className="grid gap-5 rounded-2xl border border-white/10 bg-white/[0.025] p-5 md:grid-cols-2 md:p-7">
@@ -123,7 +137,7 @@ export default function JobApplicationForm() {
                             </select>
                         </Field>
                         <Field label="Ciudad y barrio *">
-                            <input required name="location" className={inputClass} placeholder="Ej. CABA, Palermo" />
+                            <input required name="location" className={inputClass} placeholder={isUruguay ? 'Ej. Montevideo, Carrasco' : 'Ej. CABA, Palermo'} />
                         </Field>
                         {area === 'Otros' && (
                             <Field label="Otra área *">

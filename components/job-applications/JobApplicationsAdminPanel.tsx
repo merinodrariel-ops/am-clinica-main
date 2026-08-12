@@ -9,6 +9,8 @@ import {
 } from '@/app/actions/job-applications';
 import {
     JOB_APPLICATION_AREAS,
+    JOB_APPLICATION_SOURCE_LABELS,
+    JOB_APPLICATION_SOURCES,
     JOB_APPLICATION_STATUSES,
     JOB_APPLICATION_STATUS_LABELS,
     type JobApplicationStatus,
@@ -59,6 +61,7 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
     const [rows, setRows] = useState(initialRows);
     const [statusFilter, setStatusFilter] = useState('todos');
     const [areaFilter, setAreaFilter] = useState('todas');
+    const [sourceFilter, setSourceFilter] = useState('todas');
     const [search, setSearch] = useState('');
     const [drafts, setDrafts] = useState<Record<string, Draft>>(() => Object.fromEntries(
         initialRows.map((row) => [row.id, { status: row.status, review_notes: row.review_notes || '' }])
@@ -68,9 +71,15 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
     const [copied, setCopied] = useState(false);
 
     function copyFormLink() {
-        const link = areaFilter && areaFilter !== 'todas'
-            ? `https://www.amesteticadental.com/trabaja-en-am?area=${encodeURIComponent(areaFilter)}`
-            : `https://www.amesteticadental.com/trabaja-en-am`;
+        const isUy = sourceFilter === 'web_uy';
+        const base = isUy
+            ? 'https://www.amesteticadental.uy/trabaja-en-am'
+            : 'https://am-clinica-main.vercel.app/trabaja-en-am';
+        const params = new URLSearchParams();
+        if (isUy) params.set('source', 'uy');
+        if (areaFilter && areaFilter !== 'todas') params.set('area', areaFilter);
+        const query = params.toString();
+        const link = query ? `${base}?${query}` : base;
 
         navigator.clipboard.writeText(link).then(() => {
             setCopied(true);
@@ -116,10 +125,11 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
         return rows.filter((row) => {
             if (statusFilter !== 'todos' && row.status !== statusFilter) return false;
             if (areaFilter !== 'todas' && !row.applications.some((application) => application.area === areaFilter)) return false;
+            if (sourceFilter !== 'todas' && row.source !== sourceFilter) return false;
             if (!rawSearch) return true;
             return `${row.full_name} ${row.email}`.toLowerCase().includes(rawSearch);
         });
-    }, [areaFilter, rows, search, statusFilter]);
+    }, [areaFilter, rows, search, sourceFilter, statusFilter]);
 
     const counts = useMemo(() => {
         return JOB_APPLICATION_STATUSES.reduce((acc, status) => {
@@ -187,7 +197,7 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                 ))}
             </div>
 
-            <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[1fr_200px_200px_auto]">
+            <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[1fr_180px_190px_190px_auto]">
                 <label className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
@@ -207,6 +217,12 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                     <option value="todas">Todas las áreas</option>
                     {JOB_APPLICATION_AREAS.map((area) => (
                         <option key={area} value={area}>{area}</option>
+                    ))}
+                </select>
+                <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+                    <option value="todas">Todos los orígenes</option>
+                    {JOB_APPLICATION_SOURCES.map((source) => (
+                        <option key={source} value={source}>{JOB_APPLICATION_SOURCE_LABELS[source]}</option>
                     ))}
                 </select>
                 <button
@@ -236,6 +252,13 @@ export default function JobApplicationsAdminPanel({ initialRows }: { initialRows
                                         <h2 className="text-xl font-bold text-slate-950 dark:text-white">{row.full_name}</h2>
                                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                             {JOB_APPLICATION_STATUS_LABELS[row.status]}
+                                        </span>
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                            row.source === 'web_uy'
+                                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
+                                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                                        }`}>
+                                            {JOB_APPLICATION_SOURCE_LABELS[row.source] || row.source}
                                         </span>
                                     </div>
                                     <p className="mt-1 text-sm text-slate-500">{formatDate(row.created_at)} · {row.area}{row.other_area ? ` · ${row.other_area}` : ''}</p>
