@@ -31,4 +31,24 @@ assert.match(
 );
 assert.match(html, /Agenda de hoy/);
 
+const meetingHtml = renderAgendaHtml({
+  doctorName: 'Ariel Merino',
+  date: '2026-08-14',
+  appointments: [
+    {
+      id: 'apt-meeting',
+      title: 'Reunión equipo IA',
+      start_time: '2026-08-14T14:00:00.000-03:00',
+      end_time: '2026-08-14T14:30:00.000-03:00',
+      status: 'confirmed',
+      type: 'reunion',
+      notes: null,
+      patient_data: null,
+    },
+  ],
+});
+
+assert.match(meetingHtml, /Reunión equipo IA/);
+assert.match(meetingHtml, /reunion/);
+
 console.log('doctor-daily-agenda-notifications.spec.ts: ok');

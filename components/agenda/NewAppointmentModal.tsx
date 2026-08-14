@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors, getAgendaClinicalAreas, type AgendaClinicalArea } from '@/app/actions/agenda';
+import { createAppointment, updateAppointment, deleteAppointment, searchPatients, getDoctors, getAgendaClinicalAreas, getAgendaMeetingParticipants, type AgendaClinicalArea } from '@/app/actions/agenda';
 import { X, Loader2, Search, User, Trash2, Check, Stethoscope, MessageCircle, UserPlus, Video } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -36,6 +36,14 @@ interface Doctor {
     area?: string | null;
 }
 
+interface StaffParticipant {
+    id: string;
+    full_name: string;
+    role: string;
+    area?: string | null;
+    staffType?: string | null;
+}
+
 interface AppointmentData {
     id?: string;
     title: string;
@@ -48,6 +56,8 @@ interface AppointmentData {
     type: string;
     modality?: AppointmentModality | string | null;
     notes: string;
+    meetingParticipantIds?: string[];
+    meetingParticipants?: { profile_id: string; full_name: string }[];
     patient?: { full_name?: string };
     doctor?: { full_name?: string };
 }
@@ -95,6 +105,7 @@ const TYPE_DURATIONS_MIN: Record<string, number> = {
 };
 
 const PATIENT_OPTIONAL_TYPES = new Set(['recordatorio_interno', 'reunion']);
+const RESPONSIBLE_REQUIRED_TYPES = new Set(['reunion']);
 
 const APPOINTMENT_PRESETS = [
     { key: 'primera_presencial', label: 'Primera presencial', type: 'consulta', modality: 'presencial' as AppointmentModality, durationMin: 60 },
@@ -102,11 +113,18 @@ const APPOINTMENT_PRESETS = [
     { key: 'segunda_virtual', label: 'Segunda virtual', type: 'control', modality: 'virtual' as AppointmentModality, durationMin: 20 },
 ] as const;
 
+function normalizeParticipantIds(ids: string[], requiredId?: string) {
+    const normalized = new Set(ids.filter(Boolean));
+    if (requiredId) normalized.add(requiredId);
+    return Array.from(normalized);
+}
+
 export default function NewAppointmentModal({ isOpen, onClose, onSave, initialData, initialDate }: NewAppointmentModalProps) {
     const supabase = createClient();
     const [loading, setLoading] = useState(false);
     const isSubmitting = useRef(false);
     const [doctors, setDoctors] = useState<Doctor[]>([]);
+    const [meetingParticipants, setMeetingParticipants] = useState<StaffParticipant[]>([]);
     const [areas, setAreas] = useState<AgendaClinicalArea[]>([]);
 
     // Form State
@@ -143,6 +161,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     // Doctor Search State
     const [doctorSearch, setDoctorSearch] = useState('');
     const [showDoctorResults, setShowDoctorResults] = useState(false);
+    const [participantIds, setParticipantIds] = useState<string[]>([]);
 
     const filteredTarifarioItems = tarifarioItems
         .filter(item =>
@@ -152,15 +171,24 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         .slice(0, 8);
 
     const selectedArea = areas.find(area => area.id === areaId);
-    const filteredDoctors = doctors.filter(d =>
+    const responsibleOptions = type === 'reunion' ? meetingParticipants : doctors;
+    const filteredDoctors = responsibleOptions.filter(d =>
         d.full_name.toLowerCase().includes(doctorSearch.toLowerCase())
-        && (!selectedArea || !d.area || d.area.localeCompare(selectedArea.nombre, 'es', { sensitivity: 'base' }) === 0)
+        && (type === 'reunion' || !selectedArea || !d.area || d.area.localeCompare(selectedArea.nombre, 'es', { sensitivity: 'base' }) === 0)
     );
+    const selectedParticipantIds = new Set(participantIds);
+    if (type === 'reunion' && doctorId) selectedParticipantIds.add(doctorId);
+    const selectedParticipants = meetingParticipants.filter(participant => selectedParticipantIds.has(participant.id));
 
     const loadDoctors = useCallback(async () => {
-        const [docs, clinicalAreas] = await Promise.all([getDoctors(), getAgendaClinicalAreas()]);
+        const [docs, clinicalAreas, participants] = await Promise.all([
+            getDoctors(),
+            getAgendaClinicalAreas(),
+            getAgendaMeetingParticipants(),
+        ]);
         setDoctors(docs);
         setAreas(clinicalAreas);
+        setMeetingParticipants(participants);
     }, []);
 
     const loadTarifario = useCallback(async () => {
@@ -218,6 +246,8 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setShowPreloadPatient(false);
             setPreloadPhone('');
             setPreloadEmail('');
+            const initialParticipantIds = initialData.meetingParticipantIds || initialData.meetingParticipants?.map(participant => participant.profile_id) || [];
+            setParticipantIds(normalizeParticipantIds(initialParticipantIds, initialData.doctorId || ''));
         } else if (initialDate) {
             // Create Mode con fecha específica
             setTitle('');
@@ -242,6 +272,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setShowPreloadPatient(false);
             setPreloadPhone('');
             setPreloadEmail('');
+            setParticipantIds([]);
         }
     }, [isOpen, initialData, initialDate]);
 
@@ -264,7 +295,8 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         setModality('virtual');
         setEndFromStart(TYPE_DURATIONS_MIN.reunion);
         if (!title.trim()) setTitle('Reunión');
-    }, [setEndFromStart, title]);
+        if (doctorId) setParticipantIds(prev => normalizeParticipantIds(prev, doctorId));
+    }, [doctorId, setEndFromStart, title]);
 
     useEffect(() => {
         if (!initialData?.id) return;
@@ -347,9 +379,14 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             alert('Seleccioná un paciente existente o precargá uno pendiente de formulario antes de agendar.');
             return;
         }
+        if (RESPONSIBLE_REQUIRED_TYPES.has(type) && !doctorId) {
+            alert('Seleccioná un responsable para la reunión.');
+            return;
+        }
         
         isSubmitting.current = true;
         setLoading(true);
+        const normalizedParticipantIds = normalizeParticipantIds(participantIds, type === 'reunion' ? doctorId : '');
 
         const formData = new FormData();
         formData.append('title', title);
@@ -361,6 +398,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
         formData.append('status', status);
         formData.append('type', type);
         formData.append('modality', modality);
+        formData.append('participantIds', JSON.stringify(normalizedParticipantIds));
         const serializedNotes = serializeAppointmentNotes({
             visibleNotes: notes,
             type,
@@ -384,6 +422,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     type,
                     modality,
                     notes: serializedNotes,
+                    meeting_participant_ids: normalizedParticipantIds,
                     is_primera_vez: false
                 };
                 const result = await updateAppointment(initialData.id, updates);
@@ -407,7 +446,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
             setLoading(false);
             isSubmitting.current = false;
         }
-    }, [initialData?.id, loading, title, patientId, doctorId, areaId, startTime, endTime, status, type, modality, orthoReplacementDays, notes, onSave, onClose]);
+    }, [initialData?.id, loading, title, patientId, doctorId, areaId, startTime, endTime, status, type, modality, participantIds, orthoReplacementDays, notes, onSave, onClose]);
 
     const handleFormSubmit = useCallback(() => {
         handleSubmit();
@@ -829,20 +868,23 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     <div className="grid grid-cols-2 gap-5">
                         <div className={`relative ${type === 'recordatorio_interno' ? 'opacity-40 pointer-events-none select-none' : ''}`}>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">
-                                Odontologo{type === 'recordatorio_interno' ? ' (no aplica)' : ''}
+                                {type === 'reunion' ? 'Responsable' : 'Odontologo'}{type === 'recordatorio_interno' ? ' (no aplica)' : ''}
                             </label>
                             <div className="relative">
                                 <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                 <Input
                                     name="doctor-search"
                                     type="text"
-                                    placeholder="Buscar odontologo..."
+                                    placeholder={type === 'reunion' ? 'Buscar responsable...' : 'Buscar odontologo...'}
                                     className="block w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm h-auto"
                                     value={doctorSearch}
                                     onChange={(e) => {
                                         setDoctorSearch(e.target.value);
                                         setShowDoctorResults(true);
-                                        if (doctorId) setDoctorId(''); // Clear selection if typing
+                                        if (doctorId) {
+                                            setParticipantIds(prev => prev.filter(id => id !== doctorId));
+                                            setDoctorId('');
+                                        }
                                     }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && filteredDoctors.length > 0) {
@@ -850,6 +892,9 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                             const doctor = filteredDoctors[0];
                                             setDoctorId(doctor.id);
                                             setDoctorSearch(doctor.full_name);
+                                            if (type === 'reunion') {
+                                                setParticipantIds(prev => normalizeParticipantIds(prev, doctor.id));
+                                            }
                                             setShowDoctorResults(false);
                                         }
                                     }}
@@ -875,19 +920,27 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                                 onClick={() => {
                                                     setDoctorId(d.id);
                                                     setDoctorSearch(d.full_name);
+                                                    if (type === 'reunion') {
+                                                        setParticipantIds(prev => normalizeParticipantIds(prev, d.id));
+                                                    }
                                                     setShowDoctorResults(false);
                                                 }}
                                             >
                                                 <div className="w-7 h-7 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
                                                     <User className="w-4 h-4 text-blue-500" />
                                                 </div>
-                                                <div className="font-medium text-sm text-gray-900 dark:text-white">{d.full_name}</div>
+                                                <div>
+                                                    <div className="font-medium text-sm text-gray-900 dark:text-white">{d.full_name}</div>
+                                                    {type === 'reunion' && d.area && (
+                                                        <div className="text-[10px] text-gray-500">{d.area}</div>
+                                                    )}
+                                                </div>
                                             </Button>
                                         ))
                                     }
                                     {filteredDoctors.length === 0 && (
                                         <div className="px-4 py-3 text-xs text-gray-500 italic">
-                                            No se encontraron doctores.
+                                            No se encontraron personas.
                                         </div>
                                     )}
                                 </div>
@@ -901,6 +954,9 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 onChange={(e) => {
                                     const newType = e.target.value;
                                     setType(newType);
+                                    if (newType === 'reunion' && doctorId) {
+                                        setParticipantIds(prev => normalizeParticipantIds(prev, doctorId));
+                                    }
                                     setEndFromStart(TYPE_DURATIONS_MIN[newType] ?? 60);
                                 }}
                             >
@@ -941,6 +997,62 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             )}
                         </div>
                     </div>
+
+                    {type === 'reunion' && (
+                        <div>
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider pl-1">
+                                    Participantes
+                                </label>
+                                <span className="text-[10px] font-semibold text-cyan-600">
+                                    {selectedParticipants.length} seleccionado{selectedParticipants.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                                {meetingParticipants.map((participant) => {
+                                    const selected = selectedParticipantIds.has(participant.id);
+                                    const isResponsible = participant.id === doctorId;
+
+                                    return (
+                                        <Button
+                                            key={participant.id}
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                if (isResponsible) return;
+                                                setParticipantIds(prev => {
+                                                    if (prev.includes(participant.id)) {
+                                                        return prev.filter(id => id !== participant.id);
+                                                    }
+                                                    return [...prev, participant.id];
+                                                });
+                                            }}
+                                            className={`h-auto justify-start gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-all ${
+                                                selected
+                                                    ? 'border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-100'
+                                                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                                            }`}
+                                        >
+                                            <span className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                                selected ? 'border-cyan-500 bg-cyan-500 text-white' : 'border-gray-300'
+                                            }`}>
+                                                {selected && <Check size={12} />}
+                                            </span>
+                                            <span className="min-w-0">
+                                                <span className="block truncate font-semibold">{participant.full_name}</span>
+                                                <span className="block truncate text-[10px] opacity-70">
+                                                    {isResponsible ? 'Responsable' : participant.area || participant.role || 'Staff'}
+                                                </span>
+                                            </span>
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                            <p className="mt-1 pl-1 text-[10px] font-medium text-gray-400">
+                                El responsable se incluye automáticamente y la reunión aparece en el email diario de cada participante.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Status Pills */}
                     <div>

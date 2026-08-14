@@ -57,6 +57,9 @@ type AppointmentRow = {
     apellido?: string | null;
     whatsapp?: string | null;
   }[] | null;
+  meeting_participants?: {
+    profile_id?: string | null;
+  }[] | null;
 };
 
 type DeliveryResult = {
@@ -284,7 +287,7 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?:
       .from('personal')
       .select('id, user_id, nombre, apellido, email, whatsapp')
       .eq('activo', true)
-      .in('tipo', ['odontologo', 'profesional'])
+      .in('tipo', ['odontologo', 'profesional', 'empleado'])
       .not('user_id', 'is', null),
     supabase
       .from('doctor_daily_agenda_settings')
@@ -311,7 +314,18 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?:
       .in('id', doctorIds),
     supabase
       .from('agenda_appointments')
-      .select('id, title, start_time, end_time, status, type, notes, doctor_id, patient_data:patient_id(id_paciente, nombre, apellido, whatsapp)')
+      .select(`
+        id,
+        title,
+        start_time,
+        end_time,
+        status,
+        type,
+        notes,
+        doctor_id,
+        patient_data:patient_id(id_paciente, nombre, apellido, whatsapp),
+        meeting_participants:agenda_meeting_participants(profile_id)
+      `)
       .in('doctor_id', doctorIds)
       .gte('start_time', start)
       .lte('start_time', end)
@@ -337,9 +351,18 @@ export async function sendDailyDoctorAgendas(date = getLocalISODate(), options?:
   }
 
   for (const apt of rawApts) {
-    if (!apt.doctor_id) continue;
-    if (!appointmentsByDoctor.has(apt.doctor_id)) appointmentsByDoctor.set(apt.doctor_id, []);
-    appointmentsByDoctor.get(apt.doctor_id)!.push(apt);
+    const participantIds = new Set<string>();
+    if (apt.doctor_id) participantIds.add(apt.doctor_id);
+    if (apt.type === 'reunion') {
+      for (const participant of apt.meeting_participants || []) {
+        if (participant.profile_id) participantIds.add(participant.profile_id);
+      }
+    }
+
+    for (const doctorId of participantIds) {
+      if (!appointmentsByDoctor.has(doctorId)) appointmentsByDoctor.set(doctorId, []);
+      appointmentsByDoctor.get(doctorId)!.push(apt);
+    }
   }
 
   const results: DeliveryResult[] = [];

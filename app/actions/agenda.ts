@@ -23,10 +23,12 @@ function getAdminClient() {
 
 const DETAILED_DAY_APPOINTMENT_TYPES = new Set(['turno_detallado', 'tallado']);
 const PATIENT_OPTIONAL_APPOINTMENT_TYPES = new Set(['recordatorio_interno', 'reunion']);
+const RESPONSIBLE_REQUIRED_APPOINTMENT_TYPES = new Set(['reunion']);
 const DETAILED_DAY_WORKFLOW_NAME = 'Diseño de Sonrisa';
 const DETAILED_DAY_LAB_RECIPIENTS =
     process.env.WORKFLOW_LAB_NOTIFICATION_RECIPIENTS ||
     'amesteticadentallab@gmail.com,juliian_97@outlook.com,drarielmerino@gmail.com,lourdesfreire031@gmail.com';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function createDetailedDayEventKey(parts: string[]) {
     return parts.join('::');
@@ -50,6 +52,78 @@ function formatPatientName(patient?: { nombre?: string | null; apellido?: string
 
 function escapeAgendaPatientSearchTerm(term: string): string {
     return term.replace(/[%_,]/g, '\\$&');
+}
+
+function normalizeProfileIds(ids: unknown[], requiredId?: string | null) {
+    const normalized = new Set<string>();
+    if (requiredId && UUID_REGEX.test(requiredId)) normalized.add(requiredId);
+
+    for (const id of ids) {
+        if (typeof id !== 'string') continue;
+        const trimmed = id.trim();
+        if (UUID_REGEX.test(trimmed)) normalized.add(trimmed);
+    }
+
+    return Array.from(normalized);
+}
+
+function parseParticipantIds(value: FormDataEntryValue | null) {
+    if (typeof value !== 'string' || !value.trim()) return [];
+
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+        return value.split(',').map(item => item.trim()).filter(Boolean);
+    }
+}
+
+async function syncMeetingParticipants(
+    adminClient: ReturnType<typeof getAdminClient>,
+    appointmentId: string,
+    type: string | null | undefined,
+    doctorId: string | null | undefined,
+    participantIds: string[]
+) {
+    if (type !== 'reunion') {
+        const { error } = await adminClient
+            .from('agenda_meeting_participants')
+            .delete()
+            .eq('appointment_id', appointmentId);
+        if (error && error.code !== '42P01' && error.code !== 'PGRST205') {
+            throw new Error(error.message);
+        }
+        return;
+    }
+
+    if (!doctorId) {
+        throw new Error('Toda reunión necesita un responsable.');
+    }
+
+    const ids = normalizeProfileIds(participantIds, doctorId);
+    if (ids.length === 0) {
+        throw new Error('Toda reunión necesita al menos un participante.');
+    }
+
+    const { error: deleteError } = await adminClient
+        .from('agenda_meeting_participants')
+        .delete()
+        .eq('appointment_id', appointmentId);
+
+    if (deleteError) {
+        throw new Error(deleteError.message);
+    }
+
+    const { error: insertError } = await adminClient
+        .from('agenda_meeting_participants')
+        .insert(ids.map(profileId => ({
+            appointment_id: appointmentId,
+            profile_id: profileId,
+        })));
+
+    if (insertError) {
+        throw new Error(insertError.message);
+    }
 }
 
 async function logDetailedDayWorkflowNotification(params: {
@@ -349,6 +423,7 @@ type AppointmentUpdatePayload = Partial<{
     created_at: string;
     created_by: string;
     is_primera_vez: boolean;
+    meeting_participant_ids: string[];
 }>;
 
 export async function getAppointments(start: string, end: string) {
@@ -373,7 +448,11 @@ export async function getAppointments(start: string, end: string) {
             created_at,
             created_by,
             patient_data:patient_id (nombre, apellido, whatsapp, primera_consulta_fecha, fecha_alta, intervalo_limpieza_meses),
-            doctor_data:doctor_id (full_name)
+            doctor_data:doctor_id (full_name),
+            meeting_participants:agenda_meeting_participants (
+                profile_id,
+                profile:profile_id (full_name)
+            )
         `)
         .gte('start_time', start)
         .lte('end_time', end);
@@ -391,6 +470,7 @@ export async function getAppointments(start: string, end: string) {
     return data.map(apt => {
         const patient = Array.isArray(apt.patient_data) ? apt.patient_data[0] : apt.patient_data;
         const doctor = Array.isArray(apt.doctor_data) ? apt.doctor_data[0] : apt.doctor_data;
+        const meetingParticipants = Array.isArray(apt.meeting_participants) ? apt.meeting_participants : [];
 
         // Regla de Oro AM Clínica: Turno que pasó el horario y no está cancelado/no-show -> COMPLETADO
         const isPast = new Date(apt.end_time) < now;
@@ -409,7 +489,20 @@ export async function getAppointments(start: string, end: string) {
                 fecha_alta: patient.fecha_alta ?? null,
                 intervalo_limpieza_meses: patient.intervalo_limpieza_meses ?? null,
             } : null,
-            doctor: doctor || null
+            doctor: doctor || null,
+            meeting_participant_ids: meetingParticipants
+                .map((participant: { profile_id?: string | null }) => participant.profile_id)
+                .filter(Boolean),
+            meeting_participants: meetingParticipants.map((participant: {
+                profile_id?: string | null;
+                profile?: { full_name?: string | null } | { full_name?: string | null }[] | null;
+            }) => {
+                const profile = Array.isArray(participant.profile) ? participant.profile[0] : participant.profile;
+                return {
+                    profile_id: participant.profile_id || '',
+                    full_name: profile?.full_name || 'Participante',
+                };
+            }).filter((participant: { profile_id: string }) => Boolean(participant.profile_id)),
         };
     });
 }
@@ -433,9 +526,14 @@ export async function createAppointment(formData: FormData) {
     const type = formData.get('type') as string || 'consulta';
     const modality = normalizeAppointmentModality(formData.get('modality') as string | null);
     const notes = formData.get('notes') as string;
+    const participantIds = parseParticipantIds(formData.get('participantIds'));
 
     if (!PATIENT_OPTIONAL_APPOINTMENT_TYPES.has(type) && !patientId) {
         return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
+    }
+
+    if (RESPONSIBLE_REQUIRED_APPOINTMENT_TYPES.has(type) && !doctorId) {
+        return { success: false, error: 'Toda reunión necesita un responsable.' };
     }
 
     const { data: newApt, error } = await supabase
@@ -463,6 +561,23 @@ export async function createAppointment(formData: FormData) {
 
     // Outbound Google Calendar Sync
     if (newApt?.id) {
+        try {
+            await syncMeetingParticipants(getAdminClient(), newApt.id, type, doctorId, participantIds);
+        } catch (participantError) {
+            console.error('[agenda] meeting participants sync failed during creation:', participantError);
+            await getAdminClient()
+                .from('agenda_appointments')
+                .delete()
+                .eq('id', newApt.id)
+                .then(({ error: cleanupError }) => {
+                    if (cleanupError) console.error('[agenda] meeting cleanup after participant failure failed:', cleanupError.message);
+                });
+            return {
+                success: false,
+                error: participantError instanceof Error ? participantError.message : 'No se pudieron guardar los participantes de la reunión',
+            };
+        }
+
         try {
             const { createGoogleEvent } = await import('@/lib/am-scheduler/google-calendar-outbound');
             await createGoogleEvent(newApt.id);
@@ -495,6 +610,10 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     delete safeUpdates.created_at;
     delete safeUpdates.created_by;
     delete safeUpdates.is_primera_vez;
+    const meetingParticipantIds = Array.isArray(safeUpdates.meeting_participant_ids)
+        ? safeUpdates.meeting_participant_ids
+        : [];
+    delete safeUpdates.meeting_participant_ids;
     if (safeUpdates.modality) {
         safeUpdates.modality = normalizeAppointmentModality(safeUpdates.modality);
     }
@@ -522,6 +641,10 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
         }
     }
 
+    if (RESPONSIBLE_REQUIRED_APPOINTMENT_TYPES.has(safeUpdates.type || '') && !safeUpdates.doctor_id) {
+        return { success: false, error: 'Toda reunión necesita un responsable.' };
+    }
+
     const { error } = await adminClient
         .from('agenda_appointments')
         .update({
@@ -533,6 +656,18 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     if (error) {
         console.error('Error updating appointment:', error);
         return { success: false, error: error.message };
+    }
+
+    try {
+        if (safeUpdates.type) {
+            await syncMeetingParticipants(adminClient, id, safeUpdates.type, safeUpdates.doctor_id ?? null, meetingParticipantIds);
+        }
+    } catch (participantError) {
+        console.error('[agenda] meeting participants sync failed during update:', participantError);
+        return {
+            success: false,
+            error: participantError instanceof Error ? participantError.message : 'No se pudieron guardar los participantes de la reunión',
+        };
     }
 
     // Outbound Google Calendar Sync
@@ -933,6 +1068,70 @@ export async function getDoctors() {
             };
         })
         .filter((doctor): doctor is { id: string; full_name: string; role: string; area: string | null } => Boolean(doctor))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name, 'es', { sensitivity: 'base' }));
+}
+
+export async function getAgendaMeetingParticipants() {
+    const supabase = await createClient();
+
+    const { data: staff, error: staffError } = await supabase
+        .from('personal')
+        .select('user_id, nombre, apellido, tipo, area, rol')
+        .eq('activo', true)
+        .not('user_id', 'is', null)
+        .order('nombre');
+
+    if (staffError) {
+        console.error('Error fetching agenda participants:', staffError);
+        return [];
+    }
+
+    const userIds = (staff || [])
+        .map((row: { user_id: string | null }) => row.user_id)
+        .filter((id): id is string => Boolean(id));
+
+    if (userIds.length === 0) return [];
+
+    const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, categoria')
+        .in('id', userIds);
+
+    if (profilesError) {
+        console.error('Error fetching participant profiles:', profilesError);
+        return [];
+    }
+
+    const profileById = new Map((profiles || []).map(profile => [profile.id, profile]));
+
+    return (staff || [])
+        .map((row: {
+            user_id: string | null;
+            nombre: string | null;
+            apellido: string | null;
+            tipo: string | null;
+            area: string | null;
+            rol: string | null;
+        }) => {
+            const profile = row.user_id ? profileById.get(row.user_id) : null;
+            if (!profile || !row.user_id) return null;
+
+            const fallbackName = `${row.nombre || ''} ${row.apellido || ''}`.trim();
+            return {
+                id: profile.id,
+                full_name: profile.full_name || fallbackName || 'Participante',
+                role: profile.categoria || row.rol || row.tipo || 'staff',
+                area: row.area || null,
+                staffType: row.tipo || null,
+            };
+        })
+        .filter((participant): participant is {
+            id: string;
+            full_name: string;
+            role: string;
+            area: string | null;
+            staffType: string | null;
+        } => Boolean(participant))
         .sort((a, b) => a.full_name.localeCompare(b.full_name, 'es', { sensitivity: 'base' }));
 }
 

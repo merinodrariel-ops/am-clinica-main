@@ -42,6 +42,8 @@ interface AppointmentModalData {
     type: string;
     modality?: string | null;
     notes: string;
+    meetingParticipantIds?: string[];
+    meetingParticipants?: { profile_id: string; full_name: string }[];
     patient?: { full_name?: string; intervalo_limpieza_meses?: number | null };
     doctor?: { full_name?: string };
 }
@@ -61,6 +63,8 @@ interface AgendaAppointmentRecord {
     color_tag?: string | null;
     patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null; intervalo_limpieza_meses?: number | null } | null;
     doctor?: { full_name?: string } | null;
+    meeting_participant_ids?: string[];
+    meeting_participants?: { profile_id: string; full_name: string }[];
 }
 
 interface AgendaEventExtendedProps {
@@ -73,6 +77,8 @@ interface AgendaEventExtendedProps {
     area_id?: string;
     patient?: { full_name?: string; primera_consulta_fecha?: string | null; fecha_alta?: string | null; intervalo_limpieza_meses?: number | null };
     doctor?: { full_name?: string };
+    meeting_participant_ids?: string[];
+    meeting_participants?: { profile_id: string; full_name: string }[];
     conflict?: boolean;
     start_time?: string;
     isBlock?: boolean;
@@ -145,6 +151,21 @@ function getCleaningTitle(type: CleaningAppointmentType): string {
 function getDoctorColor(doctorId: string, doctors: Doctor[]): string {
     const idx = doctors.findIndex(d => d.id === doctorId);
     return DOCTOR_COLORS[idx >= 0 ? idx % DOCTOR_COLORS.length : 0];
+}
+
+function getAgendaParticipantIds(apt: Pick<AgendaAppointmentRecord, 'doctor_id' | 'type' | 'meeting_participant_ids'>) {
+    const ids = new Set<string>();
+    if (apt.doctor_id) ids.add(apt.doctor_id);
+    if (apt.type === 'reunion') {
+        for (const participantId of apt.meeting_participant_ids || []) {
+            ids.add(participantId);
+        }
+    }
+    return ids;
+}
+
+function appointmentBelongsToDoctor(apt: Pick<AgendaAppointmentRecord, 'doctor_id' | 'type' | 'meeting_participant_ids'>, doctorId: string) {
+    return getAgendaParticipantIds(apt).has(doctorId);
 }
 
 function localISODate(date: Date) {
@@ -328,6 +349,8 @@ export default function AgendaCalendar() {
             patientId: props.patient_id || '',
             doctorId: props.doctor_id || '',
             areaId: props.area_id || '',
+            meetingParticipantIds: props.meeting_participant_ids || [],
+            meetingParticipants: props.meeting_participants || [],
             patient: props.patient,
             doctor: props.doctor
         };
@@ -449,7 +472,7 @@ export default function AgendaCalendar() {
 
             const filtered = activeDoctorIds.has('all')
                 ? appointments
-                : appointments.filter(apt => apt.doctor_id && activeDoctorIds.has(apt.doctor_id));
+                : appointments.filter(apt => Array.from(activeDoctorIds).some(doctorId => appointmentBelongsToDoctor(apt, doctorId)));
 
             const sorted = [...filtered].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
@@ -457,21 +480,24 @@ export default function AgendaCalendar() {
             const conflictMap = new Set<string>();
 
             sorted.forEach(apt => {
-                if (!apt.doctor_id || apt.status === 'cancelled' || apt.status === 'no_show') return;
+                if (apt.status === 'cancelled' || apt.status === 'no_show') return;
                 const start = new Date(apt.start_time).getTime();
                 const end = new Date(apt.end_time).getTime();
+                const participantIds = Array.from(getAgendaParticipantIds(apt));
 
-                if (!doctorIntervals[apt.doctor_id]) doctorIntervals[apt.doctor_id] = [];
+                for (const participantId of participantIds) {
+                    if (!doctorIntervals[participantId]) doctorIntervals[participantId] = [];
 
-                for (const interval of doctorIntervals[apt.doctor_id]) {
-                    // Check for overlap
-                    if (Math.max(start, interval.start) < Math.min(end, interval.end)) {
-                        conflictMap.add(apt.id);
-                        conflictMap.add(interval.id);
+                    for (const interval of doctorIntervals[participantId]) {
+                        // Check for overlap
+                        if (Math.max(start, interval.start) < Math.min(end, interval.end)) {
+                            conflictMap.add(apt.id);
+                            conflictMap.add(interval.id);
+                        }
                     }
-                }
 
-                doctorIntervals[apt.doctor_id].push({ start, end, id: apt.id });
+                    doctorIntervals[participantId].push({ start, end, id: apt.id });
+                }
             });
 
             const events: EventInput[] = filtered.map(apt => {
@@ -501,6 +527,8 @@ export default function AgendaCalendar() {
                             patient_id: apt.patient_id || '',
                             doctor_id: apt.doctor_id || '',
                             area_id: apt.area_id || '',
+                            meeting_participant_ids: apt.meeting_participant_ids || [],
+                            meeting_participants: apt.meeting_participants || [],
                             start_time: apt.start_time,
                             patient: apt.patient || undefined,
                             doctor: apt.doctor || undefined,
@@ -527,6 +555,8 @@ export default function AgendaCalendar() {
                             patient_id: apt.patient_id || '',
                             doctor_id: apt.doctor_id || '',
                             area_id: apt.area_id || '',
+                            meeting_participant_ids: apt.meeting_participant_ids || [],
+                            meeting_participants: apt.meeting_participants || [],
                             start_time: apt.start_time,
                             patient: apt.patient || undefined,
                             doctor: apt.doctor || undefined,
@@ -565,6 +595,8 @@ export default function AgendaCalendar() {
                         patient_id: apt.patient_id || '',
                         doctor_id: apt.doctor_id || '',
                         area_id: apt.area_id || '',
+                        meeting_participant_ids: apt.meeting_participant_ids || [],
+                        meeting_participants: apt.meeting_participants || [],
                         start_time: apt.start_time,
                         patient: apt.patient || undefined,
                         doctor: apt.doctor || undefined,
@@ -1185,6 +1217,8 @@ export default function AgendaCalendar() {
                                         notes: props.notes || '',
                                         patientId: props.patient_id || '',
                                         doctorId: props.doctor_id || '',
+                                        meetingParticipantIds: props.meeting_participant_ids || [],
+                                        meetingParticipants: props.meeting_participants || [],
                                         patient: props.patient,
                                         doctor: props.doctor,
                                     },
@@ -1309,6 +1343,8 @@ export default function AgendaCalendar() {
                                 end: new Date(apt.end_time),
                                 patientId: apt.patient_id || '',
                                 doctorId: apt.doctor_id || '',
+                                meetingParticipantIds: apt.meeting_participant_ids || [],
+                                meetingParticipants: apt.meeting_participants || [],
                                 status: apt.status,
                                 type: apt.type,
                                 modality: apt.modality || 'presencial',

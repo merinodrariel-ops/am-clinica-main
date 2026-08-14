@@ -17,7 +17,9 @@ type AgendaRow = {
     end_time: string;
     status: string | null;
     type: string | null;
+    doctor_id?: string | null;
     patient_data?: PatientName | PatientName[] | null;
+    meeting_participants?: { profile_id?: string | null }[] | null;
 };
 
 export type MinimalDoctorAppointment = {
@@ -159,8 +161,19 @@ function normalizeDoctorName(value?: string | null) {
     return value?.trim() || 'Profesional';
 }
 
-function getDoctorIdsFromAgendaRows(rows: { doctor_id?: string | null }[]) {
-    return Array.from(new Set(rows.map(row => row.doctor_id).filter((id): id is string => Boolean(id))));
+function getAgendaParticipantIds(row: AgendaRow) {
+    const ids = new Set<string>();
+    if (row.doctor_id) ids.add(row.doctor_id);
+    if (row.type === 'reunion') {
+        for (const participant of row.meeting_participants || []) {
+            if (participant.profile_id) ids.add(participant.profile_id);
+        }
+    }
+    return Array.from(ids);
+}
+
+function agendaRowBelongsToDoctor(row: AgendaRow, doctorId: string) {
+    return getAgendaParticipantIds(row).includes(doctorId);
 }
 
 async function getDoctorNameMap(admin: ReturnType<typeof getAdminClient>, doctorIds: string[]) {
@@ -192,8 +205,7 @@ export async function getMinimalDoctorAgendaDay(doctorId: string, date?: string 
             .maybeSingle(),
         admin
             .from('agenda_appointments')
-            .select('id, title, start_time, end_time, status, type, patient_data:patient_id(nombre, apellido)')
-            .eq('doctor_id', doctorId)
+            .select('id, title, doctor_id, start_time, end_time, status, type, patient_data:patient_id(nombre, apellido), meeting_participants:agenda_meeting_participants(profile_id)')
             .gte('start_time', start)
             .lte('start_time', end)
             .order('start_time', { ascending: true }),
@@ -213,7 +225,9 @@ export async function getMinimalDoctorAgendaDay(doctorId: string, date?: string 
         doctorId,
         doctorName: normalizeDoctorName(profile?.full_name),
         date: safeDate,
-        appointments: ((appointments || []) as AgendaRow[]).map(mapAgendaRow),
+        appointments: ((appointments || []) as AgendaRow[])
+            .filter(row => agendaRowBelongsToDoctor(row, doctorId))
+            .map(mapAgendaRow),
     };
 }
 
@@ -237,8 +251,7 @@ export async function getMinimalDoctorAgendaRange(
             .maybeSingle(),
         admin
             .from('agenda_appointments')
-            .select('id, title, start_time, end_time, status, type, patient_data:patient_id(nombre, apellido)')
-            .eq('doctor_id', doctorId)
+            .select('id, title, doctor_id, start_time, end_time, status, type, patient_data:patient_id(nombre, apellido), meeting_participants:agenda_meeting_participants(profile_id)')
             .gte('start_time', start)
             .lte('start_time', end)
             .order('start_time', { ascending: true }),
@@ -250,7 +263,7 @@ export async function getMinimalDoctorAgendaRange(
     if (error) {
         console.error('[getMinimalDoctorAgendaRange] agenda error:', error);
     } else {
-        for (const row of ((appointments || []) as AgendaRow[])) {
+        for (const row of ((appointments || []) as AgendaRow[]).filter(item => agendaRowBelongsToDoctor(item, doctorId))) {
             const date = getLocalISODate(new Date(row.start_time));
             if (!dayMap.has(date)) dayMap.set(date, []);
             dayMap.get(date)!.push(mapAgendaRow(row));
@@ -289,7 +302,7 @@ export async function getMinimalAllDoctorsAgendaRange(
 
     const { data: appointments, error } = await admin
         .from('agenda_appointments')
-        .select('id, title, doctor_id, start_time, end_time, status, type, patient_data:patient_id(nombre, apellido)')
+        .select('id, title, doctor_id, start_time, end_time, status, type, patient_data:patient_id(nombre, apellido), meeting_participants:agenda_meeting_participants(profile_id)')
         .not('doctor_id', 'is', null)
         .gte('start_time', start)
         .lte('start_time', end)
@@ -299,17 +312,18 @@ export async function getMinimalAllDoctorsAgendaRange(
         console.error('[getMinimalAllDoctorsAgendaRange] agenda error:', error);
     }
 
-    const rows = ((appointments || []) as (AgendaRow & { doctor_id: string | null })[]);
-    const doctorNameMap = await getDoctorNameMap(admin, getDoctorIdsFromAgendaRows(rows));
+    const rows = ((appointments || []) as AgendaRow[]);
+    const doctorNameMap = await getDoctorNameMap(admin, Array.from(new Set(rows.flatMap(getAgendaParticipantIds))));
     const dayDoctorMap = new Map<string, Map<string, MinimalDoctorAppointment[]>>();
 
     for (const row of rows) {
-        if (!row.doctor_id) continue;
         const date = getLocalISODate(new Date(row.start_time));
         if (!dayDoctorMap.has(date)) dayDoctorMap.set(date, new Map());
         const doctorMap = dayDoctorMap.get(date)!;
-        if (!doctorMap.has(row.doctor_id)) doctorMap.set(row.doctor_id, []);
-        doctorMap.get(row.doctor_id)!.push(mapAgendaRow(row));
+        for (const doctorId of getAgendaParticipantIds(row)) {
+            if (!doctorMap.has(doctorId)) doctorMap.set(doctorId, []);
+            doctorMap.get(doctorId)!.push(mapAgendaRow(row));
+        }
     }
 
     const groupedDays: AllDoctorsAgendaDay[] = Array.from({ length: rangeDays }, (_, index) => {

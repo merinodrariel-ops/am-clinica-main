@@ -32,6 +32,8 @@ interface Appointment {
     notes: string | null;
     patient_id: string | null;
     doctor_id: string | null;
+    meeting_participant_ids?: string[];
+    meeting_participants?: { profile_id: string; full_name: string }[];
     patient?: { full_name?: string } | null;
     doctor?: { full_name?: string } | null;
 }
@@ -133,6 +135,12 @@ function getAppointmentDisplayColor(type: string | null | undefined, doctorColor
     }
 
     return doctorColor;
+}
+
+function appointmentBelongsToDoctor(apt: Appointment, doctorId: string) {
+    if (apt.doctor_id === doctorId) return true;
+    if (apt.type !== 'reunion') return false;
+    return (apt.meeting_participant_ids || []).includes(doctorId);
 }
 
 // ─── Time label column ────────────────────────────────────────────────────────
@@ -367,7 +375,7 @@ export default function DoctorResourceView({
                         <div className="w-14 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800" />
                         {visibleDoctors.map((doc) => {
                             const color = doctorColors[doctors.indexOf(doc) % doctorColors.length];
-                            const dayApts = appointments.filter((a) => a.doctor_id === doc.id && getVisibleWindow(a.start_time, a.end_time).isVisible);
+                            const dayApts = appointments.filter((a) => appointmentBelongsToDoctor(a, doc.id) && getVisibleWindow(a.start_time, a.end_time).isVisible);
                             return (
                                 <div
                                     key={doc.id}
@@ -399,7 +407,7 @@ export default function DoctorResourceView({
                         <TimeColumn />
                         {visibleDoctors.map((doc) => {
                             const color   = doctorColors[doctors.indexOf(doc) % doctorColors.length];
-                            const docApts = appointments.filter((a) => a.doctor_id === doc.id);
+                            const docApts = appointments.filter((a) => appointmentBelongsToDoctor(a, doc.id));
                             return (
                                 <DoctorColumn
                                     key={doc.id}
