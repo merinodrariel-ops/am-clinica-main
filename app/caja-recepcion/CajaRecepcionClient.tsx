@@ -2136,9 +2136,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                         )}
 
                         {financingStatusPreview && (
-                            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
-                                    <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-5">
+                            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center">
+                                <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+                                    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-800 p-5">
                                         <div>
                                             <h3 className="text-lg font-semibold text-white">Estado de financiación</h3>
                                             <p className="mt-1 text-sm text-slate-400">
@@ -2153,7 +2153,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                         </button>
                                     </div>
 
-                                    <div className="space-y-4 p-5">
+                                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
                                         <textarea
                                             value={financingStatusPreview.message}
                                             onChange={(event) => setFinancingStatusPreview((prev) => prev ? { ...prev, message: event.target.value } : prev)}
@@ -2185,9 +2185,9 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                         {/* Edit Date Modal */}
 
                         {editingMov && (
-                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full">
-                                    <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+                                <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
+                                    <div className="flex shrink-0 items-center justify-between border-b border-gray-100 p-6 dark:border-gray-700">
                                         <div>
                                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                                 Editar movimiento de ingreso
@@ -2206,7 +2206,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                         </button>
                                     </div>
 
-                                    <div className="p-6 space-y-4">
+                                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
                                         {/* Fecha */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -2394,7 +2394,7 @@ Podés abonarlo por transferencia o en tu próxima visita. ¡Gracias! ✨`;
                                         </div>
                                     </div>
 
-                                    <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
+                                    <div className="flex shrink-0 justify-end gap-3 border-t border-gray-100 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
                                         <button
                                             onClick={() => setEditingMov(null)}
                                             className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

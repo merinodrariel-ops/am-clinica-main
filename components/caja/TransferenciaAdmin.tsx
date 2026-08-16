@@ -190,8 +190,8 @@ export default function TransferenciaAdmin({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+            <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
                 <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
@@ -214,7 +214,7 @@ export default function TransferenciaAdmin({
                     </Button>
                 </div>
 
-                <div className="p-5 space-y-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
                     {false && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -338,7 +338,7 @@ export default function TransferenciaAdmin({
                     </div>
                 </div>
 
-                <div className="p-5 border-t border-gray-100 dark:border-gray-700 flex gap-3">
+                <div className="flex shrink-0 gap-3 border-t border-gray-100 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
                     <Button
                         variant="outline"
                         onClick={handleClose}

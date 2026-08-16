@@ -129,8 +129,8 @@ export default function MovimientoStockForm({ isOpen, item, tipo, onClose, onSuc
     const isSalida = tipo === 'SALIDA';
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center">
+            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200 dark:bg-gray-800">
                 <div className={clsx(
                     "px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center",
                     isEntrada ? "bg-emerald-50/50 dark:bg-emerald-900/10" : isSalida ? "bg-red-50/50 dark:bg-red-900/10" : "bg-blue-50/50 dark:bg-blue-900/10"

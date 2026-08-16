@@ -46,7 +46,7 @@ export default function Modal({
             <div
                 ref={panelRef}
                 tabIndex={-1}
-                className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full ${className} max-h-[90vh] overflow-y-auto outline-none animate-in fade-in zoom-in duration-200`}
+                className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full ${className} max-h-[calc(100dvh-2rem)] overflow-y-auto outline-none animate-in fade-in zoom-in duration-200`}
             >
                 {title && (
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
