@@ -25,6 +25,14 @@ const eslintConfig = defineConfig([
     "build/**",
     ".vercel/**",
     "next-env.d.ts",
+    ".agent/**",
+    ".claude/**",
+    ".claude-flow/**",
+    ".swarm/**",
+    "collab-public/**",
+    "outputs/**",
+    "scratch/**",
+    "scripts/legacy/**",
   ]),
 ]);
 

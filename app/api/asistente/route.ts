@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import { searchPatients, getAppointments, getDoctors, createAppointment } from '@/app/actions/agenda';
 import { canAccessInternalAssistant } from '@/lib/asistente-access';
 import { runAdminAgentCommand } from '@/lib/admin-agent/service';
+import { getAiModel } from '@/lib/ai-models';
 
 export const maxDuration = 60;
 
@@ -254,7 +255,7 @@ export async function POST(request: Request) {
     try {
         for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
             const response = await client.messages.create({
-                model: 'claude-haiku-4-5',
+                model: getAiModel('adminAssistant'),
                 max_tokens: 1024,
                 system: [
                     { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },

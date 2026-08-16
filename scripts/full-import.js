@@ -1,7 +1,4 @@
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-const fetch = global.fetch || require('node-fetch');
-
 const API_URL = 'http://localhost:3000/api/import-notion';
 const LIMIT = 50; // Use a reasonable batch size
 

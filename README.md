@@ -13,6 +13,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Requires Node.js 22 or newer.
+
 First, run the development server:
 
 ```bash
@@ -26,6 +28,36 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Quality checks
+
+```bash
+npm run test:unit
+npm run test:mcp
+npm run typecheck
+npm run build
+npm run lint:changed -- origin/main
+npm run audit:dead-code
+npm run audit:secrets
+```
+
+`npm run audit:secrets:history` performs the slower full-history audit. Historical findings require credential rotation before any coordinated history rewrite.
+
+Pull requests and pushes to `main` run the same unit, MCP, typecheck, build, changed-file lint, dependency-report, and secret-scan stages in GitHub Actions.
+
+## AI model configuration
+
+Default models are selected per workload in `lib/ai-models.ts`. Each workload can be overridden without editing application code:
+
+- `AI_MODEL_IMPLICIT_HOURS`
+- `AI_MODEL_CONTRACT_ASSISTANT`
+- `AI_MODEL_SCHEDULE_IMPORT`
+- `AI_MODEL_PREDICTIVE_PULSE`
+- `AI_MODEL_SMILE_ALIGNMENT`
+- `AI_MODEL_SMILE_IMAGE`
+- `AI_MODEL_SMILE_VIDEO`
+- `AI_MODEL_CLINICAL_CASE_WRITER`
+- `AI_MODEL_ADMIN_ASSISTANT`
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

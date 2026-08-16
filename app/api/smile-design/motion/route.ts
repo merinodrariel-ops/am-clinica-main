@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { canManagePatientDrive } from '@/lib/patient-drive-access';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
+import { getAiModel } from '@/lib/ai-models';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const VIDEO_MODEL = 'veo-3.1-lite-generate-preview';
 const OPERATION_RE = /^(?:models\/[a-zA-Z0-9._-]+\/)?operations\/[a-zA-Z0-9._/-]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // Keep the JSON request below Vercel's function payload ceiling.
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     const { ai } = videoClient();
     const operation = await ai.models.generateVideos({
-      model: VIDEO_MODEL,
+      model: getAiModel('smileVideo'),
       prompt: MOTION_PROMPT,
       image: { imageBytes: afterBase64, mimeType },
       config: {

@@ -1,6 +1,7 @@
 'use server';
 
 import { GoogleGenAI } from '@google/genai';
+import { getAiModel } from '@/lib/ai-models';
 
 function getGeminiAI() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -40,7 +41,7 @@ TEXTO DEL CONTRATO:
 ${fullText.slice(0, 8000)}`;
 
         const result = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+            model: getAiModel('contractAssistant'),
             contents: prompt,
         });
 
@@ -86,7 +87,7 @@ ${instruction}
 Texto mejorado:`;
 
         const result = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+            model: getAiModel('contractAssistant'),
             contents: prompt,
         });
 

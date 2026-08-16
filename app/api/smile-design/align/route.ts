@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { getAiModel } from '@/lib/ai-models';
 
 function getGeminiAI() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -33,7 +34,7 @@ If any landmark is not visible or not detectable, return null for that field.
 Return ONLY valid JSON, no markdown.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: getAiModel('smileAlignment'),
             contents: [{
                 role: 'user',
                 parts: [

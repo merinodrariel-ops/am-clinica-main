@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { GoogleGenAI } from '@google/genai';
 import * as xlsx from 'xlsx';
 import { inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
+import { getAiModel } from '@/lib/ai-models';
 
 function getGeminiAI() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -85,7 +86,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
         // 4. Call Gemini
         const ai = getGeminiAI();
         const result = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: getAiModel('scheduleImport'),
             contents: fullPrompt
         });
 

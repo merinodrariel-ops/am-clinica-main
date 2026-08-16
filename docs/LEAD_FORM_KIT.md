@@ -12,7 +12,7 @@ Agregar al `.env.local` del proyecto del sitio web:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://ybozzesadqcorvfqpsyo.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlib3p6ZXNhZHFjb3J2ZnFwc3lvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NDQ4OTAsImV4cCI6MjA4MjEyMDg5MH0.QfChgi5stid2NPoGZJmyC9YXLofc6GjH9Z13X8kYn_E
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>
 ```
 
 > ⚠️ **Importante:** la `anon key` es pública (va al cliente). La `service_role` key NO se comparte y NO se usa en el sitio público.

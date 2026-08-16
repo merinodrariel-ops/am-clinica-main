@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { getAiModel } from '@/lib/ai-models';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
 
     try {
         const response = await new Anthropic().messages.create({
-            model: 'claude-haiku-4-5',
+            model: getAiModel('clinicalCaseWriter'),
             max_tokens: 1800,
             system: CASE_WRITER_PROMPT,
             tools: [PROPOSAL_TOOL],

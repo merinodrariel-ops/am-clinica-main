@@ -56,6 +56,9 @@ windows-portable-pack/exocad-config.json
 # Local scratch & temporary files
 /scratch/
 /horarios/
+/outputs/
+/ruvector.db
+/collab-public/
 
 # Patient data backups & PII exports (NEVER commit — Ley 25.326)
 /data/backups/

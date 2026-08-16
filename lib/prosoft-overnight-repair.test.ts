@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { repairOvernightExitMarks } from './prosoft-overnight-repair';
+import { repairOvernightExitMarks, type ProsoftRepairRegistro } from './prosoft-overnight-repair';
 
 test('uses a single early next-day mark as the missing overnight exit', () => {
-    const repaired = repairOvernightExitMarks([
+    const repaired = repairOvernightExitMarks<ProsoftRepairRegistro>([
         {
             fecha: '2026-05-29',
             entrada: '12:08',
@@ -45,7 +45,7 @@ test('repairs the May 2026 overnight import cases for Claudia, Georgi and Mika',
     ] as const;
 
     for (const [name, startDate, entry, nextDate, earlyExit, expectedHours] of cases) {
-        const repaired = repairOvernightExitMarks([
+        const repaired = repairOvernightExitMarks<ProsoftRepairRegistro>([
             {
                 fecha: startDate,
                 entrada: entry,

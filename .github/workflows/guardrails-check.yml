@@ -22,6 +22,7 @@ jobs:
           git fetch origin "${{ github.base_ref }}" --depth=1
 
           CHANGED_FILES=$(git diff --name-only "${BASE_REF}"...HEAD)
+          ADDED_OR_MODIFIED_FILES=$(git diff --name-only --diff-filter=ACMRT "${BASE_REF}"...HEAD)
 
           if [ -z "${CHANGED_FILES}" ]; then
             echo "No changed files detected."
@@ -32,6 +33,13 @@ jobs:
           echo "${CHANGED_FILES}"
 
           FAIL=0
+
+          # 0) Block local databases, scratch scripts, exports, and nested repos.
+          if echo "${ADDED_OR_MODIFIED_FILES}" | grep -Eq '^(ruvector\.db|outputs/|scratch/|collab-public(?:/|$))'; then
+            echo "[ERROR] Local artifact or nested repository detected. Keep runtime exports, scratch scripts, and local databases out of git."
+            echo "${ADDED_OR_MODIFIED_FILES}" | grep -E '^(ruvector\.db|outputs/|scratch/|collab-public(?:/|$))' || true
+            FAIL=1
+          fi
 
           # 1) Block profiles.role usage in code/sql (excluding markdown and memory docs)
           for f in ${CHANGED_FILES}; do

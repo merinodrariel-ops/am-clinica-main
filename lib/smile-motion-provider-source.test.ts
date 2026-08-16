@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const routeSource = readFileSync('app/api/smile-design/motion/route.ts', 'utf8');
+const modelSource = readFileSync('lib/ai-models.ts', 'utf8');
 const hookSource = readFileSync('hooks/useSmileMotion.ts', 'utf8');
 const modalSource = readFileSync('components/patients/drive/PhotoStudioModal.tsx', 'utf8');
 const actionSource = readFileSync('app/actions/smile-design.ts', 'utf8');
 
 test('Smile Motion uses one low-cost Google Veo Lite generation from the after image', () => {
-  assert.match(routeSource, /veo-3\.1-lite-generate-preview/);
+  assert.match(modelSource, /smileVideo: 'veo-3\.1-lite-generate-preview'/);
+  assert.match(routeSource, /getAiModel\('smileVideo'\)/);
   assert.match(routeSource, /image: \{ imageBytes: afterBase64, mimeType \}/);
   assert.match(routeSource, /numberOfVideos: 1/);
   assert.match(routeSource, /durationSeconds: 4/);

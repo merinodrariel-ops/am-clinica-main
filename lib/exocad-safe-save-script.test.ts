@@ -9,7 +9,7 @@ const installerPath = path.join(process.cwd(), 'public', 'setup-exocad', 'instal
 test('Exocad launcher waits for the process and verifies changed files before reporting success', async () => {
     const script = await readFile(scriptPath, 'utf8');
 
-    assert.match(script, /Start-Process[^\n]+.*-PassThru/s);
+    assert.match(script, /Start-Process[^\n]+[\s\S]*-PassThru/);
     assert.match(script, /\.WaitForExit\(\)/);
     assert.match(script, /Get-ProjectManifest/);
     assert.match(script, /Get-ChangedProjectFiles/);

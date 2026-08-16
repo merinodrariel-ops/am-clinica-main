@@ -1,0 +1,30 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "scripts/**/*.{ts,js,mjs}",
+    "tests/**/*.spec.ts"
+  ],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "emails/**/*.tsx",
+    "hooks/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "mcp/**/*.ts",
+    "scripts/**/*.{ts,js,mjs}",
+    "tests/**/*.ts",
+    "utils/**/*.ts"
+  ],
+  "ignoreBinaries": ["gitleaks"],
+  "ignoreDependencies": ["tailwindcss", "ts-node"],
+  "ignore": [
+    ".agent/**",
+    ".claude/**",
+    ".claude-flow/**",
+    ".swarm/**",
+    "collab-public/**",
+    "outputs/**",
+    "scratch/**",
+    "scripts/legacy/**"
+  ]
+}

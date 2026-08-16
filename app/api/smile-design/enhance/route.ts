@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { getAiModel } from '@/lib/ai-models';
 import { buildSmileDesignPrompt } from '@/lib/smile-design-prompt';
 import {
     DEFAULT_SMILE_SETTINGS,
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
 
         const ai = getAI();
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
+            model: getAiModel('smileImage'),
             contents: [{
                 role: 'user',
                 parts: [

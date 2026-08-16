@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { getAiModel } from '@/lib/ai-models';
 
 const supabase = createAdminClient();
 
@@ -12,7 +13,7 @@ function getGeminiAI() {
     return new GoogleGenAI({ apiKey });
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
     try {
         const now = new Date();
         const monthsData = [];
@@ -70,7 +71,8 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        console.log('[predictive-pulse] Data aggregation complete. Prompting Gemini with model gemini-2.5-flash...');
+        const model = getAiModel('predictivePulse');
+        console.log(`[predictive-pulse] Data aggregation complete. Prompting Gemini with model ${model}...`);
         const ai = getGeminiAI();
 
         const prompt = `
@@ -91,7 +93,7 @@ export async function GET(req: NextRequest) {
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model,
             contents: [{
                 role: 'user',
                 parts: [{ text: prompt }]
@@ -105,7 +107,7 @@ export async function GET(req: NextRequest) {
         let analysis;
         try {
             analysis = JSON.parse(responseText.replace(/```json?\n?|```/g, '').trim());
-        } catch (e) {
+        } catch {
             console.error('[predictive-pulse] JSON parse error. Raw:', responseText);
             throw new Error('AI Response parsing failed');
         }
@@ -115,11 +117,11 @@ export async function GET(req: NextRequest) {
             history: monthsData.reverse()
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[predictive-pulse] General Error:', error);
         return NextResponse.json({
             error: 'Internal Server Error',
-            details: error.message
+            details: error instanceof Error ? error.message : 'Error desconocido'
         }, { status: 500 });
     }
 }

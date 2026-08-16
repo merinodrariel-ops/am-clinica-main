@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { getAiModel } from "@/lib/ai-models";
 
 function getGeminiAI() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -48,7 +49,7 @@ Respuesta JSON:`;
     try {
         const ai = getGeminiAI();
         const result = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: getAiModel('implicitHours'),
             contents: prompt
         });
         const text = result.text || "";

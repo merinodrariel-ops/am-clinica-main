@@ -7,18 +7,19 @@ const source = readFileSync('components/patients/drive/PhotoStudioModal.tsx', 'u
 test('removed-background canvas layers stay local until the user explicitly saves', () => {
     assert.doesNotMatch(source, /Guardando recorte en Drive/);
     assert.match(source, /Fondo de capa eliminado\. Se guardará solamente cuando guardes el lienzo/);
-    assert.match(source, /materializeCanvasLayersForSave\(activeCanvas\)/);
+    assert.match(source, /persistCanvasDocument\(activeCanvas\)/);
+    assert.match(source, /materializeCanvasLayersForSave\(canvasDocument\)/);
     assert.match(source, /uploadCanvasLayerAssetAction/);
 });
 
 test('edited outputs in the bottom rail drag by Drive id instead of their thumbnail pixels', () => {
     assert.match(
         source,
-        /editedOutputFiles\.map[\s\S]*?draggable[\s\S]*?preparePhotoStudioCanvasDrag\(event\.dataTransfer, editedFile\.id\)/,
+        /selectionRailFiles\.map[\s\S]*?draggable[\s\S]*?preparePhotoStudioCanvasDrag\(event\.dataTransfer, selectionFile\.id\)/,
     );
     assert.match(
         source,
-        /src=\{editedFile\.thumbnailLink\}[\s\S]*?draggable=\{false\}[\s\S]*?pointer-events-none/,
+        /src=\{selectionFile\.thumbnailLink\}[\s\S]*?draggable=\{false\}[\s\S]*?pointer-events-none/,
     );
 });
 
