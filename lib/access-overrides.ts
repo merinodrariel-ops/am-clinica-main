@@ -6,6 +6,13 @@
 export type ModuleAccessLevel = 'inherit' | 'read' | 'edit' | 'none';
 export type AccessOverrides = Partial<Record<string, ModuleAccessLevel>>;
 
+export type ActiveAccessGrant = {
+    module_key: string;
+    access_level: 'read' | 'edit';
+    starts_at?: string | null;
+    expires_at?: string | null;
+};
+
 export const MODULE_DEFINITIONS = [
     { key: 'agenda',           label: 'Agenda',                financial: false },
     { key: 'patients',         label: 'Pacientes',             financial: false },
@@ -61,4 +68,34 @@ export function getCategoryDefault(categoria: string, moduleKey: string): 'full'
     }
 
     return 'none';
+}
+
+/**
+ * Resolves the effective access used by the UI.
+ * Explicit per-user overrides remain authoritative; temporary grants only
+ * elevate inherited access and automatically expire by timestamp.
+ */
+export function resolveModuleAccess(
+    categoria: string,
+    moduleKey: string,
+    overrides: AccessOverrides | null | undefined,
+    grants: ActiveAccessGrant[] = [],
+    now = new Date(),
+): 'full' | 'read' | 'none' {
+    const override = overrides?.[moduleKey];
+    if (override === 'none') return 'none';
+    if (override === 'edit') return 'full';
+    if (override === 'read') return 'read';
+
+    const inherited = getCategoryDefault(categoria || 'partner_viewer', moduleKey);
+    const activeGrant = grants
+        .filter(grant => grant.module_key === moduleKey)
+        .filter(grant => !grant.starts_at || new Date(grant.starts_at) <= now)
+        .filter(grant => !grant.expires_at || new Date(grant.expires_at) > now)
+        .sort((left, right) => (left.access_level === 'edit' ? 1 : 0) - (right.access_level === 'edit' ? 1 : 0))
+        .at(-1);
+
+    if (!activeGrant) return inherited;
+    if (activeGrant.access_level === 'edit') return 'full';
+    return inherited === 'full' ? 'full' : 'read';
 }

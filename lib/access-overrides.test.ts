@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getCategoryDefault } from './access-overrides';
+import { getCategoryDefault, resolveModuleAccess } from './access-overrides';
 
 test('odontologo never gets access to financial modules by default', () => {
     assert.equal(getCategoryDefault('odontologo', 'caja_recepcion'), 'none');
@@ -20,4 +20,14 @@ test('marketing only inherits read access to patients', () => {
     assert.equal(getCategoryDefault('marketing', 'agenda'), 'none');
     assert.equal(getCategoryDefault('marketing', 'caja_admin'), 'none');
     assert.equal(getCategoryDefault('marketing', 'portal'), 'none');
+});
+
+test('temporary grants elevate inherited access but do not bypass explicit denies', () => {
+    const future = new Date(Date.now() + 60_000).toISOString();
+    assert.equal(resolveModuleAccess('odontologo', 'caja_recepcion', null, [
+        { module_key: 'caja_recepcion', access_level: 'read', expires_at: future },
+    ]), 'read');
+    assert.equal(resolveModuleAccess('odontologo', 'caja_recepcion', { caja_recepcion: 'none' }, [
+        { module_key: 'caja_recepcion', access_level: 'edit', expires_at: future },
+    ]), 'none');
 });

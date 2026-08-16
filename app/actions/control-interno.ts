@@ -32,6 +32,20 @@ export type BlackBoxEvent = {
     metadata: Record<string, unknown> | null;
 };
 
+export type ControlAccessGrant = {
+    id: string;
+    target_user_id: string;
+    target_name: string;
+    target_email: string;
+    module_key: string;
+    access_level: 'read' | 'edit';
+    reason: string;
+    starts_at: string;
+    expires_at: string;
+    revoked_at: string | null;
+    created_at: string;
+};
+
 type ControlProfile = {
     id: string;
     email: string | null;
@@ -45,6 +59,7 @@ type ControlProfile = {
 
 const CONTROL_ROLES = new Set(['owner', 'admin', 'developer']);
 const MUTATION_ROLES = new Set(['owner']);
+const GRANT_ROLES = new Set(['owner', 'admin', 'developer']);
 
 const SENSITIVE_MODULES = new Set([
     'patients',
@@ -121,6 +136,7 @@ export async function getInternalControlData(): Promise<{
     success: boolean;
     users?: ControlUser[];
     events?: BlackBoxEvent[];
+    grants?: ControlAccessGrant[];
     error?: string;
 }> {
     const actorResult = await getActor(CONTROL_ROLES);
@@ -128,7 +144,7 @@ export async function getInternalControlData(): Promise<{
 
     try {
         const admin = createAdminClient();
-        const [{ data: profiles, error: profilesError }, authResult, { data: events, error: eventsError }] = await Promise.all([
+        const [{ data: profiles, error: profilesError }, authResult, { data: events, error: eventsError }, { data: grants, error: grantsError }] = await Promise.all([
             admin
                 .from('profiles')
                 .select('id, email, full_name, categoria, estado, is_active, created_at, access_overrides')
@@ -139,11 +155,21 @@ export async function getInternalControlData(): Promise<{
                 .select('id, created_at, user_email, categoria, role, action, table_name, record_id, metadata')
                 .order('created_at', { ascending: false })
                 .limit(160),
+            admin
+                .from('access_grants')
+                .select('id, target_user_id, module_key, access_level, reason, starts_at, expires_at, revoked_at, created_at')
+                .order('created_at', { ascending: false })
+                .limit(120),
         ]);
 
         if (profilesError) throw profilesError;
         if (authResult.error) throw authResult.error;
         if (eventsError) throw eventsError;
+        // Keep the existing center readable during a staged rollout where the
+        // migration has not reached the remote database yet. Grant mutations
+        // remain unavailable until the table exists; the rest of the console
+        // must not disappear because of that deployment ordering.
+        if (grantsError && !/access_grants|relation .* does not exist/i.test(grantsError.message || '')) throw grantsError;
 
         const authUsers = authResult.data.users as Array<{
             id: string;
@@ -185,10 +211,134 @@ export async function getInternalControlData(): Promise<{
                 : null,
         }));
 
-        return { success: true, users, events: blackBoxEvents };
+        const profileById = new Map(users.map(user => [user.id, user]));
+        const controlGrants = (grants || []).map((grant: Record<string, unknown>) => {
+            const target = profileById.get(String(grant.target_user_id));
+            return {
+                id: String(grant.id),
+                target_user_id: String(grant.target_user_id),
+                target_name: target?.full_name || 'Sin nombre',
+                target_email: target?.email || '',
+                module_key: String(grant.module_key),
+                access_level: grant.access_level === 'edit' ? 'edit' : 'read',
+                reason: String(grant.reason || ''),
+                starts_at: String(grant.starts_at),
+                expires_at: String(grant.expires_at),
+                revoked_at: typeof grant.revoked_at === 'string' ? grant.revoked_at : null,
+                created_at: String(grant.created_at),
+            } satisfies ControlAccessGrant;
+        });
+
+        return { success: true, users, events: blackBoxEvents, grants: controlGrants };
     } catch (error) {
         console.error('[control-interno] getInternalControlData error:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Error cargando control interno' };
+    }
+}
+
+export async function createAccessGrant(input: {
+    targetUserId: string;
+    moduleKey: string;
+    accessLevel: 'read' | 'edit';
+    reason: string;
+    expiresAt: string;
+}): Promise<{ success: boolean; error?: string }> {
+    const actorResult = await getActor(GRANT_ROLES);
+    if ('error' in actorResult) return { success: false, error: actorResult.error };
+
+    try {
+        const moduleDefinition = MODULE_DEFINITIONS.find(definition => definition.key === input.moduleKey);
+        if (!moduleDefinition) throw new Error('Módulo inválido');
+        if (input.accessLevel !== 'read' && input.accessLevel !== 'edit') throw new Error('Nivel inválido');
+        if (!input.targetUserId || input.reason.trim().length < 3) throw new Error('Indicá usuario y motivo');
+
+        const expiresAt = new Date(input.expiresAt);
+        const now = new Date();
+        const maxExpiry = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        if (Number.isNaN(expiresAt.getTime()) || expiresAt <= now) throw new Error('La fecha de vencimiento debe ser futura');
+        if (expiresAt > maxExpiry) throw new Error('El acceso temporal no puede superar 30 días');
+
+        const admin = createAdminClient();
+        const { data: target, error: targetError } = await admin
+            .from('profiles')
+            .select('id, email, full_name, is_active')
+            .eq('id', input.targetUserId)
+            .single();
+        if (targetError || !target) throw targetError || new Error('Usuario no encontrado');
+        if (target.is_active === false) throw new Error('No se puede otorgar acceso a un usuario inactivo');
+
+        const { error } = await admin.from('access_grants').insert({
+            target_user_id: input.targetUserId,
+            module_key: moduleDefinition.key,
+            access_level: input.accessLevel,
+            reason: input.reason.trim(),
+            expires_at: expiresAt.toISOString(),
+            created_by: actorResult.actor.id,
+        });
+        if (error) throw error;
+
+        await admin.from('audit_logs').insert({
+            user_id: actorResult.actor.id,
+            user_email: actorResult.actor.email,
+            categoria: actorResult.actor.categoria,
+            role: actorResult.actor.categoria,
+            action: 'access_center_create_temporary_grant',
+            table_name: 'access_grants',
+            metadata: {
+                target_user_id: input.targetUserId,
+                target_email: target.email,
+                module_key: moduleDefinition.key,
+                access_level: input.accessLevel,
+                reason: input.reason.trim(),
+                expires_at: expiresAt.toISOString(),
+            },
+        });
+
+        revalidatePath('/admin/control-interno');
+        return { success: true };
+    } catch (error) {
+        console.error('[control-interno] createAccessGrant error:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'No se pudo crear el acceso temporal' };
+    }
+}
+
+export async function revokeAccessGrant(grantId: string): Promise<{ success: boolean; error?: string }> {
+    const actorResult = await getActor(GRANT_ROLES);
+    if ('error' in actorResult) return { success: false, error: actorResult.error };
+    try {
+        if (!grantId) throw new Error('Acceso temporal inválido');
+        const admin = createAdminClient();
+        const { data: grant, error: grantError } = await admin
+            .from('access_grants')
+            .select('id, target_user_id, module_key, access_level')
+            .eq('id', grantId)
+            .is('revoked_at', null)
+            .single();
+        if (grantError || !grant) throw grantError || new Error('Acceso temporal no encontrado');
+
+        const { error } = await admin
+            .from('access_grants')
+            .update({ revoked_at: new Date().toISOString(), revoked_by: actorResult.actor.id })
+            .eq('id', grantId)
+            .is('revoked_at', null);
+        if (error) throw error;
+
+        await admin.from('audit_logs').insert({
+            user_id: actorResult.actor.id,
+            user_email: actorResult.actor.email,
+            categoria: actorResult.actor.categoria,
+            role: actorResult.actor.categoria,
+            action: 'access_center_revoke_temporary_grant',
+            table_name: 'access_grants',
+            record_id: grantId,
+            metadata: grant,
+        });
+
+        revalidatePath('/admin/control-interno');
+        return { success: true };
+    } catch (error) {
+        console.error('[control-interno] revokeAccessGrant error:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'No se pudo revocar el acceso temporal' };
     }
 }
 

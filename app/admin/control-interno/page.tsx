@@ -13,6 +13,7 @@ export default async function InternalControlPage() {
                 <InternalControlClient
                     initialUsers={result.users || []}
                     initialEvents={result.events || []}
+                    initialGrants={result.grants || []}
                 />
             ) : (
                 <div className="p-8">
