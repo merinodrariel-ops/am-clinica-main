@@ -1,5 +1,42 @@
 @import "tailwindcss";
 
+/*
+ * Modal contract: the viewport owns the scroll on short screens and the panel
+ * never grows past the visual viewport. Keep this shared so every modal has a
+ * reachable footer/action area, including browser zoom and mobile keyboards.
+ */
+.modal-viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+}
+
+.modal-panel {
+  width: 100%;
+  max-height: calc(100dvh - 2rem);
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-panel > form,
+.modal-panel > .modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 640px) {
+  .modal-viewport { align-items: center; }
+}
+
 
 @custom-variant dark (&:where(.dark, .dark *));
 

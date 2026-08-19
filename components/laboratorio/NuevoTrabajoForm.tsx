@@ -132,8 +132,8 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center">
-            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200 dark:bg-gray-800">
+        <div className="modal-viewport z-[60] bg-black/60 backdrop-blur-sm">
+            <div className="modal-panel max-w-2xl rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200 dark:bg-gray-800">
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-indigo-50/50 dark:bg-indigo-900/10">
                     <div className="flex items-center gap-3">

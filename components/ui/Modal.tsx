@@ -40,13 +40,13 @@ export default function Modal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="modal-viewport bg-black/50 backdrop-blur-sm"
             onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
             <div
                 ref={panelRef}
                 tabIndex={-1}
-                className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full ${className} max-h-[calc(100dvh-2rem)] overflow-y-auto outline-none animate-in fade-in zoom-in duration-200`}
+                className={`modal-panel bg-white dark:bg-gray-900 rounded-2xl shadow-2xl ${className} outline-none animate-in fade-in zoom-in duration-200`}
             >
                 {title && (
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
