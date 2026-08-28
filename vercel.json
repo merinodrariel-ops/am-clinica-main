@@ -7,6 +7,14 @@
     {
       "path": "/api/agenda/daily-summary",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/agenda/remind",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/daily-retention",
+      "schedule": "0 12 * * *"
     }
   ]
 }
