@@ -19,7 +19,7 @@
 
 .modal-panel {
   width: 100%;
-  max-height: calc(100dvh - 2rem);
+  max-height: min(44rem, calc(100dvh - 2rem));
   min-height: 0;
   overflow: hidden;
   display: flex;
@@ -28,9 +28,25 @@
 
 .modal-panel > form,
 .modal-panel > .modal-body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* Form actions must remain reachable while the body is scrolled. */
+.modal-panel form > [data-modal-actions] {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-inline: -1.5rem;
+  padding: 1rem 1.5rem max(1rem, env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.dark .modal-panel form > [data-modal-actions] {
+  background: rgba(17, 24, 39, 0.96);
 }
 
 @media (min-width: 640px) {
