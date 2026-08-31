@@ -138,16 +138,22 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
         }));
         const usablePhotos = photoData.filter((value): value is string => Boolean(value));
         if (usablePhotos.length > 0) {
-            const photoWidth = (contentWidth - 4) / 2;
-            const photoHeight = 34;
-            const photoRowHeight = 38;
-            ensureSpace(Math.ceil(usablePhotos.length / 2) * photoRowHeight + 4);
-            usablePhotos.forEach((dataUrl, index) => {
-                const x = margin + (index % 2) * (photoWidth + 4);
-                const rowY = y + Math.floor(index / 2) * photoRowHeight;
-                try { doc.addImage(dataUrl, 'JPEG', x, rowY, photoWidth, photoHeight); } catch { /* unsupported image format */ }
+            // Keep the original aspect ratio and stack images vertically. This is
+            // intentional for before/after pairs: before on top, after underneath.
+            usablePhotos.forEach((dataUrl) => {
+                try {
+                    const properties = doc.getImageProperties(dataUrl);
+                    const imageRatio = properties.width / properties.height;
+                    const maxPhotoWidth = contentWidth;
+                    const maxPhotoHeight = 52;
+                    const photoWidth = Math.min(maxPhotoWidth, maxPhotoHeight * imageRatio);
+                    const photoHeight = photoWidth / imageRatio;
+                    ensureSpace(photoHeight + 7);
+                    const x = margin + (contentWidth - photoWidth) / 2;
+                    doc.addImage(dataUrl, 'JPEG', x, y, photoWidth, photoHeight);
+                    y += photoHeight + 7;
+                } catch { /* unsupported image format */ }
             });
-            y += Math.ceil(usablePhotos.length / 2) * photoRowHeight + 4;
         }
         line('Alternativas de tratamiento', 13, true);
         payload.alternatives.forEach((item) => {
