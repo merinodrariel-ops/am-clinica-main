@@ -324,6 +324,12 @@ export default function AgendaCalendar() {
         setModalOpen(true);
     };
 
+    const confirmNewMeeting = (start: Date, end: Date) => {
+        setSelectionPopup(null);
+        setSelectedEvent({ title: 'Reunión', start, end, patientId: '', doctorId: '', status: 'confirmed', type: 'reunion', modality: 'virtual', notes: '' });
+        setModalOpen(true);
+    };
+
     const confirmBlock = (start: Date, end: Date) => {
         setSelectionPopup(null);
         setBlockModalInitialStart(start);
@@ -1531,6 +1537,13 @@ export default function AgendaCalendar() {
                         >
                             <CalendarPlus size={14} />
                             Nuevo turno
+                        </button>
+                        <button
+                            onClick={() => confirmNewMeeting(selectionPopup.start, selectionPopup.end)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-violet-50 dark:hover:bg-violet-900/30 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
+                        >
+                            <Users size={14} />
+                            Nueva reunión
                         </button>
                         <button
                             onClick={() => confirmBlock(selectionPopup.start, selectionPopup.end)}
