@@ -1413,6 +1413,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                         if (options?.coverFileId) setCoverFileId(options.coverFileId);
                         handleUploadedToFolder(options);
                     }}
+                    onBudgetFilesSelected={onBudgetFilesSelected}
                 />
             </div>
 

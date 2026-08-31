@@ -93,13 +93,24 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
     }
 
     async function exportPdf() {
-        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-        const margin = 18;
-        let y = 22;
+        // 100 x 178 mm keeps the proposal vertical and close to a phone screen ratio.
+        const pageWidth = 100;
+        const pageHeight = 178;
+        const doc = new jsPDF({ unit: 'mm', format: [pageWidth, pageHeight] });
+        const margin = 8;
+        const contentWidth = pageWidth - margin * 2;
+        let y = 14;
+        const ensureSpace = (height: number) => {
+            if (y + height > pageHeight - margin) {
+                doc.addPage([pageWidth, pageHeight]);
+                y = 14;
+            }
+        };
         const line = (text: string, size = 10, bold = false) => {
             doc.setFont('helvetica', bold ? 'bold' : 'normal');
             doc.setFontSize(size);
-            const lines = doc.splitTextToSize(text, 174);
+            const lines = doc.splitTextToSize(text, contentWidth);
+            ensureSpace(lines.length * (size * 0.48) + 5);
             doc.text(lines, margin, y);
             y += lines.length * (size * 0.48) + 4;
         };
@@ -127,12 +138,16 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
         }));
         const usablePhotos = photoData.filter((value): value is string => Boolean(value));
         if (usablePhotos.length > 0) {
+            const photoWidth = (contentWidth - 4) / 2;
+            const photoHeight = 34;
+            const photoRowHeight = 38;
+            ensureSpace(Math.ceil(usablePhotos.length / 2) * photoRowHeight + 4);
             usablePhotos.forEach((dataUrl, index) => {
-                const x = margin + (index % 2) * 88;
-                const rowY = y + Math.floor(index / 2) * 38;
-                try { doc.addImage(dataUrl, 'JPEG', x, rowY, 82, 32); } catch { /* unsupported image format */ }
+                const x = margin + (index % 2) * (photoWidth + 4);
+                const rowY = y + Math.floor(index / 2) * photoRowHeight;
+                try { doc.addImage(dataUrl, 'JPEG', x, rowY, photoWidth, photoHeight); } catch { /* unsupported image format */ }
             });
-            y += Math.ceil(usablePhotos.length / 2) * 38 + 4;
+            y += Math.ceil(usablePhotos.length / 2) * photoRowHeight + 4;
         }
         line('Alternativas de tratamiento', 13, true);
         payload.alternatives.forEach((item) => {

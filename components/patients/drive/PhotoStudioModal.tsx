@@ -9,7 +9,7 @@ import {
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2, Share2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
-    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Folder, Eraser
+    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Folder, Eraser, FileText
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -292,6 +292,7 @@ interface PhotoStudioModalProps {
     canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
     onSaved: (options?: { silent?: boolean; coverFileId?: string }) => void; // called after successful save → triggers folder refresh
+    onBudgetFilesSelected?: (files: DriveFile[]) => void;
     autoStartSmile?: boolean;
 }
 
@@ -849,6 +850,7 @@ export default function PhotoStudioModal({
     canSave,
     onClose,
     onSaved,
+    onBudgetFilesSelected,
     autoStartSmile,
 }: PhotoStudioModalProps) {
     const imgRef = useRef<HTMLImageElement>(null);
@@ -5737,6 +5739,17 @@ export default function PhotoStudioModal({
         }
     }
 
+    function handleAddSelectedToBudget() {
+        const files = imageFiles.filter((file) => selectedIds.has(file.id));
+        if (files.length === 0) {
+            toast.info('Seleccioná al menos una foto para agregar al presupuesto');
+            return;
+        }
+        onBudgetFilesSelected?.(files);
+        toast.success(`${files.length} foto${files.length !== 1 ? 's' : ''} agregada${files.length !== 1 ? 's' : ''} al presupuesto`);
+        onClose();
+    }
+
     async function downloadBlob(blob: Blob, fileName: string) {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -6330,6 +6343,16 @@ export default function PhotoStudioModal({
                                 </span>
                             </button>
                         )}
+                        {selectedIds.size > 0 && onBudgetFilesSelected && (
+                            <button
+                                onClick={handleAddSelectedToBudget}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-black text-sm font-semibold hover:bg-[#d9bb7d] transition-colors"
+                                title="Adjuntar las fotos seleccionadas al presupuesto"
+                            >
+                                <FileText size={14} />
+                                <span className="hidden sm:inline">Presupuesto ({selectedIds.size})</span>
+                            </button>
+                        )}
                         {imageFiles.length + canvases.length > 1 && (
                             <button
                                 onClick={startPresentation}
@@ -6503,9 +6526,18 @@ export default function PhotoStudioModal({
                         >
                             <Tag size={13} />
                         </button>
-                        {selectedIds.size > 1 && (
-                            <div className="flex items-center justify-center h-7 border-b border-white/10 text-[10px] font-semibold tracking-wide text-[#C9A96E] bg-[#C9A96E]/10">
-                                {selectedIds.size} seleccionadas
+                        {selectedIds.size > 0 && (
+                            <div className="flex items-center justify-center gap-1.5 h-9 px-1 border-b border-white/10 text-[10px] font-semibold tracking-wide text-[#C9A96E] bg-[#C9A96E]/10">
+                                <span>{selectedIds.size} seleccionada{selectedIds.size !== 1 ? 's' : ''}</span>
+                                {onBudgetFilesSelected && (
+                                    <button
+                                        onClick={handleAddSelectedToBudget}
+                                        className="inline-flex items-center gap-1 rounded-md bg-[#C9A96E] px-1.5 py-1 text-[9px] font-bold tracking-normal text-black hover:bg-[#d9bb7d]"
+                                        title="Adjuntar al presupuesto"
+                                    >
+                                        <FileText size={11} /> Presupuesto
+                                    </button>
+                                )}
                             </div>
                         )}
                         <div className="flex flex-col gap-1 p-1 overflow-y-auto flex-1 thin-scrollbar">
