@@ -360,9 +360,10 @@ interface PatientDriveTabProps {
     patientName: string;
     motherFolderUrl: string | null | undefined;
     initialCoverFileId?: string | null;
+    onBudgetFilesSelected?: (files: DriveFile[]) => void;
 }
 
-export default function PatientDriveTab({ patientId, patientName, motherFolderUrl, initialCoverFileId }: PatientDriveTabProps) {
+export default function PatientDriveTab({ patientId, patientName, motherFolderUrl, initialCoverFileId, onBudgetFilesSelected }: PatientDriveTabProps) {
     const { categoria: role, profile } = useAuth();
     const canUpload = canUploadPatientDrive(role);
     const canManageDrive = canManagePatientDrive(role);
@@ -540,6 +541,14 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         if (targetFiles.length === 0) return;
         setPublicCaseFiles(targetFiles);
         closePhotoContextMenu();
+    }
+
+    function handleAddToBudget(targetIds = selectedPhotoIds) {
+        const targetFiles = getPhotoSelectionFiles(targetIds);
+        if (targetFiles.length === 0) return;
+        onBudgetFilesSelected?.(targetFiles);
+        closePhotoContextMenu();
+        toast.success(`${targetFiles.length} foto${targetFiles.length !== 1 ? 's' : ''} agregada${targetFiles.length !== 1 ? 's' : ''} al presupuesto`);
     }
 
     async function handleDownloadFiles(targetIds: string[]) {
@@ -1250,6 +1259,15 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                 <CloudUpload size={13} className="text-[#C9A96E]" />
                                 Subir a web
                             </button>
+                            {onBudgetFilesSelected && (
+                                <button
+                                    onClick={() => handleAddToBudget(photoContextMenu.targetIds)}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-violet-500/15 hover:text-white transition-colors"
+                                >
+                                    <FileText size={13} className="text-violet-300" />
+                                    Agregar al presupuesto
+                                </button>
+                            )}
                             <button
                                 onClick={() => handleShareFiles(contextMenuFiles)}
                                 className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs text-white/75 hover:bg-white/10 hover:text-white transition-colors"

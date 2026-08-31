@@ -27,10 +27,10 @@ function initialPayload(patientName: string): PresupuestoPayload {
     };
 }
 
-export default function PatientBudgetsPanel({ patientId, patientName }: { patientId: string; patientName: string }) {
+export default function PatientBudgetsPanel({ patientId, patientName, initialPhotoUrls = [] }: { patientId: string; patientName: string; initialPhotoUrls?: string[] }) {
     const [records, setRecords] = useState<PresupuestoRecord[]>([]);
     const [active, setActive] = useState<PresupuestoRecord | null>(null);
-    const [payload, setPayload] = useState<PresupuestoPayload>(() => initialPayload(patientName));
+    const [payload, setPayload] = useState<PresupuestoPayload>(() => ({ ...initialPayload(patientName), photoUrls: initialPhotoUrls }));
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -47,7 +47,7 @@ export default function PatientBudgetsPanel({ patientId, patientName }: { patien
 
     function startNew() {
         setActive(null);
-        setPayload(initialPayload(patientName));
+        setPayload({ ...initialPayload(patientName), photoUrls: initialPhotoUrls });
     }
 
     function edit(record: PresupuestoRecord) {
@@ -148,7 +148,10 @@ export default function PatientBudgetsPanel({ patientId, patientName }: { patien
                     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Garantía<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={2} value={payload.guarantee} onChange={(e) => updateField('guarantee', e.target.value)} /></label>
                     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Condiciones<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={2} value={payload.conditions} onChange={(e) => updateField('conditions', e.target.value)} /></label>
                     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">CTA final<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={3} value={payload.cta} onChange={(e) => updateField('cta', e.target.value)} /></label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Fotos marcadas / Smile Design (URLs temporales)<input className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" placeholder="Pegá una URL de imagen por línea" value={payload.photoUrls.join('\n')} onChange={(e) => updateField('photoUrls', e.target.value.split('\n').map((url) => url.trim()).filter(Boolean))} /></label>
+                    <div className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Fotos marcadas / Smile Design
+                        {payload.photoUrls.length > 0 && <div className="mt-2 grid grid-cols-3 gap-2">{payload.photoUrls.map((url, index) => <div key={`${url}-${index}`} className="relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"><img src={url} alt={`Foto ${index + 1} del presupuesto`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /></div>)}</div>}
+                        <textarea className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={3} placeholder="Las fotos seleccionadas desde Foto Studio aparecen acá. También podés pegar una URL por línea." value={payload.photoUrls.join('\n')} onChange={(e) => updateField('photoUrls', e.target.value.split('\n').map((url) => url.trim()).filter(Boolean))} />
+                    </div>
                     <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-gray-800"><button onClick={() => void save()} disabled={saving} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">{saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Guardar presupuesto</button><button onClick={exportPdf} className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"><Download size={16} /> Generar PDF</button></div>
                 </div>
                 <aside className="h-fit rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm dark:border-indigo-900/50 dark:bg-indigo-950/20"><div className="mb-2 flex items-center gap-2 font-semibold text-indigo-800 dark:text-indigo-200"><Star size={16} /> Urgencia configurada</div><p className="text-xs leading-5 text-indigo-900/75 dark:text-indigo-100/75">La propuesta vence automáticamente a los 7 días. Para congelar condiciones y reservar turnos, se solicita una seña.</p></aside>

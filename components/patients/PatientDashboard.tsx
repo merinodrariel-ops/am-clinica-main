@@ -142,6 +142,15 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const isMarketing = role === 'marketing';
     const hidePaymentTabs = role !== 'admin' && role !== 'owner';
     const hideContactData = isAsistente || isOdontologo || isLaboratorio || isMarketing;
+    const [budgetPhotoUrls, setBudgetPhotoUrls] = useState<string[]>([]);
+    const [budgetEditorNonce, setBudgetEditorNonce] = useState(0);
+
+    function handleBudgetFilesSelected(files: Array<{ id: string }>) {
+        const urls = files.map((file) => `/api/drive/file/${file.id}`);
+        setBudgetPhotoUrls(urls);
+        setBudgetEditorNonce((value) => value + 1);
+        requestAnimationFrame(() => document.getElementById('presupuestos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
 
     // Historia Clínica local state (allows optimistic add without page reload)
     const [localHistoria, setLocalHistoria] = useState<HistoriaClinica[]>(historiaClinica);
@@ -474,14 +483,17 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             patientName={`${patient.apellido}, ${patient.nombre}`}
                             motherFolderUrl={patient.link_historia_clinica}
                             initialCoverFileId={patient.foto_perfil_url}
+                            onBudgetFilesSelected={canManagePresupuestos(role) ? handleBudgetFilesSelected : undefined}
                         />
                     </PatientSection>
 
                     {canManagePresupuestos(role) && (
                         <PatientSection id="presupuestos" title="Presupuestos" icon={FileText}>
                             <PatientBudgetsPanel
+                                key={budgetEditorNonce}
                                 patientId={patient.id_paciente}
                                 patientName={`${patient.nombre} ${patient.apellido}`}
+                                initialPhotoUrls={budgetPhotoUrls}
                             />
                         </PatientSection>
                     )}
