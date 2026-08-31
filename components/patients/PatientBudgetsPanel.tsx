@@ -209,7 +209,7 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
         line('Financiación', 12, true, gold); line(payload.financing, 9, false, cream);
         linkLine('Ver opciones de financiación →', 'https://www.amesteticadental.com/#financiacion');
         line('Por qué AM', 12, true, gold);
-        line('Resultados reales, planificación digital y un equipo que te acompaña desde el diagnóstico hasta el seguimiento. Estamos en Puerto Madero: Camila O’Gorman 412, Oficina 101.', 9, false, cream);
+        line('Resultados reales, planificación digital y un equipo que te acompaña desde el diagnóstico hasta el seguimiento. AM fue destacada por Forbes Argentina por su trabajo con inteligencia artificial aplicada al Diseño de Sonrisa. Estamos en Puerto Madero: Camila O’Gorman 412, Oficina 101.', 9, false, cream);
         line('Garantía y condiciones', 12, true, gold); line(`${payload.guarantee}\n${payload.conditions}`, 9, false, cream);
         line('Experiencias reales', 12, true, gold);
         line('“Nunca sentí que me vendieran algo. Me explicaron todo y el resultado se vio natural desde el primer momento.”', 9, false, cream);
