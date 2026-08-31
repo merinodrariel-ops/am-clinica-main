@@ -49,6 +49,8 @@ import type { PlanFinanciacion } from '@/lib/financiacion';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 import NuevaPrestacionModal from './NuevaPrestacionModal';
+import PatientBudgetsPanel from './PatientBudgetsPanel';
+import { canManagePresupuestos } from '@/lib/presupuesto-access';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
 import { getPatientInventoryMaterials, type PatientMaterialRecord } from '@/app/actions/inventory-stock';
 import {
@@ -474,6 +476,15 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                             initialCoverFileId={patient.foto_perfil_url}
                         />
                     </PatientSection>
+
+                    {canManagePresupuestos(role) && (
+                        <PatientSection id="presupuestos" title="Presupuestos" icon={FileText}>
+                            <PatientBudgetsPanel
+                                patientId={patient.id_paciente}
+                                patientName={`${patient.nombre} ${patient.apellido}`}
+                            />
+                        </PatientSection>
+                    )}
 
                     {!isMarketing && <>
                     {/* 2. Historia Clínica + Prestaciones + Materiales — moved up for quick access */}
