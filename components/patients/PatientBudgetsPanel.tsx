@@ -92,7 +92,7 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
         updateField('alternatives', payload.alternatives.filter((_, itemIndex) => itemIndex !== index));
     }
 
-    function exportPdf() {
+    async function exportPdf() {
         const doc = new jsPDF({ unit: 'mm', format: 'a4' });
         const margin = 18;
         let y = 22;
@@ -110,9 +110,30 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
         line(`Válido hasta: ${new Date(Date.now() + 7 * 86400000).toLocaleDateString('es-AR')}`);
         y += 3;
         line(payload.intro);
-        payload.photoUrls.slice(0, 1).forEach((url) => {
-            try { doc.addImage(url, 'JPEG', margin, y, 55, 42); y += 47; } catch { /* remote image may not be embeddable */ }
-        });
+        const photoData = await Promise.all(payload.photoUrls.slice(0, 4).map(async (url) => {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) return null;
+                const blob = await response.blob();
+                return await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result));
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsDataURL(blob);
+                });
+            } catch {
+                return null;
+            }
+        }));
+        const usablePhotos = photoData.filter((value): value is string => Boolean(value));
+        if (usablePhotos.length > 0) {
+            usablePhotos.forEach((dataUrl, index) => {
+                const x = margin + (index % 2) * 88;
+                const rowY = y + Math.floor(index / 2) * 38;
+                try { doc.addImage(dataUrl, 'JPEG', x, rowY, 82, 32); } catch { /* unsupported image format */ }
+            });
+            y += Math.ceil(usablePhotos.length / 2) * 38 + 4;
+        }
         line('Alternativas de tratamiento', 13, true);
         payload.alternatives.forEach((item) => {
             line(item.title || 'Alternativa de tratamiento', 11, true);
