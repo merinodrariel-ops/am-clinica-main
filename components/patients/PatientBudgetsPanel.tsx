@@ -99,28 +99,70 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
         const doc = new jsPDF({ unit: 'mm', format: [pageWidth, pageHeight] });
         const margin = 8;
         const contentWidth = pageWidth - margin * 2;
+        const gold: [number, number, number] = [201, 169, 110];
+        const cream: [number, number, number] = [244, 240, 232];
+        const muted: [number, number, number] = [167, 158, 143];
+        const paintPage = () => {
+            doc.setFillColor(9, 9, 11);
+            doc.rect(0, 0, pageWidth, pageHeight, 'F');
+            doc.setDrawColor(...gold);
+            doc.setLineWidth(0.25);
+            doc.line(margin, pageHeight - 7, pageWidth - margin, pageHeight - 7);
+        };
+        paintPage();
         let y = 14;
         const ensureSpace = (height: number) => {
             if (y + height > pageHeight - margin) {
                 doc.addPage([pageWidth, pageHeight]);
+                paintPage();
                 y = 14;
             }
         };
-        const line = (text: string, size = 10, bold = false) => {
+        const line = (text: string, size = 10, bold = false, color = cream) => {
             doc.setFont('helvetica', bold ? 'bold' : 'normal');
             doc.setFontSize(size);
+            doc.setTextColor(...color);
             const lines = doc.splitTextToSize(text, contentWidth);
             ensureSpace(lines.length * (size * 0.48) + 5);
             doc.text(lines, margin, y);
             y += lines.length * (size * 0.48) + 4;
         };
+        const linkLine = (label: string, url: string) => {
+            ensureSpace(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(...gold);
+            doc.textWithLink(label, margin, y, { url });
+            y += 8;
+        };
+        let logoData: string | null = null;
+        try {
+            const response = await fetch('/am-logo.png');
+            if (response.ok) {
+                const blob = await response.blob();
+                logoData = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result));
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsDataURL(blob);
+                });
+            }
+        } catch {
+            logoData = null;
+        }
+        if (logoData) {
+            try { doc.addImage(logoData, 'PNG', 40, 8, 20, 20); } catch { /* optional branding asset */ }
+            y = 34;
+        }
         doc.setTextColor(20, 29, 52);
-        line('AM ESTÉTICA DENTAL', 18, true);
-        line('Propuesta personalizada', 12, true);
-        line(`Paciente: ${payload.patientName}`);
-        line(`Válido hasta: ${new Date(Date.now() + 7 * 86400000).toLocaleDateString('es-AR')}`);
+        line('AM ESTÉTICA DENTAL', 16, true, gold);
+        line('Propuesta personalizada', 12, true, cream);
+        line(`Preparada para ${payload.patientName}`, 10, false, muted);
+        line(`Válida hasta ${new Date(Date.now() + 7 * 86400000).toLocaleDateString('es-AR')}`, 9, false, muted);
         y += 3;
-        line(payload.intro);
+        line(payload.intro, 10, false, cream);
+        line('Una planificación pensada para vos', 11, true, gold);
+        line('En AM combinamos experiencia clínica, fotografía profesional y Diseño de Sonrisa Digital para que puedas entender el resultado antes de empezar. Cada caso es personalizado: no trabajamos con sonrisas en serie.', 9, false, cream);
         const photoData = await Promise.all(payload.photoUrls.slice(0, 4).map(async (url) => {
             try {
                 const response = await fetch(url);
@@ -150,20 +192,30 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
                     const photoHeight = photoWidth / imageRatio;
                     ensureSpace(photoHeight + 7);
                     const x = margin + (contentWidth - photoWidth) / 2;
+                    doc.setDrawColor(...gold);
+                    doc.setLineWidth(0.3);
+                    doc.rect(x - 1, y - 1, photoWidth + 2, photoHeight + 2);
                     doc.addImage(dataUrl, 'JPEG', x, y, photoWidth, photoHeight);
                     y += photoHeight + 7;
                 } catch { /* unsupported image format */ }
             });
         }
-        line('Alternativas de tratamiento', 13, true);
+        line('Alternativas de tratamiento', 13, true, gold);
         payload.alternatives.forEach((item) => {
-            line(item.title || 'Alternativa de tratamiento', 11, true);
-            line(item.description);
-            line(`Total: ${item.currency} ${item.total.toLocaleString('es-AR')}`, 11, true);
+            line(item.title || 'Alternativa de tratamiento', 11, true, cream);
+            line(item.description, 9, false, cream);
+            line(`Total: ${item.currency} ${item.total.toLocaleString('es-AR')}`, 12, true, gold);
         });
-        line('Financiación', 12, true); line(payload.financing);
-        line('Garantía y condiciones', 12, true); line(`${payload.guarantee}\n${payload.conditions}`);
-        line('¿Cómo avanzar?', 12, true); line(payload.cta);
+        line('Financiación', 12, true, gold); line(payload.financing, 9, false, cream);
+        linkLine('Ver opciones de financiación →', 'https://www.amesteticadental.com/#financiacion');
+        line('Por qué AM', 12, true, gold);
+        line('Resultados reales, planificación digital y un equipo que te acompaña desde el diagnóstico hasta el seguimiento. Estamos en Puerto Madero: Camila O’Gorman 412, Oficina 101.', 9, false, cream);
+        line('Garantía y condiciones', 12, true, gold); line(`${payload.guarantee}\n${payload.conditions}`, 9, false, cream);
+        line('Experiencias reales', 12, true, gold);
+        line('“Nunca sentí que me vendieran algo. Me explicaron todo y el resultado se vio natural desde el primer momento.”', 9, false, cream);
+        linkLine('Conocé más casos clínicos →', 'https://www.amesteticadental.com/#antes-y-despues');
+        line('¿Cómo avanzar?', 12, true, gold); line(payload.cta, 9, false, cream);
+        linkLine('Conocé AM Estética Dental →', 'https://www.amesteticadental.com/');
         doc.save(`presupuesto-${payload.patientName.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.pdf`);
     }
 
