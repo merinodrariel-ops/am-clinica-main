@@ -5,35 +5,10 @@ import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { getUserAppProfile } from '@/app/actions/worker-portal';
 import { canManagePresupuestos } from '@/lib/presupuesto-access';
+import { AM_REFERENCE_CASES, DEFAULT_CASE_SLUGS } from '@/lib/presupuesto-brand';
+import type { PresupuestoPayload, PresupuestoRecord } from '@/lib/presupuesto-types';
 
-export type PresupuestoAlternative = {
-    title: string;
-    description: string;
-    total: number;
-    currency: 'USD' | 'ARS';
-};
-
-export type PresupuestoPayload = {
-    patientName: string;
-    intro: string;
-    alternatives: PresupuestoAlternative[];
-    financing: string;
-    guarantee: string;
-    conditions: string;
-    cta: string;
-    photoUrls: string[];
-};
-
-export type PresupuestoRecord = {
-    id: string;
-    paciente_id: string;
-    status: string;
-    valid_days: number;
-    issued_at: string;
-    expires_at: string;
-    payload: PresupuestoPayload;
-    version: number;
-};
+export type { PresupuestoAlternative, PresupuestoPayload, PresupuestoRecord } from '@/lib/presupuesto-types';
 
 async function requireBudgetRole() {
     const profile = await getUserAppProfile();
@@ -61,7 +36,22 @@ function normalizePayload(input: PresupuestoPayload): PresupuestoPayload {
         conditions: input.conditions.trim().slice(0, 1200),
         cta: input.cta.trim().slice(0, 800),
         photoUrls: input.photoUrls.filter((url) => /^https?:\/\//i.test(url)).slice(0, 6),
+        caseSlugs: normalizeCaseSlugs(input.caseSlugs),
+        financingUpfrontPct: input.financingUpfrontPct === 30 ? 30 : 50,
+        financingBaseIndex: normalizeBaseIndex(input.financingBaseIndex, input.alternatives.length),
     };
+}
+
+function normalizeCaseSlugs(slugs: string[] | undefined): string[] {
+    const known = new Set(AM_REFERENCE_CASES.map((item) => item.slug));
+    const clean = (slugs || []).filter((slug) => known.has(slug)).slice(0, 2);
+    return clean.length > 0 ? clean : DEFAULT_CASE_SLUGS;
+}
+
+function normalizeBaseIndex(index: number | undefined, alternativesCount: number): number {
+    if (!Number.isInteger(index) || index === undefined) return 0;
+    if (index < 0 || index >= Math.min(alternativesCount, 3)) return 0;
+    return index;
 }
 
 export async function listPatientPresupuestos(patientId: string): Promise<{ success: boolean; data?: PresupuestoRecord[]; error?: string }> {

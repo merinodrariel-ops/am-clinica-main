@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { FileText, Loader2, Plus, Save, Download, Star, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, Download, FileText, Loader2, Plus, Save, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
-import jsPDF from 'jspdf';
 import {
     createPatientPresupuesto,
     listPatientPresupuestos,
     updatePatientPresupuesto,
-    type PresupuestoPayload,
-    type PresupuestoRecord,
 } from '@/app/actions/presupuestos';
+import type { PresupuestoPayload, PresupuestoRecord } from '@/lib/presupuesto-types';
+import { AM_REFERENCE_CASES, DEFAULT_CASE_SLUGS } from '@/lib/presupuesto-brand';
+import { buildFinancingRows, generatePresupuestoPdf } from '@/lib/presupuesto-pdf';
 
 const emptyAlternative = () => ({ title: '', description: '', total: 0, currency: 'USD' as const });
 
@@ -19,20 +19,51 @@ function initialPayload(patientName: string): PresupuestoPayload {
         patientName,
         intro: 'Diseñamos una propuesta personalizada para acompañarte en el camino hacia la sonrisa que estás buscando.',
         alternatives: [emptyAlternative()],
-        financing: 'Consultá las opciones de financiación disponibles para tu tratamiento.',
+        financing: '',
         guarantee: 'Te acompañamos con garantía y seguimiento según las condiciones clínicas informadas por el equipo.',
         conditions: 'Los tratamientos y resultados quedan sujetos a evaluación y planificación clínica.',
         cta: 'Esta propuesta tiene una validez de 7 días corridos. Para mantener estas condiciones y reservar tus turnos, podés confirmar el tratamiento abonando una seña.',
         photoUrls: [],
+        caseSlugs: DEFAULT_CASE_SLUGS,
+        financingUpfrontPct: 50,
+        financingBaseIndex: 0,
     };
 }
 
-export default function PatientBudgetsPanel({ patientId, patientName, initialPhotoUrls = [] }: { patientId: string; patientName: string; initialPhotoUrls?: string[] }) {
+const inputClass =
+    'w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:bg-white dark:border-gray-700 dark:bg-gray-800 dark:focus:bg-gray-800';
+const labelClass = 'block text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500';
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+    return (
+        <section className="space-y-3 border-t border-gray-100 pt-5 first:border-0 first:pt-0 dark:border-gray-800">
+            <div>
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-500">{title}</h3>
+                {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}
+            </div>
+            {children}
+        </section>
+    );
+}
+
+export default function PatientBudgetsPanel({
+    patientId,
+    patientName,
+    initialPhotoUrls = [],
+}: {
+    patientId: string;
+    patientName: string;
+    initialPhotoUrls?: string[];
+}) {
     const [records, setRecords] = useState<PresupuestoRecord[]>([]);
     const [active, setActive] = useState<PresupuestoRecord | null>(null);
-    const [payload, setPayload] = useState<PresupuestoPayload>(() => ({ ...initialPayload(patientName), photoUrls: initialPhotoUrls }));
+    const [payload, setPayload] = useState<PresupuestoPayload>(() => ({
+        ...initialPayload(patientName),
+        photoUrls: initialPhotoUrls,
+    }));
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -42,8 +73,13 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
             setRecords(result.data || []);
             setLoading(false);
         });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [patientId]);
+
+    const selectedCases = payload.caseSlugs?.length ? payload.caseSlugs : DEFAULT_CASE_SLUGS;
+    const financing = useMemo(() => buildFinancingRows(payload), [payload]);
 
     function startNew() {
         setActive(null);
@@ -52,11 +88,23 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
 
     function edit(record: PresupuestoRecord) {
         setActive(record);
-        setPayload(record.payload);
+        setPayload({ ...initialPayload(record.payload.patientName || patientName), ...record.payload });
     }
 
     function updateField<K extends keyof PresupuestoPayload>(key: K, value: PresupuestoPayload[K]) {
         setPayload((current) => ({ ...current, [key]: value }));
+    }
+
+    function toggleCase(slug: string) {
+        const current = selectedCases;
+        if (current.includes(slug)) {
+            if (current.length === 1) return;
+            updateField('caseSlugs', current.filter((item) => item !== slug));
+            return;
+        }
+        // Máximo dos portadas: la propuesta tiene que seguir siendo corta.
+        const next = current.length >= 2 ? [current[1], slug] : [...current, slug];
+        updateField('caseSlugs', next);
     }
 
     async function save() {
@@ -76,9 +124,9 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
     }
 
     function updateAlternative(index: number, key: 'title' | 'description' | 'total' | 'currency', value: string) {
-        const alternatives = payload.alternatives.map((item, itemIndex) => itemIndex === index
-            ? { ...item, [key]: key === 'total' ? Number(value) || 0 : value }
-            : item);
+        const alternatives = payload.alternatives.map((item, itemIndex) =>
+            itemIndex === index ? { ...item, [key]: key === 'total' ? Number(value) || 0 : value } : item,
+        );
         updateField('alternatives', alternatives);
     }
 
@@ -89,166 +137,387 @@ export default function PatientBudgetsPanel({ patientId, patientName, initialPho
 
     function removeAlternative(index: number) {
         if (payload.alternatives.length === 1) return;
-        updateField('alternatives', payload.alternatives.filter((_, itemIndex) => itemIndex !== index));
+        const alternatives = payload.alternatives.filter((_, itemIndex) => itemIndex !== index);
+        setPayload((current) => ({
+            ...current,
+            alternatives,
+            financingBaseIndex: Math.min(current.financingBaseIndex ?? 0, alternatives.length - 1),
+        }));
     }
 
     async function exportPdf() {
-        // 100 x 178 mm keeps the proposal vertical and close to a phone screen ratio.
-        const pageWidth = 100;
-        const pageHeight = 178;
-        const doc = new jsPDF({ unit: 'mm', format: [pageWidth, pageHeight] });
-        const margin = 8;
-        const contentWidth = pageWidth - margin * 2;
-        const gold: [number, number, number] = [201, 169, 110];
-        const cream: [number, number, number] = [244, 240, 232];
-        const muted: [number, number, number] = [167, 158, 143];
-        const paintPage = () => {
-            doc.setFillColor(9, 9, 11);
-            doc.rect(0, 0, pageWidth, pageHeight, 'F');
-            doc.setDrawColor(...gold);
-            doc.setLineWidth(0.25);
-            doc.line(margin, pageHeight - 7, pageWidth - margin, pageHeight - 7);
-        };
-        paintPage();
-        let y = 14;
-        const ensureSpace = (height: number) => {
-            if (y + height > pageHeight - margin) {
-                doc.addPage([pageWidth, pageHeight]);
-                paintPage();
-                y = 14;
-            }
-        };
-        const line = (text: string, size = 10, bold = false, color = cream) => {
-            doc.setFont('helvetica', bold ? 'bold' : 'normal');
-            doc.setFontSize(size);
-            doc.setTextColor(...color);
-            const lines = doc.splitTextToSize(text, contentWidth);
-            ensureSpace(lines.length * (size * 0.48) + 5);
-            doc.text(lines, margin, y);
-            y += lines.length * (size * 0.48) + 4;
-        };
-        const linkLine = (label: string, url: string) => {
-            ensureSpace(8);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(9);
-            doc.setTextColor(...gold);
-            doc.textWithLink(label, margin, y, { url });
-            y += 8;
-        };
-        let logoData: string | null = null;
+        setExporting(true);
         try {
-            const response = await fetch('/am-logo.png');
-            if (response.ok) {
-                const blob = await response.blob();
-                logoData = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(String(reader.result));
-                    reader.onerror = () => reject(reader.error);
-                    reader.readAsDataURL(blob);
-                });
-            }
+            await generatePresupuestoPdf(payload);
         } catch {
-            logoData = null;
+            toast.error('No se pudo generar el PDF de la propuesta.');
+        } finally {
+            setExporting(false);
         }
-        if (logoData) {
-            try { doc.addImage(logoData, 'PNG', 40, 8, 20, 20); } catch { /* optional branding asset */ }
-            y = 34;
-        }
-        doc.setTextColor(20, 29, 52);
-        line('AM ESTÉTICA DENTAL', 16, true, gold);
-        line('Propuesta personalizada', 12, true, cream);
-        line(`Preparada para ${payload.patientName}`, 10, false, muted);
-        line(`Válida hasta ${new Date(Date.now() + 7 * 86400000).toLocaleDateString('es-AR')}`, 9, false, muted);
-        y += 3;
-        line(payload.intro, 10, false, cream);
-        line('Una planificación pensada para vos', 11, true, gold);
-        line('En AM combinamos experiencia clínica, fotografía profesional y Diseño de Sonrisa Digital para que puedas entender el resultado antes de empezar. Cada caso es personalizado: no trabajamos con sonrisas en serie.', 9, false, cream);
-        const photoData = await Promise.all(payload.photoUrls.slice(0, 4).map(async (url) => {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) return null;
-                const blob = await response.blob();
-                return await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(String(reader.result));
-                    reader.onerror = () => reject(reader.error);
-                    reader.readAsDataURL(blob);
-                });
-            } catch {
-                return null;
-            }
-        }));
-        const usablePhotos = photoData.filter((value): value is string => Boolean(value));
-        if (usablePhotos.length > 0) {
-            // Keep the original aspect ratio and stack images vertically. This is
-            // intentional for before/after pairs: before on top, after underneath.
-            usablePhotos.forEach((dataUrl) => {
-                try {
-                    const properties = doc.getImageProperties(dataUrl);
-                    const imageRatio = properties.width / properties.height;
-                    const maxPhotoWidth = contentWidth;
-                    const maxPhotoHeight = 52;
-                    const photoWidth = Math.min(maxPhotoWidth, maxPhotoHeight * imageRatio);
-                    const photoHeight = photoWidth / imageRatio;
-                    ensureSpace(photoHeight + 7);
-                    const x = margin + (contentWidth - photoWidth) / 2;
-                    doc.setDrawColor(...gold);
-                    doc.setLineWidth(0.3);
-                    doc.rect(x - 1, y - 1, photoWidth + 2, photoHeight + 2);
-                    doc.addImage(dataUrl, 'JPEG', x, y, photoWidth, photoHeight);
-                    y += photoHeight + 7;
-                } catch { /* unsupported image format */ }
-            });
-        }
-        line('Alternativas de tratamiento', 13, true, gold);
-        payload.alternatives.forEach((item) => {
-            line(item.title || 'Alternativa de tratamiento', 11, true, cream);
-            line(item.description, 9, false, cream);
-            line(`Total: ${item.currency} ${item.total.toLocaleString('es-AR')}`, 12, true, gold);
-        });
-        line('Financiación', 12, true, gold); line(payload.financing, 9, false, cream);
-        linkLine('Ver opciones de financiación →', 'https://www.amesteticadental.com/#financiacion');
-        line('Por qué AM', 12, true, gold);
-        line('Resultados reales, planificación digital y un equipo que te acompaña desde el diagnóstico hasta el seguimiento. AM fue destacada por Forbes Argentina por su trabajo con inteligencia artificial aplicada al Diseño de Sonrisa. Estamos en Puerto Madero: Camila O’Gorman 412, Oficina 101.', 9, false, cream);
-        line('Garantía y condiciones', 12, true, gold); line(`${payload.guarantee}\n${payload.conditions}`, 9, false, cream);
-        line('Experiencias reales', 12, true, gold);
-        line('“Nunca sentí que me vendieran algo. Me explicaron todo y el resultado se vio natural desde el primer momento.”', 9, false, cream);
-        linkLine('Conocé más casos clínicos →', 'https://www.amesteticadental.com/#antes-y-despues');
-        line('¿Cómo avanzar?', 12, true, gold); line(payload.cta, 9, false, cream);
-        linkLine('Conocé AM Estética Dental →', 'https://www.amesteticadental.com/');
-        doc.save(`presupuesto-${payload.patientName.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.pdf`);
     }
 
     return (
         <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold"><FileText size={19} /> Presupuestos</h2>
-                    <p className="text-xs text-gray-500">Privado para Administración y Recepción. Los odontólogos no acceden a este módulo.</p>
+                    <h2 className="flex items-center gap-2 text-lg font-semibold">
+                        <FileText size={19} /> Presupuestos
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                        Privado para Administración y Recepción. Los odontólogos no acceden a este módulo.
+                    </p>
                 </div>
-                <button onClick={startNew} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"><Plus size={16} /> Nuevo presupuesto</button>
+                <button
+                    onClick={startNew}
+                    className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                    <Plus size={16} /> Nuevo presupuesto
+                </button>
             </div>
-            {loading ? <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="animate-spin" size={16} /> Cargando...</div> : records.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                    {records.map((record) => <button key={record.id} onClick={() => edit(record)} className={`rounded-lg border px-3 py-2 text-left text-xs ${active?.id === record.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' : 'border-gray-200 dark:border-gray-700'}`}><span className="font-semibold">Versión {record.version}</span><br /><span className="text-gray-500">Vence {new Date(record.expires_at).toLocaleDateString('es-AR')}</span></button>)}
+
+            {loading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="animate-spin" size={16} /> Cargando...
                 </div>
-            )}
-            <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
-                <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Paciente<input className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" value={payload.patientName} onChange={(e) => updateField('patientName', e.target.value)} /></label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Introducción<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={3} value={payload.intro} onChange={(e) => updateField('intro', e.target.value)} /></label>
-                    <div><div className="mb-2 flex items-center justify-between"><label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Alternativas (solo total)</label><button onClick={addAlternative} disabled={payload.alternatives.length >= 3} className="text-xs font-semibold text-indigo-600 disabled:opacity-40">+ Agregar alternativa</button></div><div className="space-y-3">{payload.alternatives.map((item, index) => <div key={index} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"><div className="mb-2 flex items-center justify-between text-xs font-bold">Alternativa {index + 1}{payload.alternatives.length > 1 && <button onClick={() => removeAlternative(index)}><X size={14} /></button>}</div><input placeholder="Nombre del tratamiento" className="mb-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" value={item.title} onChange={(e) => updateAlternative(index, 'title', e.target.value)} /><textarea placeholder="Descripción breve" rows={2} className="mb-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" value={item.description} onChange={(e) => updateAlternative(index, 'description', e.target.value)} /><div className="flex gap-2"><select className="rounded-lg border border-gray-200 bg-gray-50 px-2 text-sm dark:border-gray-700 dark:bg-gray-800" value={item.currency} onChange={(e) => updateAlternative(index, 'currency', e.target.value)}><option value="USD">USD</option><option value="ARS">ARS</option></select><input type="number" min="0" placeholder="Total" className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" value={item.total || ''} onChange={(e) => updateAlternative(index, 'total', e.target.value)} /></div></div>)}</div></div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Financiación<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={2} value={payload.financing} onChange={(e) => updateField('financing', e.target.value)} /></label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Garantía<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={2} value={payload.guarantee} onChange={(e) => updateField('guarantee', e.target.value)} /></label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Condiciones<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={2} value={payload.conditions} onChange={(e) => updateField('conditions', e.target.value)} /></label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">CTA final<textarea className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={3} value={payload.cta} onChange={(e) => updateField('cta', e.target.value)} /></label>
-                    <div className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Fotos marcadas / Smile Design
-                        {payload.photoUrls.length > 0 && <div className="mt-2 grid grid-cols-3 gap-2">{payload.photoUrls.map((url, index) => <div key={`${url}-${index}`} className="relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"><img src={url} alt={`Foto ${index + 1} del presupuesto`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /></div>)}</div>}
-                        <textarea className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" rows={3} placeholder="Las fotos seleccionadas desde Foto Studio aparecen acá. También podés pegar una URL por línea." value={payload.photoUrls.join('\n')} onChange={(e) => updateField('photoUrls', e.target.value.split('\n').map((url) => url.trim()).filter(Boolean))} />
+            ) : (
+                records.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {records.map((record) => (
+                            <button
+                                key={record.id}
+                                onClick={() => edit(record)}
+                                className={`rounded-lg border px-3 py-2 text-left text-xs ${
+                                    active?.id === record.id
+                                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
+                                        : 'border-gray-200 dark:border-gray-700'
+                                }`}
+                            >
+                                <span className="font-semibold">Versión {record.version}</span>
+                                <br />
+                                <span className="text-gray-500">
+                                    Vence {new Date(record.expires_at).toLocaleDateString('es-AR')}
+                                </span>
+                            </button>
+                        ))}
                     </div>
-                    <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-gray-800"><button onClick={() => void save()} disabled={saving} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">{saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Guardar presupuesto</button><button onClick={exportPdf} className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"><Download size={16} /> Generar PDF</button></div>
+                )
+            )}
+
+            <div className="grid gap-5 lg:grid-cols-[1fr_330px]">
+                <div className="space-y-5 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                    <Section title="Apertura" hint="Lo primero que lee el paciente en la portada.">
+                        <label className={labelClass}>
+                            Paciente
+                            <input
+                                className={`mt-1 ${inputClass}`}
+                                value={payload.patientName}
+                                onChange={(e) => updateField('patientName', e.target.value)}
+                            />
+                        </label>
+                        <label className={labelClass}>
+                            Introducción
+                            <textarea
+                                className={`mt-1 ${inputClass}`}
+                                rows={3}
+                                value={payload.intro}
+                                onChange={(e) => updateField('intro', e.target.value)}
+                            />
+                        </label>
+                    </Section>
+
+                    <Section title="Alternativas" hint="Sólo nombre, descripción breve y total. Máximo tres.">
+                        <div className="space-y-3">
+                            {payload.alternatives.map((item, index) => (
+                                <div key={index} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                                    <div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                                        Opción {String(index + 1).padStart(2, '0')}
+                                        {payload.alternatives.length > 1 && (
+                                            <button onClick={() => removeAlternative(index)} aria-label="Quitar alternativa">
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <input
+                                        placeholder="Nombre del tratamiento"
+                                        className={`mb-2 ${inputClass}`}
+                                        value={item.title}
+                                        onChange={(e) => updateAlternative(index, 'title', e.target.value)}
+                                    />
+                                    <textarea
+                                        placeholder="Descripción breve"
+                                        rows={2}
+                                        className={`mb-2 ${inputClass}`}
+                                        value={item.description}
+                                        onChange={(e) => updateAlternative(index, 'description', e.target.value)}
+                                    />
+                                    <div className="flex gap-2">
+                                        <select
+                                            className="rounded-lg border border-gray-200 bg-gray-50 px-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+                                            value={item.currency}
+                                            onChange={(e) => updateAlternative(index, 'currency', e.target.value)}
+                                        >
+                                            <option value="USD">USD</option>
+                                            <option value="ARS">ARS</option>
+                                        </select>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            placeholder="Total"
+                                            className={inputClass}
+                                            value={item.total || ''}
+                                            onChange={(e) => updateAlternative(index, 'total', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            onClick={addAlternative}
+                            disabled={payload.alternatives.length >= 3}
+                            className="text-xs font-semibold text-indigo-600 disabled:opacity-40"
+                        >
+                            + Agregar alternativa
+                        </button>
+                    </Section>
+
+                    <Section title="Financiación" hint="Replica el simulador del sitio con TNA 18% anual.">
+                        <div className="flex flex-wrap gap-4">
+                            <div>
+                                <span className={labelClass}>Anticipo</span>
+                                <div className="mt-1 flex overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                                    {[30, 50].map((pct) => (
+                                        <button
+                                            key={pct}
+                                            onClick={() => updateField('financingUpfrontPct', pct as 30 | 50)}
+                                            className={`px-4 py-2 text-sm font-semibold transition ${
+                                                (payload.financingUpfrontPct ?? 50) === pct
+                                                    ? 'bg-amber-500 text-black'
+                                                    : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                            }`}
+                                        >
+                                            {pct}%
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <label className={labelClass}>
+                                Calculado sobre
+                                <select
+                                    className={`mt-1 ${inputClass}`}
+                                    value={payload.financingBaseIndex ?? 0}
+                                    onChange={(e) => updateField('financingBaseIndex', Number(e.target.value))}
+                                >
+                                    {payload.alternatives.map((item, index) => (
+                                        <option key={index} value={index}>
+                                            {item.title || `Opción ${index + 1}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+                        <label className={labelClass}>
+                            Nota adicional (opcional)
+                            <textarea
+                                className={`mt-1 ${inputClass}`}
+                                rows={2}
+                                placeholder="Ej: condiciones especiales acordadas con el paciente."
+                                value={payload.financing}
+                                onChange={(e) => updateField('financing', e.target.value)}
+                            />
+                        </label>
+                    </Section>
+
+                    <Section title="Casos de referencia" hint="Se adjuntan dos portadas reales publicadas en el sitio.">
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            {AM_REFERENCE_CASES.map((item) => {
+                                const checked = selectedCases.includes(item.slug);
+                                return (
+                                    <button
+                                        key={item.slug}
+                                        onClick={() => toggleCase(item.slug)}
+                                        className={`flex gap-3 rounded-lg border p-2 text-left transition ${
+                                            checked
+                                                ? 'border-amber-400 bg-amber-50 dark:border-amber-500/60 dark:bg-amber-500/10'
+                                                : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
+                                        }`}
+                                    >
+                                        <img
+                                            src={item.image}
+                                            alt={item.headline}
+                                            className="h-14 w-14 shrink-0 rounded object-cover"
+                                            onError={(event) => {
+                                                event.currentTarget.style.visibility = 'hidden';
+                                            }}
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-500">
+                                                {checked && <Check size={11} />}
+                                                {item.kicker}
+                                            </span>
+                                            <span className="mt-0.5 block text-xs font-medium leading-snug text-gray-800 dark:text-gray-100">
+                                                {item.headline}
+                                            </span>
+                                            <span className="text-[10px] uppercase tracking-wide text-gray-500">{item.stat}</span>
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </Section>
+
+                    <Section title="Fotos del paciente" hint="Antes y diseño seleccionados desde Foto Studio.">
+                        {payload.photoUrls.length > 0 && (
+                            <div className="grid grid-cols-3 gap-2">
+                                {payload.photoUrls.map((url, index) => (
+                                    <div
+                                        key={`${url}-${index}`}
+                                        className="relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"
+                                    >
+                                        <img
+                                            src={url}
+                                            alt={`Foto ${index + 1} del presupuesto`}
+                                            className="h-full w-full object-cover"
+                                            onError={(event) => {
+                                                event.currentTarget.style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <textarea
+                            className={inputClass}
+                            rows={3}
+                            placeholder="Las fotos seleccionadas desde Foto Studio aparecen acá. También podés pegar una URL por línea."
+                            value={payload.photoUrls.join('\n')}
+                            onChange={(e) =>
+                                updateField(
+                                    'photoUrls',
+                                    e.target.value.split('\n').map((url) => url.trim()).filter(Boolean),
+                                )
+                            }
+                        />
+                    </Section>
+
+                    <Section title="Cierre y legales">
+                        <label className={labelClass}>
+                            CTA final
+                            <textarea
+                                className={`mt-1 ${inputClass}`}
+                                rows={3}
+                                value={payload.cta}
+                                onChange={(e) => updateField('cta', e.target.value)}
+                            />
+                        </label>
+                        <label className={labelClass}>
+                            Garantía
+                            <textarea
+                                className={`mt-1 ${inputClass}`}
+                                rows={2}
+                                value={payload.guarantee}
+                                onChange={(e) => updateField('guarantee', e.target.value)}
+                            />
+                        </label>
+                        <label className={labelClass}>
+                            Condiciones
+                            <textarea
+                                className={`mt-1 ${inputClass}`}
+                                rows={2}
+                                value={payload.conditions}
+                                onChange={(e) => updateField('conditions', e.target.value)}
+                            />
+                        </label>
+                    </Section>
+
+                    <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+                        <button
+                            onClick={() => void save()}
+                            disabled={saving}
+                            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                        >
+                            {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Guardar presupuesto
+                        </button>
+                    </div>
                 </div>
-                <aside className="h-fit rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-sm dark:border-indigo-900/50 dark:bg-indigo-950/20"><div className="mb-2 flex items-center gap-2 font-semibold text-indigo-800 dark:text-indigo-200"><Star size={16} /> Urgencia configurada</div><p className="text-xs leading-5 text-indigo-900/75 dark:text-indigo-100/75">La propuesta vence automáticamente a los 7 días. Para congelar condiciones y reservar turnos, se solicita una seña.</p></aside>
+
+                <aside className="h-fit space-y-4 rounded-xl border border-[#c9a96e]/30 bg-[#0d0d0d] p-5 text-[#f2f0e9] lg:sticky lg:top-4">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#c9a96e]">Vista previa</p>
+                        <p className="mt-1 text-base font-semibold leading-tight">
+                            {payload.patientName || 'Paciente'}
+                        </p>
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#8a8578]">Propuesta personalizada</p>
+                    </div>
+
+                    <div className="border-t border-[#8a7042]/40 pt-3">
+                        {financing ? (
+                            <>
+                                <div className="flex items-baseline justify-between">
+                                    <span className="text-[10px] uppercase tracking-[0.14em] text-[#8a8578]">Total</span>
+                                    <span className="text-lg font-semibold text-[#c9a96e]">
+                                        {financing.currency} {Math.round(financing.plans[0].breakdown.totalUsd).toLocaleString('es-AR')}
+                                    </span>
+                                </div>
+                                <div className="mt-1 flex items-baseline justify-between text-[11px] text-[#8a8578]">
+                                    <span>Anticipo {financing.upfrontPct}%</span>
+                                    <span>
+                                        {financing.currency} {Math.round(financing.upfrontAmount).toLocaleString('es-AR')}
+                                    </span>
+                                </div>
+                                <div className="mt-3 space-y-1.5">
+                                    {financing.plans.map((plan) => (
+                                        <div key={plan.installments} className="flex items-baseline justify-between text-xs">
+                                            <span className="text-[#8a8578]">{plan.installments} cuotas</span>
+                                            <span className="font-semibold">
+                                                {financing.currency}{' '}
+                                                {Math.round(plan.breakdown.installmentUsd).toLocaleString('es-AR')}
+                                                <span className="text-[#8a8578]"> /mes</span>
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-xs text-[#8a8578]">Cargá el total de una alternativa para ver las cuotas.</p>
+                        )}
+                    </div>
+
+                    <div className="border-t border-[#8a7042]/40 pt-3">
+                        <p className="text-[10px] uppercase tracking-[0.14em] text-[#8a8578]">Casos adjuntos</p>
+                        <div className="mt-2 flex gap-2">
+                            {selectedCases.map((slug) => {
+                                const item = AM_REFERENCE_CASES.find((entry) => entry.slug === slug);
+                                if (!item) return null;
+                                return (
+                                    <img
+                                        key={slug}
+                                        src={item.image}
+                                        alt={item.headline}
+                                        className="h-16 w-16 rounded border border-[#8a7042]/50 object-cover"
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="border-t border-[#8a7042]/40 pt-3 text-[11px] leading-5 text-[#8a8578]">
+                        <p className="flex items-center gap-1.5 font-semibold text-[#c9a96e]">
+                            <Sparkles size={12} /> Urgencia configurada
+                        </p>
+                        <p className="mt-1">
+                            La propuesta vence a los 7 días. Incluye financiación, casos reales, testimonios y CTA directo a
+                            WhatsApp.
+                        </p>
+                    </div>
+
+                    <button
+                        onClick={() => void exportPdf()}
+                        disabled={exporting}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#c9a96e] px-4 py-3 text-sm font-bold uppercase tracking-[0.1em] text-[#0d0d0d] transition hover:bg-[#d9bc85] disabled:opacity-60"
+                    >
+                        {exporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />} Generar propuesta
+                    </button>
+                </aside>
             </div>
         </div>
     );
