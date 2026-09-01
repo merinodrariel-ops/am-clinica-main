@@ -620,6 +620,38 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
 
     const adminClient = getAdminClient();
 
+    // Cancellation is an event, not a scheduled reminder. Keep the previous
+    // state so we notify only on an explicit transition into cancelled.
+    let cancellationContact: {
+        previousStatus: string | null;
+        startTime: string;
+        endTime: string;
+        patientName: string;
+        patientEmail: string | null;
+        patientPhone: string | null;
+        doctorName: string | null;
+    } | null = null;
+    if (safeUpdates.status === 'cancelled') {
+        const { data: current } = await adminClient
+            .from('agenda_appointments')
+            .select('status, start_time, end_time, patient:pacientes(nombre, apellido, email, whatsapp), doctor:profiles(full_name)')
+            .eq('id', id)
+            .maybeSingle();
+        const patient = Array.isArray(current?.patient) ? current.patient[0] : current?.patient;
+        const doctor = Array.isArray(current?.doctor) ? current.doctor[0] : current?.doctor;
+        if (current) {
+            cancellationContact = {
+                previousStatus: current.status,
+                startTime: current.start_time,
+                endTime: current.end_time,
+                patientName: `${patient?.nombre ?? ''} ${patient?.apellido ?? ''}`.trim() || 'Paciente',
+                patientEmail: patient?.email ?? null,
+                patientPhone: patient?.whatsapp ?? null,
+                doctorName: doctor?.full_name ?? null,
+            };
+        }
+    }
+
     if (safeUpdates.patient_id === null) {
         let appointmentType = safeUpdates.type || null;
         if (!appointmentType) {
@@ -676,6 +708,29 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
         await updateGoogleEvent(id);
     } catch (syncErr) {
         console.error('[GoogleSync] Outbound sync failed during update:', syncErr);
+    }
+
+    if (
+        cancellationContact &&
+        cancellationContact.previousStatus !== 'cancelled' &&
+        (cancellationContact.patientEmail || cancellationContact.patientPhone)
+    ) {
+        try {
+            const { sendNotification } = await import('@/lib/am-scheduler/notification-service');
+            await sendNotification({
+                appointmentId: id,
+                templateKey: 'appointment_cancelled',
+                channel: cancellationContact.patientEmail && cancellationContact.patientPhone ? 'both' : cancellationContact.patientEmail ? 'email' : 'whatsapp',
+                patientName: cancellationContact.patientName,
+                patientEmail: cancellationContact.patientEmail,
+                patientPhone: cancellationContact.patientPhone,
+                doctorName: cancellationContact.doctorName,
+                startTime: cancellationContact.startTime,
+                endTime: cancellationContact.endTime,
+            });
+        } catch (notificationError) {
+            console.error('[agenda] cancellation notification failed:', notificationError);
+        }
     }
 
     try {
