@@ -2609,7 +2609,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
       {/* Modal de Edición */}
       {editingMov && !isEditModalMinimized && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
           onClick={() => {
             setEditingMov(null);
             setIsEditModalMinimized(false);
@@ -2618,7 +2618,7 @@ export default function MovimientosTab({ sucursal, tcBna, initialAction }: Props
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-2xl w-full max-h-[92vh] overflow-hidden flex flex-col"
+            className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-800"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">

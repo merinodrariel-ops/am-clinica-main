@@ -290,8 +290,8 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
 
             {/* Modal Abrir Caja */}
             {showAbrirModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:items-center">
+                    <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in duration-200 dark:bg-gray-800">
                         <div className="p-5 border-b border-gray-100 dark:border-gray-700">
                             <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                 <PlayCircle size={20} className="text-emerald-500" />
@@ -351,8 +351,8 @@ export default function ArqueoPanel({ bnaRate, onArqueoChange }: ArqueoPanelProp
 
             {/* Modal Cerrar Caja */}
             {showCerrarModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:items-center">
+                    <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in duration-200 dark:bg-gray-800">
                         <div className="p-5 border-b border-gray-100 dark:border-gray-700">
                             <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                 <Lock size={20} className="text-blue-500" />

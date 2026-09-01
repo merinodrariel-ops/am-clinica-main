@@ -690,7 +690,7 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     if (statusFinal && noCancelado) {
         const { data: apt } = await adminClient
             .from('agenda_appointments')
-            .select('patient_id, start_time, type, doctor_id, notes')
+            .select('patient_id, start_time, type, doctor_id, notes, survey_sent_at')
             .eq('id', id)
             .single();
 
@@ -728,6 +728,30 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
                 await createRecallsFromAppointment(
                     id, apt.type, apt.patient_id, apt.start_time, apt.doctor_id ?? null
                 ).catch(err => console.error('[recalls] auto-create failed:', err));
+
+                // La encuesta depende de la atención completada, no del pago.
+                // survey_sent_at evita duplicarla si se vuelve a guardar el turno.
+                if (!apt.survey_sent_at) {
+                    const { data: patientContact } = await adminClient
+                        .from('pacientes')
+                        .select('nombre, apellido, whatsapp, email')
+                        .eq('id_paciente', apt.patient_id)
+                        .single();
+
+                    if (patientContact) {
+                        const { createAndSendSurvey } = await import('@/lib/am-scheduler/notification-service');
+                        const patientName = `${patientContact.nombre ?? ''} ${patientContact.apellido ?? ''}`.trim() || 'Paciente';
+                        await createAndSendSurvey(
+                            id,
+                            apt.patient_id,
+                            patientName,
+                            patientContact.whatsapp ?? null,
+                            patientContact.email ?? null,
+                            null,
+                            apt.type,
+                        );
+                    }
+                }
 
                 if (apt.type === 'control_ortodoncia') {
                     const replacementDays = parseOrthoReplacementDays(apt.notes) ?? 15;
@@ -1076,7 +1100,7 @@ export async function getAgendaMeetingParticipants() {
 
     const { data: staff, error: staffError } = await supabase
         .from('personal')
-        .select('user_id, nombre, apellido, tipo, area, rol')
+        .select('user_id, nombre, apellido, tipo, area')
         .eq('activo', true)
         .not('user_id', 'is', null)
         .order('nombre');
@@ -1111,7 +1135,6 @@ export async function getAgendaMeetingParticipants() {
             apellido: string | null;
             tipo: string | null;
             area: string | null;
-            rol: string | null;
         }) => {
             const profile = row.user_id ? profileById.get(row.user_id) : null;
             if (!profile || !row.user_id) return null;
@@ -1120,7 +1143,7 @@ export async function getAgendaMeetingParticipants() {
             return {
                 id: profile.id,
                 full_name: profile.full_name || fallbackName || 'Participante',
-                role: profile.categoria || row.rol || row.tipo || 'staff',
+                role: profile.categoria || row.tipo || 'staff',
                 area: row.area || null,
                 staffType: row.tipo || null,
             };

@@ -9,7 +9,7 @@ const supabase = createClient();
 const PROFILE_SELECT = 'id,email,full_name,categoria,is_active,access_overrides';
 
 import { WorkerCategory } from '@/types/worker-portal';
-import { AccessOverrides, getCategoryDefault } from '@/lib/access-overrides';
+import { AccessOverrides, ActiveAccessGrant, MODULE_DEFINITIONS, resolveModuleAccess } from '@/lib/access-overrides';
 
 interface Profile {
     id: string;
@@ -18,6 +18,7 @@ interface Profile {
     categoria: WorkerCategory;
     is_active: boolean;
     access_overrides: AccessOverrides | null;
+    access_grants: ActiveAccessGrant[];
 }
 
 interface AuthContextType {
@@ -85,7 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         full_name: (user.user_metadata?.full_name as string) || null,
                         categoria: (normalizeCategoriaAlias(user.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
                         is_active: true,
-                        access_overrides: null
+                        access_overrides: null,
+                        access_grants: [],
                     });
                 }
             } else if (data) {
@@ -94,9 +96,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     window.location.href = '/login?error=account_disabled';
                     return;
                 }
+                const { data: grants } = await supabase
+                    .from('access_grants')
+                    .select('module_key, access_level, starts_at, expires_at')
+                    .eq('target_user_id', userId)
+                    .is('revoked_at', null)
+                    .lte('starts_at', new Date().toISOString())
+                    .gt('expires_at', new Date().toISOString());
+
                 setProfile({
                     ...(data as Profile),
                     categoria: (normalizeCategoriaAlias((data as Profile).categoria) as WorkerCategory) || 'partner_viewer',
+                    access_grants: (grants || []) as ActiveAccessGrant[],
                 });
             }
         } catch (error) {
@@ -127,7 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
                     categoria: (normalizeCategoriaAlias(currentUser.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
                     is_active: true,
-                    access_overrides: null
+                    access_overrides: null,
+                    access_grants: [],
                 });
                 fetchProfile(currentUser.id);
             } else {
@@ -149,7 +161,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     full_name: (currentUser.user_metadata?.full_name as string) || null,
                     categoria: (normalizeCategoriaAlias(currentUser.user_metadata?.categoria as string | undefined) as WorkerCategory) || 'partner_viewer',
                     is_active: true,
-                    access_overrides: null
+                    access_overrides: null,
+                    access_grants: [],
                 });
                 fetchProfile(currentUser.id);
             } else {
@@ -177,22 +190,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Per-user module access: checks access_overrides first, then falls back to category defaults.
     const moduleAccess = (key: string): 'full' | 'read' | 'none' => {
-        const overrides = profile?.access_overrides;
-        if (overrides && key in overrides) {
-            const level = overrides[key];
-            if (level === 'none') return 'none';
-            if (level === 'edit') return 'full';
-            if (level === 'read') return 'read';
-            // 'inherit' falls through to category default
-        }
         const cat = effectiveCategoria || 'partner_viewer';
-        return getCategoryDefault(cat, key);
+        return resolveModuleAccess(cat, key, profile?.access_overrides, profile?.access_grants || []);
     };
 
     // Permission Logic (Simplified Default Rule)
     const canEdit = (module: string): boolean => {
         const categoria = effectiveCategoria;
         if (!categoria) return false;
+
+        // Legacy component names are normalized into the Centro de acceso keys.
+        // This makes temporary grants and explicit overrides effective across
+        // both newer and older surfaces without changing every caller at once.
+        const moduleAliases: Record<string, string> = {
+            pacientes: 'patients',
+            paciente: 'patients',
+            turnos: 'agenda',
+            agenda: 'agenda',
+            tareas: 'todos',
+            email: 'email_templates',
+            emails: 'email_templates',
+        };
+        const normalizedModule = moduleAliases[module] || module;
+        if (MODULE_DEFINITIONS.some(definition => definition.key === normalizedModule)) {
+            return moduleAccess(normalizedModule) === 'full';
+        }
+
         if (categoria === 'owner') return true;
         if (categoria === 'partner_viewer') return false;
 

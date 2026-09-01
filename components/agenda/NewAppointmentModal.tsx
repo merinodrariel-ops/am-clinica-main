@@ -517,8 +517,8 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all duration-300">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100 border border-gray-100 dark:border-gray-800">
+        <div className="modal-viewport bg-black/40 backdrop-blur-sm transition-all duration-300">
+            <div className="modal-panel max-w-lg rounded-2xl border border-gray-100 bg-white shadow-2xl transition-all scale-100 dark:border-gray-800 dark:bg-gray-900">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -537,7 +537,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                             handleSubmit();
                         }
                     }}
-                    className="p-6 space-y-5"
+                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] space-y-5"
                 >
 
                     {/* Patient Search - Hero Field */}
@@ -783,23 +783,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     </div>
 
                     {/* Date Time Row */}
-                    <div className="grid grid-cols-2 gap-5">
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Área clínica</label>
-                                <select
-                                    className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                    value={areaId}
-                                    onChange={(e) => {
-                                        setAreaId(e.target.value);
-                                        setDoctorId('');
-                                        setDoctorSearch('');
-                                    }}
-                                >
-                                    <option value="">Sin área específica</option>
-                                    {areas.map(area => <option key={area.id} value={area.id}>{area.nombre}</option>)}
-                                </select>
-                            </div>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Inicio</label>
                             <Input
@@ -810,7 +794,6 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 onChange={(e) => setStartTime(e.target.value)}
                             />
                         </div>
-                        </div>
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Fin</label>
                             <Input
@@ -820,6 +803,21 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                                 value={endTime}
                                 onChange={(e) => setEndTime(e.target.value)}
                             />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 pl-1">Área clínica</label>
+                            <select
+                                className="block w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                value={areaId}
+                                onChange={(e) => {
+                                    setAreaId(e.target.value);
+                                    setDoctorId('');
+                                    setDoctorSearch('');
+                                }}
+                            >
+                                <option value="">Sin área específica</option>
+                                {areas.map(area => <option key={area.id} value={area.id}>{area.nombre}</option>)}
+                            </select>
                         </div>
                     </div>
 
@@ -1121,7 +1119,7 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <div data-modal-actions className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
                         {initialData?.id ? (
                             <Button
                                 type="button"

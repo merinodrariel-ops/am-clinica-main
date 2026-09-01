@@ -141,8 +141,8 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+            <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
                 {/* Header */}
                 <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-red-50 dark:bg-red-900/10 rounded-t-2xl">
                     <div>
@@ -160,7 +160,7 @@ export default function NuevoGastoForm({ isOpen, onClose, onSuccess, bnaRate }: 
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-5">
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
 
                     {/* Concept */}
                     <div>

@@ -16,7 +16,6 @@ const supabase = createClient();
 import { formatCurrency } from '@/lib/bna';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerWorkflowFromSenaPayment } from '@/app/actions/clinical-workflows';
-import { triggerRecallFromCajaPayment } from '@/app/actions/recalls';
 import { getLocalISODate } from '@/lib/local-date';
 import { drawReceiptOnCanvas } from '@/lib/receipt-drawing';
 import { saveReceiptAndLinkToMovement } from '@/app/actions/generate-receipt';
@@ -847,16 +846,6 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                 );
             }
 
-            // 10. Limpieza recall trigger — fires when caja registers a limpieza payment
-            // regardless of what appointment type is on the calendar that day.
-            triggerRecallFromCajaPayment({
-                patientId: formData.paciente_id,
-                conceptoNombre: conceptoFinal,
-                paymentDate: fechaMovimiento,
-                cajaMovementId: mainMovement.id,
-                doctorId: null,
-            }).catch(e => console.error('[caja] limpieza recall trigger failed:', e));
-
             onSuccess();
             setStep(5);
         } catch (error: unknown) {
@@ -981,10 +970,10 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
     });
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
             <canvas ref={receiptCanvasRef} style={{ display: 'none' }} />
             <div
-                className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-xl"
+                className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800"
                 onKeyDown={(event) => {
                     if (step !== 4 || saving) return;
                     if (!shouldHandleEnterAsSubmit(event)) return;
@@ -1024,7 +1013,7 @@ export default function NuevoIngresoForm({ isOpen, onClose, onSuccess, bnaRate, 
                     </Button>
                 </div>
 
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     {step === 1 && (
                         <>
                             <div className="space-y-6">

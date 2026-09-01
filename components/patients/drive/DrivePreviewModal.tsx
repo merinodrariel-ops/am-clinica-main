@@ -25,6 +25,7 @@ interface DrivePreviewModalProps {
     canSave: boolean;
     onClose: () => void;
     onSaved: (options?: { silent?: boolean; coverFileId?: string }) => void;
+    onBudgetFilesSelected?: (files: DriveFile[]) => void;
     autoStartSmile?: boolean;
 }
 
@@ -51,6 +52,7 @@ export default function DrivePreviewModal({
     canSave,
     onClose,
     onSaved,
+    onBudgetFilesSelected,
     autoStartSmile,
 }: DrivePreviewModalProps) {
     if (!file) return null;
@@ -69,6 +71,7 @@ export default function DrivePreviewModal({
                 canSave={canSave}
                 onClose={onClose}
                 onSaved={onSaved}
+                onBudgetFilesSelected={onBudgetFilesSelected}
                 autoStartSmile={autoStartSmile}
             />
         );

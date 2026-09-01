@@ -404,8 +404,8 @@ export default function TarifarioPage() {
 
             {/* New Item Modal */}
             {showNewItem && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl">
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+                    <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl dark:bg-gray-800">
                         <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                             <h3 className="font-semibold text-gray-900 dark:text-white">Nuevo Item</h3>
                             <button

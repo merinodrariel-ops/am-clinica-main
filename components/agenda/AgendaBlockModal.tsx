@@ -84,8 +84,8 @@ export default function AgendaBlockModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="modal-viewport bg-black/50 backdrop-blur-sm">
+            <div className="modal-panel max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-2">
