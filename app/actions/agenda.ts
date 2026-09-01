@@ -1100,7 +1100,7 @@ export async function getAgendaMeetingParticipants() {
 
     const { data: staff, error: staffError } = await supabase
         .from('personal')
-        .select('user_id, nombre, apellido, tipo, area, rol')
+        .select('user_id, nombre, apellido, tipo, area')
         .eq('activo', true)
         .not('user_id', 'is', null)
         .order('nombre');
@@ -1135,7 +1135,6 @@ export async function getAgendaMeetingParticipants() {
             apellido: string | null;
             tipo: string | null;
             area: string | null;
-            rol: string | null;
         }) => {
             const profile = row.user_id ? profileById.get(row.user_id) : null;
             if (!profile || !row.user_id) return null;
@@ -1144,7 +1143,7 @@ export async function getAgendaMeetingParticipants() {
             return {
                 id: profile.id,
                 full_name: profile.full_name || fallbackName || 'Participante',
-                role: profile.categoria || row.rol || row.tipo || 'staff',
+                role: profile.categoria || row.tipo || 'staff',
                 area: row.area || null,
                 staffType: row.tipo || null,
             };
