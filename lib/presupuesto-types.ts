@@ -20,6 +20,8 @@ export type PresupuestoPayload = {
     financingUpfrontPct?: 30 | 50;
     /** Alternativa sobre la que se calcula la financiación. */
     financingBaseIndex?: number;
+    /** Si es false, la propuesta no incluye la sección de financiación. */
+    financingEnabled?: boolean;
 };
 
 export type PresupuestoRecord = {

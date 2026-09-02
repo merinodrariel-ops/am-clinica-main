@@ -39,6 +39,7 @@ function normalizePayload(input: PresupuestoPayload): PresupuestoPayload {
         caseSlugs: normalizeCaseSlugs(input.caseSlugs),
         financingUpfrontPct: input.financingUpfrontPct === 30 ? 30 : 50,
         financingBaseIndex: normalizeBaseIndex(input.financingBaseIndex, input.alternatives.length),
+        financingEnabled: input.financingEnabled !== false,
     };
 }
 

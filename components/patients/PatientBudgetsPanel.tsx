@@ -27,6 +27,7 @@ function initialPayload(patientName: string): PresupuestoPayload {
         caseSlugs: DEFAULT_CASE_SLUGS,
         financingUpfrontPct: 50,
         financingBaseIndex: 0,
+        financingEnabled: true,
     };
 }
 
@@ -280,7 +281,20 @@ export default function PatientBudgetsPanel({
                         </button>
                     </Section>
 
-                    <Section title="Financiación" hint="Replica el simulador del sitio con TNA 18% anual.">
+                    <Section title="Financiación" hint="Elegí si esta propuesta debe ofrecer financiación.">
+                        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+                            <input
+                                type="checkbox"
+                                checked={payload.financingEnabled !== false}
+                                onChange={(e) => updateField('financingEnabled', e.target.checked)}
+                                className="h-4 w-4 accent-amber-500"
+                            />
+                            <span>
+                                <span className="block font-semibold text-gray-800 dark:text-gray-100">Incluir financiación en la propuesta</span>
+                                <span className="block text-xs text-gray-500">Si la desactivás, no aparecerán cuotas ni financiación en el PDF.</span>
+                            </span>
+                        </label>
+                        {payload.financingEnabled !== false && <>
                         <div className="flex flex-wrap gap-4">
                             <div>
                                 <span className={labelClass}>Anticipo</span>
@@ -325,6 +339,7 @@ export default function PatientBudgetsPanel({
                                 onChange={(e) => updateField('financing', e.target.value)}
                             />
                         </label>
+                        </>}
                     </Section>
 
                     <Section title="Casos de referencia" hint="Se adjuntan dos portadas reales publicadas en el sitio.">
@@ -478,7 +493,7 @@ export default function PatientBudgetsPanel({
                                 </div>
                             </>
                         ) : (
-                            <p className="text-xs text-[#8a8578]">Cargá el total de una alternativa para ver las cuotas.</p>
+                            <p className="text-xs text-[#8a8578]">{payload.financingEnabled === false ? 'Esta propuesta no incluye financiación.' : 'Cargá el total de una alternativa para ver las cuotas.'}</p>
                         )}
                     </div>
 
@@ -505,7 +520,7 @@ export default function PatientBudgetsPanel({
                             <Sparkles size={12} /> Urgencia configurada
                         </p>
                         <p className="mt-1">
-                            La propuesta vence a los 7 días. Incluye financiación, casos reales, testimonios y CTA directo a
+                            La propuesta vence a los 7 días. {payload.financingEnabled === false ? 'Incluye casos reales, testimonios y CTA directo a' : 'Incluye financiación, casos reales, testimonios y CTA directo a'}
                             WhatsApp.
                         </p>
                     </div>

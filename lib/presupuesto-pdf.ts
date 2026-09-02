@@ -254,6 +254,7 @@ export function financingBaseAlternative(payload: PresupuestoPayload) {
 }
 
 export function buildFinancingRows(payload: PresupuestoPayload) {
+    if (payload.financingEnabled === false) return null;
     const base = financingBaseAlternative(payload);
     if (!base || base.total <= 0) return null;
     const upfrontPct = upfrontPctOf(payload);
