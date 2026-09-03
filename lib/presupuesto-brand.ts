@@ -123,6 +123,24 @@ export const AM_REFERENCE_CASES: ReferenceCase[] = [
         image: caseImage('casos/carilla-unitaria-incisivo-central-oscurecido/carilla-unitaria-incisivo-central-oscurecido-antes-despues-portada-dr-ariel-merino-am-estetica-dental-puerto-madero'),
         url: `${AM_SITE}/casos/carilla-unitaria-incisivo-central-oscurecido`,
     },
+    {
+        slug: 'gingivectomia-laser-micro-diseno-sonrisa-resinas',
+        kicker: 'GINGIVECTOMÍA LÁSER',
+        stat: '5 DÍAS',
+        headline: 'Gingivectomía láser + microdiseño de sonrisa en resinas.',
+        detail: 'Gingivectomía en todos los márgenes gingivales y microdiseño mínimamente invasivo con carillas de resina.',
+        image: caseImage('casos/carillas-resina-caries/transformacion-extrema-caries-carillas-resina-gingivectomia-laser-antes-despues-rostro-labios-portada-dr-ariel-merino-am-estetica-dental-buenos-aires'),
+        url: `${AM_SITE}/casos/gingivectomia-laser-micro-diseno-sonrisa-resinas`,
+    },
+    {
+        slug: 'gingivectomia-laser-sin-bisturi-sangrado-puntos',
+        kicker: 'GINGIVECTOMÍA LÁSER',
+        stat: 'CASO PERSONALIZADO',
+        headline: 'Encías sanas sin bisturí, sangrado ni puntos.',
+        detail: 'Remodelado del tejido gingival inferior con láser, combinado con limpieza periodontal por ultrasonido.',
+        image: caseImage('casos/gingivectomia-laser-09-antes-despues-comparativa-2/01-gingivectomia-laser-09-antes-despues-comparativa.png'),
+        url: `${AM_SITE}/casos/gingivectomia-laser-sin-bisturi-sangrado-puntos`,
+    },
 ];
 
 export const DEFAULT_CASE_SLUGS = [
