@@ -15,7 +15,6 @@ import {
     PieChart,
     Info,
     ExternalLink,
-    Download
 } from 'lucide-react';
 import {
     type Sucursal,
@@ -26,7 +25,6 @@ import {
 import { createClient } from '@/utils/supabase/client';
 
 const supabase = createClient();
-import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
 
@@ -164,13 +162,6 @@ export default function ReportesTab({ sucursal }: Props) {
                         />
                     </div>
 
-                    <Button
-                        variant="outline"
-                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 h-auto"
-                    >
-                        <Download className="w-4 h-4" />
-                        Exportar
-                    </Button>
                 </div>
             </div>
 

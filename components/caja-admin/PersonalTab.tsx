@@ -25,7 +25,6 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    Download,
     Trash2,
     MessageCircle,
     Copy,
@@ -3032,24 +3031,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <button
-                                        type="button"
-                                        onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'download')}
-                                        disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
-                                    >
-                                        <FileText className="w-4 h-4" />
-                                        Descargar PDF
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'view')}
-                                        disabled={!selectedProfesional || selectedPrestacionesPanelRows.length === 0}
-                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
-                                    >
-                                        <ExternalLink className="w-4 h-4" />
-                                        Ver PDF
-                                    </button>
-                                    <button
                                         onClick={() => setShowPrestacionForm(false)}
                                         className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                         aria-label="Cerrar"
@@ -3401,26 +3382,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                                 </button>
                                                             );
                                                         })}
-                                                    </div>
-                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'download')}
-                                                            disabled={!selectedProfesional || filtered.length === 0}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-colors"
-                                                        >
-                                                            <FileText className="w-3.5 h-3.5" />
-                                                            Descargar PDF
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => selectedProfesional && void exportPrestacionesDashboardPdf(selectedProfesional, modalPrestaciones, panelMes, 'view')}
-                                                            disabled={!selectedProfesional || filtered.length === 0}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
-                                                        >
-                                                            <ExternalLink className="w-3.5 h-3.5" />
-                                                            Ver PDF
-                                                        </button>
                                                     </div>
                                                 </div>
                                                 {/* List */}
@@ -4143,24 +4104,6 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => downloadHoursDashboardCsv(p, hoursDashboardRows)}
-                                                disabled={hoursDashboardLoading || hoursDashboardRows.length === 0}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-40 transition-colors"
-                                            >
-                                                <Download className="w-4 h-4" />
-                                                Descargar CSV
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => printHoursDashboard(p, hoursDashboardRows)}
-                                                disabled={hoursDashboardLoading}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-colors"
-                                            >
-                                                <FileText className="w-4 h-4" />
-                                                Descargar PDF
-                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={() => {
