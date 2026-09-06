@@ -5,7 +5,7 @@
  */
 
 import { createAdminClient } from '@/utils/supabase/admin';
-import { EmailService } from '@/lib/email-service';
+import { EmailService } from '@/lib/email-service.server';
 import type { EmailMessageType } from '@/lib/email-message-tracking';
 import {
   renderTemplate,
@@ -39,8 +39,8 @@ async function sendEmail(ctx: AppointmentNotificationContext): Promise<{ success
         surveyToken: ctx.surveyToken ?? '',
       }));
       subject = `¿Cómo fue tu primera visita? — ${ctx.clinicName ?? 'AM Clínica'}`;
-    } catch (renderErr) {
-      console.error('[AM-Scheduler] Error rendering SurveyFirstVisitEmail:', renderErr);
+    } catch {
+      console.error('[AM-Scheduler] Error rendering SurveyFirstVisitEmail');
       return { success: false, error: 'Failed to render email template' };
     }
   } else {
@@ -171,61 +171,100 @@ export async function sendWhatsAppMessage(
   }
 }
 
-// ─── Log to Supabase ──────────────────────────────────────────────────────────
-
-async function logNotification(
+// Persist intent before calling providers: a failed write must never lead to an untracked send.
+async function reserveNotification(
+  supabase: ReturnType<typeof createAdminClient>,
   ctx: AppointmentNotificationContext,
   channel: 'email' | 'whatsapp',
-  result: { success: boolean; id?: string; error?: string }
 ) {
-  try {
-    const supabase = createAdminClient();
-    await supabase.from('notification_logs').insert({
-      appointment_id: ctx.appointmentId,
-      rule_id: ctx.ruleId ?? null,
-      channel,
-      recipient_email: channel === 'email' ? ctx.patientEmail : null,
-      recipient_phone: channel === 'whatsapp' ? ctx.patientPhone : null,
-      template_key: ctx.templateKey,
-      payload: { patientName: ctx.patientName, doctorName: ctx.doctorName, startTime: ctx.startTime },
-      status: result.success ? 'sent' : 'failed',
-      provider_id: result.id ?? null,
-      error_message: result.error ?? null,
-      sent_at: result.success ? new Date().toISOString() : null,
-    });
-  } catch (err) {
-    console.error('[AM-Scheduler] Failed to log notification:', err);
-  }
+  const { data, error } = await supabase.from('notification_logs').insert({
+    appointment_id: ctx.appointmentId,
+    rule_id: ctx.ruleId ?? null,
+    channel,
+    recipient_email: channel === 'email' ? ctx.patientEmail : null,
+    recipient_phone: channel === 'whatsapp' ? ctx.patientPhone : null,
+    template_key: ctx.templateKey,
+    payload: {
+      patientName: ctx.patientName,
+      doctorName: ctx.doctorName,
+      startTime: ctx.startTime,
+      endTime: ctx.endTime,
+      appointmentType: ctx.appointmentType,
+      idempotencyKey: ctx.idempotencyKey ?? null,
+    },
+    status: 'pending',
+  }).select('id').single();
+  return error || !data?.id ? null : data.id as string;
 }
 
-// ─── Main Dispatcher ──────────────────────────────────────────────────────────
-
-export async function sendNotification(ctx: AppointmentNotificationContext): Promise<NotificationResult> {
-  const results: NotificationResult = { success: false };
-
-  if (ctx.channel === 'email' || ctx.channel === 'both') {
-    const emailResult = await sendEmail(ctx);
-    await logNotification(ctx, 'email', emailResult);
-    if (emailResult.success) {
-      results.success = true;
-      results.emailId = emailResult.id;
-    } else {
-      results.error = emailResult.error;
+export async function sendNotification(
+  ctx: AppointmentNotificationContext,
+  dependencies = { createAdminClient, sendEmail, sendWhatsApp },
+): Promise<NotificationResult> {
+  const supabase = dependencies.createAdminClient();
+  const delivered = new Map<string, string | undefined>();
+  const pending = new Set<string>();
+  if (ctx.idempotencyKey) {
+    let query = supabase.from('notification_logs').select('channel, status, payload, provider_id')
+      .eq('appointment_id', ctx.appointmentId).eq('template_key', ctx.templateKey).in('status', ['sent', 'pending']);
+    query = ctx.ruleId ? query.eq('rule_id', ctx.ruleId) : query.is('rule_id', null);
+    const { data, error } = await query;
+    if (error) return { success: false, error: 'Notification history unavailable' };
+    for (const row of data ?? []) {
+      // New records identify the exact event; legacy reminder logs include its start time.
+      const payload = row.payload as { idempotencyKey?: string; startTime?: string } | null;
+      if (payload?.idempotencyKey && payload.idempotencyKey !== ctx.idempotencyKey) continue;
+      if (!payload?.idempotencyKey && ctx.ruleId && payload?.startTime
+        && new Date(payload.startTime).getTime() !== new Date(ctx.startTime).getTime()) continue;
+      if (row.status === 'sent') delivered.set(row.channel, row.provider_id ?? undefined);
+      else pending.add(row.channel);
     }
   }
-
-  if (ctx.channel === 'whatsapp' || ctx.channel === 'both') {
-    const waResult = await sendWhatsApp(ctx);
-    await logNotification(ctx, 'whatsapp', waResult);
-    if (waResult.success) {
-      results.success = true;
-      results.whatsappId = waResult.id;
-    } else if (!results.success) {
-      results.error = waResult.error;
+  const channels: Array<'email' | 'whatsapp'> = ctx.channel === 'both' ? ['email', 'whatsapp'] : [ctx.channel];
+  const result: NotificationResult = { success: true };
+  const failures: string[] = [];
+  for (const channel of channels) {
+    if (delivered.has(channel)) {
+      if (channel === 'email') result.emailId = delivered.get(channel);
+      else result.whatsappId = delivered.get(channel);
+      continue;
     }
+    if (pending.has(channel)) {
+      failures.push(`${channel}: delivery pending reconciliation`);
+      continue;
+    }
+    let logId: string | null;
+    try { logId = await reserveNotification(supabase, ctx, channel); }
+    catch { logId = null; }
+    if (!logId) {
+      failures.push(`${channel}: notification log reservation failed`);
+      continue;
+    }
+    let sent: { success: boolean; id?: string; error?: string };
+    try {
+      sent = await (channel === 'email' ? dependencies.sendEmail(ctx) : dependencies.sendWhatsApp(ctx));
+    } catch {
+      // An exception leaves delivery uncertain; retain pending instead of replaying a possible send.
+      failures.push(`${channel}: delivery outcome unavailable`);
+      continue;
+    }
+    if (sent.success) {
+      if (channel === 'email') result.emailId = sent.id;
+      else result.whatsappId = sent.id;
+    }
+    try {
+      const { error } = await supabase.from('notification_logs').update({
+        status: sent.success ? 'sent' : 'failed', provider_id: sent.id ?? null,
+        error_message: sent.error ?? null, sent_at: sent.success ? new Date().toISOString() : null,
+      }).eq('id', logId);
+      if (error) failures.push(`${channel}: notification log update failed; reconciliation required`);
+    } catch {
+      failures.push(`${channel}: notification log update failed; reconciliation required`);
+    }
+    if (!sent.success) failures.push(`${channel}: delivery failed`);
   }
-
-  return results;
+  if (failures.length) { result.success = false; result.error = failures.join('; '); }
+  return result;
 }
 
 // ─── Survey Creator ───────────────────────────────────────────────────────────
@@ -237,20 +276,23 @@ export async function createAndSendSurvey(
   patientPhone: string | null,
   patientEmail: string | null,
   doctorName: string | null,
-  appointmentType?: string
-) {
-  const supabase = createAdminClient();
+  appointmentType?: string,
+  dependencies = { createAdminClient, sendNotification },
+): Promise<NotificationResult> {
+  const supabase = dependencies.createAdminClient();
 
   // Resolve actual patient_id and appointment type if not provided
   let actualPatientId = patientId;
   let actualAppointmentType = appointmentType;
 
-  if (!actualPatientId || !actualAppointmentType) {
-    const { data: appt } = await supabase
+  {
+    const { data: appt, error: appointmentError } = await supabase
       .from('agenda_appointments')
-      .select('patient_id, type')
+      .select('patient_id, type, survey_sent_at')
       .eq('id', appointmentId)
       .single();
+    if (appointmentError || !appt) return { success: false, error: 'Appointment lookup failed' };
+    if (appt.survey_sent_at) return { success: true };
     if (appt) {
       actualPatientId = appt.patient_id;
       actualAppointmentType = actualAppointmentType || appt.type;
@@ -271,22 +313,6 @@ export async function createAndSendSurvey(
     }
   }
 
-  // Create survey record
-  const { data: survey, error } = await supabase
-    .from('satisfaction_surveys')
-    .insert({ 
-      appointment_id: appointmentId, 
-      patient_id: actualPatientId, 
-      sent_at: new Date().toISOString() 
-    })
-    .select('token')
-    .single();
-
-  if (error || !survey) {
-    console.error('[AM-Scheduler] Failed to create survey:', error);
-    return;
-  }
-
   // Determine channel and template based on patient contact info and first-visit status
   let channel: 'email' | 'whatsapp' | 'both' = 'whatsapp';
   let templateKey = 'survey_post_appointment';
@@ -294,7 +320,7 @@ export async function createAndSendSurvey(
   if (isFirstCompletedVisit && patientEmail) {
     channel = 'email';
     templateKey = 'survey_first_visit';
-  } else if (!patientPhone && patientEmail) {
+  } else if (patientEmail && (!patientPhone || !process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN)) {
     channel = 'email';
     templateKey = 'survey_post_appointment';
   } else if (patientPhone) {
@@ -302,10 +328,22 @@ export async function createAndSendSurvey(
     templateKey = 'survey_post_appointment';
   } else {
     console.warn('[AM-Scheduler] Patient has no phone nor email — cannot dispatch survey:', appointmentId);
-    return;
+    return { success: false, error: 'No contact channel' };
   }
 
-  await sendNotification({
+  // Reuse the token after failed deliveries so retries keep the same survey link.
+  const { data: existing, error: lookupError } = await supabase
+    .from('satisfaction_surveys').select('token')
+    .eq('appointment_id', appointmentId).order('created_at', { ascending: true }).limit(1).maybeSingle();
+  if (lookupError) return { success: false, error: 'Survey lookup failed' };
+  const { data: survey, error } = existing
+    ? { data: existing, error: null }
+    : await supabase.from('satisfaction_surveys')
+      .insert({ appointment_id: appointmentId, patient_id: actualPatientId })
+      .select('token').single();
+  if (error || !survey) return { success: false, error: 'Survey creation failed' };
+
+  const result = await dependencies.sendNotification({
     appointmentId,
     templateKey,
     channel,
@@ -317,11 +355,17 @@ export async function createAndSendSurvey(
     startTime: new Date().toISOString(),
     endTime: new Date().toISOString(),
     surveyToken: survey.token,
+    idempotencyKey: `survey-${appointmentId}`,
   });
 
-  // Mark appointment as survey sent
-  await supabase
+  if (!result.success) return result;
+
+  // Mark only successful deliveries; failed sends remain eligible for retry.
+  const { error: markError } = await supabase
     .from('agenda_appointments')
     .update({ survey_sent_at: new Date().toISOString() })
     .eq('id', appointmentId);
+  if (markError) return { success: false, error: 'Survey delivery marker failed' };
+  await supabase.from('satisfaction_surveys').update({ sent_at: new Date().toISOString() }).eq('token', survey.token);
+  return result;
 }

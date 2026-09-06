@@ -1,5 +1,8 @@
 'use server';
 
+import { loadDashboardStats } from '@/lib/dashboard-queries';
+import { getDashboardDates } from '@/lib/dashboard-dates';
+import { getISODateInTimeZone } from '@/lib/local-date';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
 import { getExpenseCategoryComparisons, getFinanciacionMensualResumen } from '@/lib/dashboard';
@@ -42,84 +45,10 @@ export async function getDashboardStatsAction(): Promise<DashboardStats> {
     await verifyAccess(['owner', 'admin', 'developer', 'partner_viewer', 'reception']);
     const supabase = createAdminClient();
     try {
-        const { count: patientsCount } = await supabase
-            .from('pacientes')
-            .select('*', { count: 'exact', head: true })
-            .eq('is_deleted', false);
-
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const day = now.getDate();
-        const todayStart = new Date(year, month, day).toISOString();
-        const monthStart = new Date(year, month, 1).toISOString();
-
-        const { data: todayMovs } = await supabase
-            .from('caja_recepcion_movimientos')
-            .select('usd_equivalente')
-            .gte('fecha_hora', todayStart)
-            .eq('estado', 'pagado')
-            .eq('is_deleted', false);
-
-        const todayIncome = todayMovs?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
-
-        const { data: monthMovs } = await supabase
-            .from('caja_recepcion_movimientos')
-            .select('usd_equivalente')
-            .gte('fecha_hora', monthStart)
-            .eq('estado', 'pagado')
-            .eq('is_deleted', false);
-
-        const monthIncome = monthMovs?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
-
-        const { count: newPatientsCount } = await supabase
-            .from('pacientes')
-            .select('*', { count: 'exact', head: true })
-            .is('is_deleted', false)
-            .gte('fecha_alta', monthStart);
-
-        // Admin cash balance (last closure saldos)
-        const { data: lastArqueo } = await supabase
-            .from('caja_admin_arqueos')
-            .select('saldos_finales')
-            .eq('estado', 'cerrado')
-            .order('fecha_cierre', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-        const saldos = (lastArqueo?.saldos_finales as Record<string, number>) || {};
-        const adminCash = { ars: 0, usd: 0 };
-        // Sum all saldos — cuentas ARS/USD split is handled elsewhere; return totals
-        Object.values(saldos).forEach(v => { adminCash.ars += Number(v) || 0; });
-
-        const yearStart = new Date(year, 0, 1).toISOString();
-
-        const { count: limpiezasMes } = await supabase
-            .from('agenda_appointments')
-            .select('*', { count: 'exact', head: true })
-            .in('type', ['limpieza', 'limpieza_convencional', 'limpieza_laser'])
-            .not('status', 'in', '("cancelled","no_show")')
-            .gte('start_time', monthStart);
-
-        const { count: limpiezasAnio } = await supabase
-            .from('agenda_appointments')
-            .select('*', { count: 'exact', head: true })
-            .in('type', ['limpieza', 'limpieza_convencional', 'limpieza_laser'])
-            .not('status', 'in', '("cancelled","no_show")')
-            .gte('start_time', yearStart);
-
-        return {
-            patientsCount: patientsCount || 0,
-            newPatientsCount: newPatientsCount || 0,
-            todayIncome: Math.round(todayIncome),
-            monthIncome: Math.round(monthIncome),
-            adminCash,
-            limpiezasMes: limpiezasMes || 0,
-            limpiezasAnio: limpiezasAnio || 0,
-        };
+        return await loadDashboardStats(supabase);
     } catch (error) {
         console.error('getDashboardStatsAction:', error);
-        return { patientsCount: 0, newPatientsCount: 0, todayIncome: 0, monthIncome: 0, adminCash: { ars: 0, usd: 0 }, limpiezasMes: 0, limpiezasAnio: 0 };
+        throw new Error('No se pudieron cargar los indicadores. Volvé a intentar.');
     }
 }
 
@@ -154,33 +83,9 @@ export async function getOwnerDashboardStatsAction(
     await verifyAccess(['owner', 'admin', 'developer']);
     const supabase = createAdminClient();
     try {
-        const now = new Date();
-        const year = targetYear ?? now.getFullYear();
-        const month = targetMonth ?? now.getMonth();
-        const monthsToCompare = 6;
-        const monthStart = new Date(year, month, 1).toISOString().split('T')[0];
-        const nextMonthStart = new Date(year, month + 1, 1).toISOString().split('T')[0];
-        const previousMonthStart = new Date(year, month - 1, 1).toISOString().split('T')[0];
-        const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
-        const previousMonthLastDay = new Date(year, month, 0).getDate();
-        const previousComparisonDay = Math.min(now.getDate(), previousMonthLastDay);
-        const previousComparisonEnd = isCurrentMonth
-            ? new Date(year, month - 1, previousComparisonDay + 1).toISOString().split('T')[0]
-            : monthStart;
-        const previousMonthLabel = new Date(year, month - 1, 1)
-            .toLocaleDateString('es-AR', { month: 'long' });
-        const egresosComparacionLabel = isCurrentMonth
-            ? `vs. mismo corte de ${previousMonthLabel}`
-            : `vs. ${previousMonthLabel}`;
-        const comparisonMonthStart = new Date(year, month - (monthsToCompare - 1), 1).toISOString().split('T')[0];
-        const rawMonthWindows = Array.from({ length: monthsToCompare }, (_, index) => {
-            const date = new Date(year, month - (monthsToCompare - 1) + index, 1);
-            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            const shortLabel = date.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').slice(0, 3);
-            const label = date.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-            return { key, shortLabel, label, year: date.getFullYear() };
-        });
-        const monthWindows = rawMonthWindows.filter(w => w.year >= 2026).map(({ year: _y, ...rest }) => rest);
+        const { year, month, monthStart, nextMonthStart, previousMonthStart,
+            previousComparisonEnd, egresosComparacionLabel, comparisonMonthStart,
+            monthWindows, nextMonthStartInstant } = getDashboardDates(new Date(), targetYear, targetMonth);
 
         const { count: totalPacientes } = await supabase
             .from('pacientes')
@@ -219,18 +124,18 @@ export async function getOwnerDashboardStatsAction(
         const primeraVezMes = monthlyCounts[currentMonthKey] || 0;
 
         // Limpiezas por mes (últimos 6 meses) — desde agenda_appointments por type
-        const limpiezasWindowStart = new Date(year, month - (monthsToCompare - 1), 1).toISOString();
+        const limpiezasWindowStart = `${comparisonMonthStart}T00:00:00-03:00`;
         const { data: limpiezasData } = await supabase
             .from('agenda_appointments')
             .select('start_time')
             .in('type', ['limpieza', 'limpieza_convencional', 'limpieza_laser'])
             .not('status', 'in', '("cancelled","no_show")')
             .gte('start_time', limpiezasWindowStart)
-            .lt('start_time', new Date(year, month + 1, 1).toISOString());
+            .lt('start_time', nextMonthStartInstant);
 
         const limpiezasCounts = monthWindows.reduce<Record<string, number>>((acc, m) => { acc[m.key] = 0; return acc; }, {});
         (limpiezasData || []).forEach((row: { start_time: string }) => {
-            const key = row.start_time.slice(0, 7);
+            const key = getISODateInTimeZone(new Date(row.start_time)).slice(0, 7);
             if (key in limpiezasCounts) limpiezasCounts[key] += 1;
         });
         const limpiezasMensual = monthWindows.map((m) => ({ ...m, count: limpiezasCounts[m.key] || 0 }));

@@ -5,6 +5,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { normalizeAppointmentModality, parseAppointmentModality, parseOrthoReplacementDays } from '@/lib/agenda-appointment-meta';
 import { sendEmail } from '@/lib/email-service';
+import { agendaUpdateNeedsCurrentState, validateAgendaAppointment, validateAgendaAppointmentUpdate, type AgendaPolicyFields } from '@/lib/agenda-form-policy';
 import { canViewPatientRecords } from '@/lib/patient-access';
 import {
     filterAndRankPatientSearchResults,
@@ -22,8 +23,6 @@ function getAdminClient() {
 }
 
 const DETAILED_DAY_APPOINTMENT_TYPES = new Set(['turno_detallado', 'tallado']);
-const PATIENT_OPTIONAL_APPOINTMENT_TYPES = new Set(['recordatorio_interno', 'reunion']);
-const RESPONSIBLE_REQUIRED_APPOINTMENT_TYPES = new Set(['reunion']);
 const DETAILED_DAY_WORKFLOW_NAME = 'Diseño de Sonrisa';
 const DETAILED_DAY_LAB_RECIPIENTS =
     process.env.WORKFLOW_LAB_NOTIFICATION_RECIPIENTS ||
@@ -528,13 +527,10 @@ export async function createAppointment(formData: FormData) {
     const notes = formData.get('notes') as string;
     const participantIds = parseParticipantIds(formData.get('participantIds'));
 
-    if (!PATIENT_OPTIONAL_APPOINTMENT_TYPES.has(type) && !patientId) {
-        return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
-    }
-
-    if (RESPONSIBLE_REQUIRED_APPOINTMENT_TYPES.has(type) && !doctorId) {
-        return { success: false, error: 'Toda reunión necesita un responsable.' };
-    }
+    const validationError = validateAgendaAppointment({
+        type, patient_id: patientId, doctor_id: doctorId, start_time: startTime, end_time: endTime,
+    });
+    if (validationError) return { success: false, error: validationError };
 
     const { data: newApt, error } = await supabase
         .from('agenda_appointments')
@@ -610,7 +606,8 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     delete safeUpdates.created_at;
     delete safeUpdates.created_by;
     delete safeUpdates.is_primera_vez;
-    const meetingParticipantIds = Array.isArray(safeUpdates.meeting_participant_ids)
+    const hasParticipantUpdate = Array.isArray(safeUpdates.meeting_participant_ids);
+    let meetingParticipantIds = Array.isArray(safeUpdates.meeting_participant_ids)
         ? safeUpdates.meeting_participant_ids
         : [];
     delete safeUpdates.meeting_participant_ids;
@@ -652,29 +649,35 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
         }
     }
 
-    if (safeUpdates.patient_id === null) {
-        let appointmentType = safeUpdates.type || null;
-        if (!appointmentType) {
-            const { data: currentAppointment, error: currentAppointmentError } = await adminClient
-                .from('agenda_appointments')
-                .select('type')
-                .eq('id', id)
-                .single();
-
-            if (currentAppointmentError) {
-                console.error('Error checking appointment type before patient removal:', currentAppointmentError);
-                return { success: false, error: currentAppointmentError.message };
-            }
-            appointmentType = currentAppointment?.type || null;
+    const shouldSyncParticipants = safeUpdates.type !== undefined || safeUpdates.doctor_id !== undefined || hasParticipantUpdate;
+    let currentPolicy: Partial<AgendaPolicyFields> = {};
+    if (agendaUpdateNeedsCurrentState(safeUpdates)
+        || (shouldSyncParticipants && (safeUpdates.type === undefined || (safeUpdates.type === 'reunion' && safeUpdates.doctor_id === undefined)))) {
+        const { data: currentAppointment, error: currentError } = await adminClient
+            .from('agenda_appointments')
+            .select('type, patient_id, doctor_id, start_time, end_time')
+            .eq('id', id)
+            .single();
+        if (currentError || !currentAppointment) {
+            return { success: false, error: currentError?.message || 'No se encontró el turno.' };
         }
-
-        if (!PATIENT_OPTIONAL_APPOINTMENT_TYPES.has(appointmentType || '')) {
-            return { success: false, error: 'Todo turno clínico necesita un paciente registrado o precargado.' };
-        }
+        currentPolicy = currentAppointment;
     }
-
-    if (RESPONSIBLE_REQUIRED_APPOINTMENT_TYPES.has(safeUpdates.type || '') && !safeUpdates.doctor_id) {
-        return { success: false, error: 'Toda reunión necesita un responsable.' };
+    const validationError = validateAgendaAppointmentUpdate(safeUpdates, currentPolicy);
+    if (validationError) return { success: false, error: validationError };
+    const effectiveType = safeUpdates.type !== undefined ? safeUpdates.type : currentPolicy.type;
+    const effectiveDoctorId = safeUpdates.doctor_id !== undefined ? safeUpdates.doctor_id : currentPolicy.doctor_id;
+    if (shouldSyncParticipants && effectiveType === 'reunion') {
+        const responsibleError = validateAgendaAppointmentUpdate({ doctor_id: effectiveDoctorId ?? null }, { type: effectiveType });
+        if (responsibleError) return { success: false, error: responsibleError };
+    }
+    if (shouldSyncParticipants && effectiveType === 'reunion' && !hasParticipantUpdate) {
+        const { data: storedParticipants, error: participantsError } = await adminClient
+            .from('agenda_meeting_participants')
+            .select('profile_id')
+            .eq('appointment_id', id);
+        if (participantsError) return { success: false, error: participantsError.message };
+        meetingParticipantIds = (storedParticipants || []).map(participant => participant.profile_id);
     }
 
     const { error } = await adminClient
@@ -691,8 +694,8 @@ export async function updateAppointment(id: string, updates: AppointmentUpdatePa
     }
 
     try {
-        if (safeUpdates.type) {
-            await syncMeetingParticipants(adminClient, id, safeUpdates.type, safeUpdates.doctor_id ?? null, meetingParticipantIds);
+        if (shouldSyncParticipants) {
+            await syncMeetingParticipants(adminClient, id, effectiveType, effectiveDoctorId ?? null, meetingParticipantIds);
         }
     } catch (participantError) {
         console.error('[agenda] meeting participants sync failed during update:', participantError);

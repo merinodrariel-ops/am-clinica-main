@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, Users, Banknote, Calendar, Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+const TodayWorkPanel = dynamic(() => import('@/components/dashboard/TodayWorkPanel'), { ssr: false });
 const CajaAlerts = dynamic(() => import('@/components/dashboard/CajaAlerts'), { ssr: false });
 const UserAlerts = dynamic(() => import('@/components/dashboard/UserAlerts'), { ssr: false });
 const StatsGrid = dynamic(() => import('@/components/dashboard/StatsGrid'), {
@@ -71,6 +72,8 @@ export default function DashboardPage() {
 
             {/* Owner-only Dashboard */}
             {role === 'owner' && <OwnerDashboard />}
+
+            {isReceptionOrAdmin && <TodayWorkPanel />}
 
             {/* Pacientes con tratamiento activo sin turno hace +45 días */}
             {(role === 'owner' || role === 'admin') && <SilentPatientsPanel />}

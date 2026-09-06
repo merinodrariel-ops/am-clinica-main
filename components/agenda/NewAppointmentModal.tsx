@@ -19,6 +19,7 @@ import {
     serializeAppointmentNotes,
     stripAppointmentMeta,
 } from '@/lib/agenda-appointment-meta';
+import { APPOINTMENT_TYPE_OPTIONS, TYPE_DURATIONS_MIN, PATIENT_OPTIONAL_TYPES, validateAgendaAppointment } from '@/lib/agenda-form-policy';
 import { buildPreloadedPatientPayload } from '@/lib/preloaded-patient';
 
 interface Patient {
@@ -69,43 +70,6 @@ interface NewAppointmentModalProps {
     initialData?: AppointmentData | null;
     initialDate?: Date;
 }
-
-const APPOINTMENT_TYPE_OPTIONS = [
-    { value: 'consulta', label: '⭐ Consulta de primera vez' },
-    { value: 'control_carilla_inmediato', label: 'Control carilla inmediato' },
-    { value: 'control_carilla_anual', label: 'Control carilla anual' },
-    { value: 'control_ortodoncia', label: 'Control ortodoncia' },
-    { value: 'resinas_diseno_sonrisa', label: 'Diseño de sonrisa en resinas' },
-    { value: 'cirugia_implantes', label: 'Cirugía / implantes' },
-    { value: 'limpieza_convencional', label: 'Limpieza convencional' },
-    { value: 'limpieza_laser', label: 'Limpieza con láser' },
-    { value: 'tallado', label: 'Día detallado' },
-    { value: 'cementado', label: 'Cementado' },
-    { value: 'botox', label: 'Botox' },
-    { value: 'control', label: 'Control general / urgencia' },
-    { value: 'reunion', label: 'Reunión / Google Meet' },
-    { value: 'recordatorio_interno', label: '📞 Recordatorio interno' },
-] as const;
-
-const TYPE_DURATIONS_MIN: Record<string, number> = {
-    consulta:  60,
-    control:   60,
-    control_carilla_inmediato: 60,
-    control_carilla_anual: 60,
-    control_ortodoncia: 60,
-    resinas_diseno_sonrisa: 240,
-    cirugia_implantes: 180,
-    limpieza:  60,
-    limpieza_convencional: 60,
-    limpieza_laser: 60,
-    botox:     30,
-    cementado: 240,
-    tallado:   240,
-    reunion:   30,
-};
-
-const PATIENT_OPTIONAL_TYPES = new Set(['recordatorio_interno', 'reunion']);
-const RESPONSIBLE_REQUIRED_TYPES = new Set(['reunion']);
 
 const APPOINTMENT_PRESETS = [
     { key: 'primera_presencial', label: 'Primera presencial', type: 'consulta', modality: 'presencial' as AppointmentModality, durationMin: 60 },
@@ -375,15 +339,14 @@ export default function NewAppointmentModal({ isOpen, onClose, onSave, initialDa
     const handleSubmit = useCallback(async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (loading || isSubmitting.current) return;
-        if (!PATIENT_OPTIONAL_TYPES.has(type) && !patientId) {
-            alert('Seleccioná un paciente existente o precargá uno pendiente de formulario antes de agendar.');
+        const validationError = validateAgendaAppointment({
+            type, patient_id: patientId, doctor_id: doctorId, start_time: startTime, end_time: endTime,
+        });
+        if (validationError) {
+            alert(validationError);
             return;
         }
-        if (RESPONSIBLE_REQUIRED_TYPES.has(type) && !doctorId) {
-            alert('Seleccioná un responsable para la reunión.');
-            return;
-        }
-        
+
         isSubmitting.current = true;
         setLoading(true);
         const normalizedParticipantIds = normalizeParticipantIds(participantIds, type === 'reunion' ? doctorId : '');

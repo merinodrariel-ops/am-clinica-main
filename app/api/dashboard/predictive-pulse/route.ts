@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { createClient } from '@/utils/supabase/server';
+import { ADMIN_VIEW_ROLES } from '@/lib/server-role-guard';
 import { getAiModel } from '@/lib/ai-models';
+import { aiPredictiveJsonSchema, parseAiPredictive } from '@/lib/ai-predictive';
 
-const supabase = createAdminClient();
 
 function getGeminiAI() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -15,6 +17,15 @@ function getGeminiAI() {
 
 export async function GET(_req: NextRequest) {
     try {
+        const userClient = await createClient();
+        const { data: { user }, error: authError } = await userClient.auth.getUser();
+        if (authError || !user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+        const { data: profile, error: profileError } = await userClient
+            .from('profiles').select('categoria').eq('id', user.id).single();
+        if (profileError || !profile?.categoria || !ADMIN_VIEW_ROLES.includes(profile.categoria)) {
+            return NextResponse.json({ error: 'Sin permisos' }, { status: 403 });
+        }
+        const supabase = createAdminClient();
         const now = new Date();
         const monthsData = [];
 
@@ -37,7 +48,7 @@ export async function GET(_req: NextRequest) {
                 .gte('fecha_movimiento', startIso)
                 .lt('fecha_movimiento', endIso);
 
-            if (incomeError) console.error(`[predictive-pulse] Income fetch error for ${monthLabel}:`, incomeError);
+            if (incomeError) throw new Error('No se pudieron consultar los ingresos para el informe.');
             const income = incomeData?.reduce((sum: number, m: { usd_equivalente: unknown }) => sum + (Number(m.usd_equivalente) || 0), 0) || 0;
 
             // Expenses - sum usd_equivalente_total
@@ -50,7 +61,7 @@ export async function GET(_req: NextRequest) {
                 .gte('fecha_movimiento', startIso)
                 .lt('fecha_movimiento', endIso);
 
-            if (expenseError) console.error(`[predictive-pulse] Expense fetch error for ${monthLabel}:`, expenseError);
+            if (expenseError) throw new Error('No se pudieron consultar los egresos para el informe.');
             const expenses = expenseData?.reduce((sum: number, m: { usd_equivalente_total: unknown }) => sum + (Number(m.usd_equivalente_total) || 0), 0) || 0;
 
             // New Patients
@@ -61,7 +72,7 @@ export async function GET(_req: NextRequest) {
                 .gte('fecha_alta', startIso)
                 .lt('fecha_alta', endIso);
 
-            if (patientError) console.error(`[predictive-pulse] Patient fetch error for ${monthLabel}:`, patientError);
+            if (patientError) throw new Error('No se pudieron consultar las altas para el informe.');
 
             monthsData.push({
                 month: monthLabel,
@@ -83,7 +94,7 @@ export async function GET(_req: NextRequest) {
             {
                 "forecast": {
                     "nextMonthRevenue": number,
-                    "confidence": number,
+                    "confidence": number entre 0 y 100 (estimación orientativa, no certeza estadística),
                     "trend": "up" | "down" | "stable"
                 },
                 "insights": string[],
@@ -98,19 +109,10 @@ export async function GET(_req: NextRequest) {
                 role: 'user',
                 parts: [{ text: prompt }]
             }],
-            config: { responseMimeType: 'application/json' }
+            config: { responseMimeType: 'application/json', responseJsonSchema: aiPredictiveJsonSchema }
         });
 
-        const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        console.log(`[predictive-pulse] Gemini response: ${responseText.slice(0, 100)}...`);
-
-        let analysis;
-        try {
-            analysis = JSON.parse(responseText.replace(/```json?\n?|```/g, '').trim());
-        } catch {
-            console.error('[predictive-pulse] JSON parse error. Raw:', responseText);
-            throw new Error('AI Response parsing failed');
-        }
+        const analysis = parseAiPredictive(response.text || '');
 
         return NextResponse.json({
             analysis,

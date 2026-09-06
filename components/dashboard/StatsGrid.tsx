@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Users, Banknote, BarChart3, Wallet, Sparkles } from 'lucide-react';
 import { getDashboardStatsAction as getDashboardStats } from '@/app/actions/dashboard';
 import type { DashboardStats } from '@/lib/dashboard';
@@ -9,14 +9,26 @@ export default function StatsGrid() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function loadStats() {
-            const data = await getDashboardStats();
-            setStats(data);
+    const [error, setError] = useState(false);
+    const loadStats = useCallback(async () => {
+        setLoading(true);
+        setError(false);
+        try {
+            setStats(await getDashboardStats());
+        } catch {
+            setError(true);
+        } finally {
             setLoading(false);
         }
-        loadStats();
     }, []);
+    useEffect(() => { void loadStats(); }, [loadStats]);
+
+    if (error) return (
+        <div role="alert" className="mb-8 flex items-center justify-between gap-4 rounded-xl border border-white/10 p-4 text-sm text-slate-300">
+            No se pudieron cargar los indicadores.
+            <button type="button" onClick={loadStats} className="text-emerald-400 hover:underline">Reintentar</button>
+        </div>
+    );
 
     if (loading) {
         return (
@@ -63,7 +75,7 @@ export default function StatsGrid() {
         },
         {
             icon: Wallet,
-            label: 'Caja Admin (Efectivo)',
+            label: 'Caja física (Efectivo)',
             isDouble: true,
             valueUsd: `USD ${stats?.adminCash?.usd.toLocaleString() || 0}`,
             valueArs: `ARS ${stats?.adminCash?.ars.toLocaleString() || 0}`,

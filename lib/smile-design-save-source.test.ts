@@ -7,16 +7,17 @@ const source = fs.readFileSync(
   path.join(process.cwd(), 'components/patients/drive/PhotoStudioModal.tsx'),
   'utf8'
 );
+const saveSource = fs.readFileSync(path.join(process.cwd(), 'lib/photo-studio/smile-save.ts'), 'utf8');
 const actionSource = fs.readFileSync(
   path.join(process.cwd(), 'app/actions/smile-design.ts'),
   'utf8'
 );
 
 test('Smile Design save compresses the complete payload below the function transport limit', () => {
-  assert.match(source, /MAX_SMILE_SAVE_PAYLOAD_CHARS = 3_600_000/);
+  assert.match(saveSource, /MAX_SMILE_SAVE_PAYLOAD_CHARS = 3_600_000/);
   assert.match(source, /prepareSmileDesignSavePayload/);
-  assert.match(source, /afterMime: 'image\/jpeg'/);
-  assert.match(source, /payloadChars <= MAX_SMILE_SAVE_PAYLOAD_CHARS/);
+  assert.match(saveSource, /afterMime: 'image\/jpeg'/);
+  assert.match(saveSource, /payloadChars <= MAX_SMILE_SAVE_PAYLOAD_CHARS/);
 });
 
 test('Smile Design save reports the real preparation or server-action error', () => {
@@ -41,7 +42,7 @@ test('Smile Design save moves the result and minimal before/after slice to Selec
 test('saved before/after uses the visible divider position and contains no purple handle', () => {
   assert.match(source, /prepareSmileDesignSavePayload\([\s\S]*?slicePosRef\.current/);
   assert.match(source, /slicePos: prepared\.slicePos/);
-  assert.match(source, /rgba\(255,255,255,0\.88\)/);
-  assert.doesNotMatch(source, /rgba\(168,85,247/);
-  assert.doesNotMatch(source, /ctx\.arc\(cx, cy, r/);
+  assert.match(saveSource, /rgba\(255,255,255,0\.88\)/);
+  assert.doesNotMatch(saveSource, /rgba\(168,85,247/);
+  assert.doesNotMatch(saveSource, /ctx\.arc\(cx, cy, r/);
 });

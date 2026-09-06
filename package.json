@@ -14,7 +14,7 @@
     "lint:changed": "node scripts/lint-changed.mjs",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "npm run test:unit",
-    "test:unit": "tsx --test lib/*.test.ts",
+    "test:unit": "node scripts/run-unit-tests.mjs",
     "test:mcp": "tsx --test mcp/am-clinica/core.test.ts",
     "audit:dead-code": "knip --dependencies --no-exit-code",
     "audit:secrets": "node scripts/gitleaks-tracked.mjs",

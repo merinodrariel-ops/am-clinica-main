@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { getAiModel } from "@/lib/ai-models";
+import { aiImplicitHoursJsonSchema, parseAiImplicitHours } from "@/lib/ai-schedule";
 
 function getGeminiAI() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -38,9 +39,9 @@ Reglas:
    - "Domingo" o "Dom": 8 horas (08:00 a 16:00).
    - "Tarde": 6 horas (14:00 a 20:00).
    - "Noche": 10 horas (20:00 a 06:00 del día siguiente).
-3. Si el horario cruza la medianoche (ej: 20:00 a 06:00), calcula las horas correctamente (10 horas).
+3. Si el horario cruza la medianoche (ej: 20:00 a 06:00), conserva los horarios; el sistema calcula las horas.
 4. Si solo hay un horario (ej: "08:00"), marca incompleto: true.
-5. Formato de salida: JSON puro con las llaves: entrada (string HH:mm o null), salida (string HH:mm o null), horas (number), incompleto (boolean), observaciones (string corto del motivo).
+5. Formato de salida: JSON puro con las llaves: entrada (string HH:mm o null), salida (string HH:mm o null), incompleto (boolean), observaciones (string corto del motivo).
 
 Celda a procesar: "${cellContent}"
 
@@ -50,23 +51,12 @@ Respuesta JSON:`;
         const ai = getGeminiAI();
         const result = await ai.models.generateContent({
             model: getAiModel('implicitHours'),
-            contents: prompt
+            contents: prompt,
+            config: { responseMimeType: 'application/json', responseJsonSchema: aiImplicitHoursJsonSchema },
         });
-        const text = result.text || "";
-
-        // Limpiar posibles bloques de código markdown
-        const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(jsonStr);
-
-        return {
-            entrada: parsed.entrada || null,
-            salida: parsed.salida || null,
-            horas: Number(parsed.horas) || 0,
-            incompleto: !!parsed.incompleto,
-            observaciones: parsed.observaciones || ""
-        };
-    } catch (error) {
-        console.error("Error calling Gemini for parsing:", error);
+        return parseAiImplicitHours(result.text || '');
+    } catch {
+        console.error("Error parsing attendance with Gemini");
         // Fallback básico si falla la IA
         return { entrada: null, salida: null, horas: 0, incompleto: true, observaciones: "Error AI" };
     }

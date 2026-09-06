@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { GoogleGenAI } from '@google/genai';
 import * as xlsx from 'xlsx';
-import { inferSalidaDiaSiguiente } from '@/lib/caja-admin/attendance-utils';
+import { aiScheduleJsonSchema, parseAiSchedule } from '@/lib/ai-schedule';
 import { getAiModel } from '@/lib/ai-models';
 
 function getGeminiAI() {
@@ -14,42 +14,32 @@ function getGeminiAI() {
     return new GoogleGenAI({ apiKey });
 }
 
-interface AIHorarioRegistro {
-    personal_id?: string;
-    fecha?: string;
-    hora_ingreso?: string | null;
-    hora_egreso?: string | null;
-    horas?: number;
-    estado?: string;
-}
-
-interface AIHorarioResponse {
-    registros?: AIHorarioRegistro[];
-    mensaje_al_usuario?: string;
-}
-
 export async function processHorariosFile(formData: FormData) {
     try {
-        const file = formData.get('file') as File;
-        const prompt = formData.get('prompt') as string;
+        const file = formData.get('file');
+        const prompt = formData.get('prompt');
 
-        if (!file) throw new Error("No file provided");
+        if (!(file instanceof File) || file.size === 0) throw new Error('Seleccioná una planilla válida.');
+        if (file.size > 10 * 1024 * 1024) throw new Error('La planilla supera el límite de 10 MB.');
+        if (typeof prompt !== 'string' || prompt.length > 10000) throw new Error('Las instrucciones no son válidas.');
 
         // 1. Read the file
         const buffer = await file.arrayBuffer();
         const workbook = xlsx.read(buffer, { type: 'buffer' });
         const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) throw new Error('La planilla no contiene hojas.');
         const csvContent = xlsx.utils.sheet_to_csv(workbook.Sheets[firstSheetName]);
 
         // 2. Get current active personal from DB to map names accurately
         const supabase = await createClient();
         const { data: personalList, error: personalError } = await supabase
             .from('personal')
-            .select('id, nombre, apellido, email')
+            .select('id, nombre, apellido')
             .eq('activo', true);
 
         if (personalError) throw new Error("Error fetching personal");
 
+        if (!personalList?.length) throw new Error('No hay personal activo disponible para importar.');
         const contextPersonal = personalList.map(p => `ID: ${p.id} | Name: ${p.nombre} ${p.apellido || ''}`).join('\n');
 
         // 3. Prepare AI Prompt
@@ -75,7 +65,6 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
       "fecha": "YYYY-MM-DD",
       "hora_ingreso": "HH:mm" o null,
       "hora_egreso": "HH:mm" o null,
-      "horas": número decimal (calcula Salida - Ingreso, ojo con salida después de medianoche),
       "estado": "pending" o "observado" (si falta entrada o salida u ocurre alguna anomalía)
     }
   ],
@@ -87,30 +76,12 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
         const ai = getGeminiAI();
         const result = await ai.models.generateContent({
             model: getAiModel('scheduleImport'),
-            contents: fullPrompt
+            contents: fullPrompt,
+            config: { responseMimeType: 'application/json', responseJsonSchema: aiScheduleJsonSchema },
         });
 
-        const textOutput = result.text || "";
-        const cleanJson = textOutput.replace(/```json/g, "").replace(/```/g, "").trim();
-
-        const parsedData = JSON.parse(cleanJson) as AIHorarioResponse;
-
-        if (!parsedData.registros || !Array.isArray(parsedData.registros)) {
-            throw new Error("El modelo de AI no devolvió la estructura esperada.");
-        }
-
-        // 5. Insert valid records into database
-        const validRecords = parsedData.registros
-            .filter((r) => r.personal_id && r.fecha)
-            .map((r) => ({
-                personal_id: r.personal_id,
-                fecha: r.fecha,
-                hora_ingreso: r.hora_ingreso,
-                hora_egreso: r.hora_egreso,
-                salida_dia_siguiente: inferSalidaDiaSiguiente(r.hora_ingreso, r.hora_egreso),
-                horas: r.horas || 0,
-                estado: r.estado === 'observado' || r.estado === 'Observado' ? 'observado' : 'pending'
-            }));
+        const parsedData = parseAiSchedule(result.text || '', personalList.map(person => person.id));
+        const validRecords = parsedData.registros;
 
         let insertedCount = 0;
 
@@ -136,7 +107,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin marcas de markd
         };
 
     } catch (err: unknown) {
-        console.error("Error processHorariosFile:", err);
+        console.error("Error processHorariosFile: import failed");
         return { success: false, error: err instanceof Error ? err.message : 'Error desconocido' };
     }
 }

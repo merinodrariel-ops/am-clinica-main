@@ -9,7 +9,7 @@ import {
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2, Share2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
-    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Folder, Eraser, FileText
+    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Eraser, FileText
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -18,6 +18,9 @@ import type { DriveFile } from '@/app/actions/patient-files-drive';
 import { uploadEditedPhotoAction, replaceEditedPhotoAction, duplicateDriveFileAction, deleteDriveFileAction, saveFotosOrderAction, renameDriveFileAction, uploadPhotoForSocialAction, movePhotosToSelectionAction, syncEditedPhotosToSelectionAction } from '@/app/actions/patient-files-drive';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
+import { prepareSmileDesignSavePayload } from '@/lib/photo-studio/smile-save';
+import { CanvasThumbnailPreview, CanvasPresentationPreview } from './CanvasPreviews';
+import { normalizeRotation, normalizeFileEditState, serializeFileEditState, DEFAULT_TEXT_ANNOTATION_WIDTH, isCurrentPhotoSave, type DrawColor, type DrawPoint, type DrawShape, type TextAnnotation, type FileEditState } from '@/lib/photo-studio/edit-state';
 import FabricCanvasStage from './FabricCanvasStage';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, shouldPreserveCanvasLayerAlpha, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
@@ -63,216 +66,6 @@ import WarpBrush from './WarpBrush';
 import BeforeAfterSlider from './BeforeAfterSlider';
 import SubjectTransformOverlay from './SubjectTransformOverlay';
 import { saveSmileDesignResult, getSmileShareUrl, saveSmileMotionVideo } from '@/app/actions/smile-design';
-
-/**
- * Generates a side-by-side (before/after) base64 string for saving.
- */
-async function generateComparisonBase64(
-    beforeUrl: string,
-    afterDataUrl: string,
-    maxSide = 1600,
-    quality = 0.86
-): Promise<string | null> {
-    return new Promise((resolve) => {
-        const imgBefore = new Image();
-        const imgAfter = new Image();
-        let loadedCount = 0;
-
-        const onBothLoaded = () => {
-            loadedCount++;
-            if (loadedCount === 2) {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const w = imgBefore.naturalWidth || imgBefore.width;
-                    const h = imgBefore.naturalHeight || imgBefore.height;
-                    
-                    // Constrain for performance/safety
-                    let scale = 1;
-                    if (w > maxSide || h > maxSide) {
-                        scale = maxSide / Math.max(w, h);
-                    }
-                    
-                    const sw = Math.round(w * scale);
-                    const sh = Math.round(h * scale);
-                    
-                    canvas.width = sw * 2;
-                    canvas.height = sh;
-                    const ctx = canvas.getContext('2d', { alpha: false })!;
-                    
-                    ctx.drawImage(imgBefore, 0, 0, sw, sh);
-                    ctx.drawImage(imgAfter, sw, 0, sw, sh);
-                    
-                    // Separator line
-                    ctx.fillStyle = '#ffffff44';
-                    ctx.fillRect(sw - 1, 0, 2, sh);
-
-                    const result = canvas.toDataURL('image/jpeg', quality);
-                    resolve(result.split(',')[1]);
-                } catch (e) {
-                    console.error('Comparison generation failed:', e);
-                    resolve(null);
-                }
-            }
-        };
-
-        imgBefore.onload = onBothLoaded;
-        imgAfter.onload = onBothLoaded;
-        imgBefore.onerror = () => resolve(null);
-        imgAfter.onerror = () => resolve(null);
-
-        if (beforeUrl && !beforeUrl.startsWith('blob:') && !beforeUrl.startsWith('data:')) {
-            imgBefore.crossOrigin = "anonymous";
-        }
-        if (afterDataUrl && !afterDataUrl.startsWith('blob:') && !afterDataUrl.startsWith('data:')) {
-            imgAfter.crossOrigin = "anonymous";
-        }
-        imgBefore.src = beforeUrl;
-        imgAfter.src = afterDataUrl;
-    });
-}
-
-/**
- * Generates a before/after slice image at a given divider position (0-100%).
- * The left portion draws "before" and the right portion draws "after".
- */
-async function generateSliceBase64(
-    beforeUrl: string,
-    afterDataUrl: string,
-    pos: number,
-    maxSide = 1600,
-    quality = 0.86
-): Promise<string | null> {
-    return new Promise((resolve) => {
-        const imgBefore = new Image();
-        const imgAfter = new Image();
-        let loadedCount = 0;
-
-        const onBothLoaded = () => {
-            loadedCount++;
-            if (loadedCount === 2) {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const w = imgBefore.naturalWidth || imgBefore.width;
-                    const h = imgBefore.naturalHeight || imgBefore.height;
-                    const scale = Math.min(1, maxSide / Math.max(w, h));
-                    const sw = Math.round(w * scale);
-                    const sh = Math.round(h * scale);
-                    canvas.width = sw;
-                    canvas.height = sh;
-                    const ctx = canvas.getContext('2d', { alpha: false })!;
-
-                    // Draw full "after" image as background
-                    ctx.drawImage(imgAfter, 0, 0, sw, sh);
-
-                    // Clip left portion and draw "before"
-                    const splitX = Math.round(sw * (pos / 100));
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.rect(0, 0, splitX, sh);
-                    ctx.clip();
-                    ctx.drawImage(imgBefore, 0, 0, sw, sh);
-                    ctx.restore();
-
-                    // Minimal white divider that matches the on-screen comparator.
-                    ctx.save();
-                    ctx.shadowColor = 'rgba(0,0,0,0.35)';
-                    ctx.shadowBlur = Math.max(2, Math.round(sw * 0.003));
-                    ctx.fillStyle = 'rgba(255,255,255,0.88)';
-                    ctx.fillRect(splitX, 0, Math.max(1, Math.round(sw * 0.001)), sh);
-                    ctx.restore();
-
-                    // Labels
-                    const fontSize = Math.max(14, Math.round(sw * 0.018));
-                    ctx.font = `bold ${fontSize}px sans-serif`;
-                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                    ctx.fillText('ANTES', 12, sh - 12);
-                    ctx.textAlign = 'right';
-                    ctx.fillText('DESPUÉS', sw - 12, sh - 12);
-
-                    const result = canvas.toDataURL('image/jpeg', quality);
-                    resolve(result.split(',')[1]);
-                } catch (e) {
-                    console.error('Slice generation failed:', e);
-                    resolve(null);
-                }
-            }
-        };
-
-        imgBefore.onload = onBothLoaded;
-        imgAfter.onload = onBothLoaded;
-        imgBefore.onerror = () => resolve(null);
-        imgAfter.onerror = () => resolve(null);
-        if (beforeUrl && !beforeUrl.startsWith('blob:') && !beforeUrl.startsWith('data:')) {
-            imgBefore.crossOrigin = 'anonymous';
-        }
-        if (afterDataUrl && !afterDataUrl.startsWith('blob:') && !afterDataUrl.startsWith('data:')) {
-            imgAfter.crossOrigin = 'anonymous';
-        }
-        imgBefore.src = beforeUrl;
-        imgAfter.src = afterDataUrl;
-    });
-}
-
-const MAX_SMILE_SAVE_PAYLOAD_CHARS = 3_600_000;
-
-async function encodeSmileSaveJpeg(
-    dataUrl: string,
-    maxSide: number,
-    quality: number
-): Promise<{ dataUrl: string; base64: string }> {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const candidate = new Image();
-        candidate.onload = () => resolve(candidate);
-        candidate.onerror = () => reject(new Error('No se pudo preparar una de las imágenes del Smile Design'));
-        candidate.src = dataUrl;
-    });
-    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) throw new Error('No se pudo preparar el guardado del Smile Design');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const output = canvas.toDataURL('image/jpeg', quality);
-    return { dataUrl: output, base64: output.split(',')[1] };
-}
-
-async function prepareSmileDesignSavePayload(beforeDataUrl: string, afterDataUrl: string, slicePos: number) {
-    const presets = [
-        { maxSide: 1600, quality: 0.86 },
-        { maxSide: 1200, quality: 0.80 },
-        { maxSide: 900, quality: 0.74 },
-    ];
-
-    for (const preset of presets) {
-        const [before, after] = await Promise.all([
-            encodeSmileSaveJpeg(beforeDataUrl, preset.maxSide, preset.quality),
-            encodeSmileSaveJpeg(afterDataUrl, preset.maxSide, preset.quality),
-        ]);
-        const [comparisonBase64, sliceBase64] = await Promise.all([
-            generateComparisonBase64(before.dataUrl, after.dataUrl, preset.maxSide, preset.quality),
-            generateSliceBase64(before.dataUrl, after.dataUrl, slicePos, preset.maxSide, preset.quality),
-        ]);
-        if (!comparisonBase64 || !sliceBase64) continue;
-
-        const payloadChars = before.dataUrl.length + after.base64.length + comparisonBase64.length + sliceBase64.length;
-        if (payloadChars <= MAX_SMILE_SAVE_PAYLOAD_CHARS) {
-            return {
-                beforeDataUrl: before.dataUrl,
-                afterBase64: after.base64,
-                afterMime: 'image/jpeg',
-                comparisonBase64,
-                sliceBase64,
-                slicePos,
-            };
-        }
-    }
-
-    throw new Error('Las imágenes siguen siendo demasiado pesadas para guardar. Se conservaron sin cambios; volvé a intentar.');
-}
-
 
 const PHOTO_CATEGORIES = [
   { group: 'Rostro (Natural)', items: ['Frente', 'Perfil Izquierdo', 'Perfil Derecho', '45 Grados'] },
@@ -338,66 +131,12 @@ function guessCategory(filename: string): string | null {
 
 type BgColor = 'transparent' | 'white' | 'black';
 
-function normalizeRotation(value: number) {
-    if (!Number.isFinite(value)) return 0;
-    const normalized = ((((value + 180) % 360) + 360) % 360) - 180;
-    return normalized === -180 ? 180 : normalized;
-}
-
-type DrawColor = 'white' | 'yellow' | 'cyan' | 'red';
-
-interface DrawPoint {
-    x: number;       // normalized 0–1
-    y: number;       // normalized 0–1
-    smooth: boolean; // true = Catmull-Rom tangent, false = sharp corner
-}
-
-interface DrawShape {
-    id: string;
-    points: DrawPoint[];
-    closed: boolean;
-    color: DrawColor;
-    strokeStyle?: string;    // persisted per-shape so styles can coexist
-    children?: DrawShape[];  // set only on group shapes
-}
-
-interface TextAnnotation {
-    id: string;
-    x: number;    // normalized 0–1
-    y: number;    // normalized 0–1
-    text: string;
-    color: DrawColor;
-    width: number; // normalized 0–1 — controls the wrap box width
-    fontSize: number;
-    align: 'left' | 'center' | 'right';
-}
-
-interface FileEditState {
-    rotation: number;
-    brightness: number;
-    drawShapes: DrawShape[];
-    textAnnotations: TextAnnotation[];
-}
-
 interface PhotoSessionState extends FileEditState {
     imageUrl: string;
     bgDone: boolean;
     bgColor: BgColor;
     hasTransparentBg: boolean;
     currentPoints: DrawPoint[];
-}
-
-function normalizeFileEditState(state?: Partial<FileEditState> | null): FileEditState {
-    return {
-        rotation: normalizeRotation(state?.rotation ?? 0),
-        brightness: state?.brightness ?? 100,
-        drawShapes: state?.drawShapes ?? [],
-        textAnnotations: (state?.textAnnotations ?? []).map(normalizeTextAnnotation),
-    };
-}
-
-function serializeFileEditState(state: FileEditState): string {
-    return JSON.stringify(state);
 }
 
 function persistFileStatesToLocalStorage(patientId: string, states: Map<string, FileEditState>) {
@@ -456,20 +195,6 @@ function AirDropIcon({ size = 16, className = '' }: { size?: number; className?:
 }
 
 const TEXT_LINE_HEIGHT = 1.35; // em — must match CSS in the textarea overlay
-const DEFAULT_TEXT_ANNOTATION_WIDTH = 0.5;
-function normalizeTextAnnotation(annotation: Partial<TextAnnotation>): TextAnnotation {
-    return {
-        id: annotation.id ?? `text-${Date.now()}`,
-        x: annotation.x ?? 0,
-        y: annotation.y ?? 0,
-        text: annotation.text ?? '',
-        color: annotation.color ?? 'white',
-        width: annotation.width ?? DEFAULT_TEXT_ANNOTATION_WIDTH,
-        fontSize: annotation.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
-        align: annotation.align ?? 'left',
-    };
-}
-
 function wrapTextCanvas(ctx: CanvasRenderingContext2D, text: string, maxWidthPx: number): string[] {
     const result: string[] = [];
     for (const paragraph of text.split('\n')) {
@@ -746,101 +471,6 @@ const ROTATION_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
     '</svg>'
 )}") 10 10, crosshair`;
 
-function CanvasThumbnailPreview({ layers, bgColor, ratio }: {
-    layers: CanvasLayer[];
-    bgColor: string;
-    ratio: string;
-}) {
-    const ref = useRef<HTMLCanvasElement>(null);
-    useEffect(() => {
-        const canvas = ref.current;
-        if (!canvas) return;
-        const SIZE = 56;
-        canvas.width = SIZE;
-        canvas.height = SIZE;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        // Background
-        if (bgColor === 'transparent') {
-            // Checkerboard pattern for transparent
-            const sq = 7;
-            for (let r = 0; r < SIZE / sq; r++) {
-                for (let c = 0; c < SIZE / sq; c++) {
-                    ctx.fillStyle = (r + c) % 2 === 0 ? '#888' : '#555';
-                    ctx.fillRect(c * sq, r * sq, sq, sq);
-                }
-            }
-        } else {
-            ctx.fillStyle = bgColor === 'black' ? '#000000' : '#ffffff';
-            ctx.fillRect(0, 0, SIZE, SIZE);
-        }
-        if (layers.length === 0) return;
-        // Draw layers scaled to thumbnail
-        layers.forEach(layer => {
-            if (!(layer.img instanceof HTMLImageElement) || !layer.img.complete || layer.img.naturalWidth === 0) return;
-            const cx = layer.x * SIZE;
-            const cy = layer.y * SIZE;
-            const w = layer.w * SIZE;
-            const h = layer.h * SIZE;
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate((layer.rotation ?? 0) * Math.PI / 180);
-            ctx.globalAlpha = 1;
-            ctx.drawImage(layer.img, -w / 2, -h / 2, w, h);
-            ctx.restore();
-        });
-    }, [layers, bgColor, ratio]);
-    return <canvas ref={ref} width={56} height={56} className="w-full h-full object-cover" />;
-}
-
-function CanvasPresentationPreview({ layers, bgColor, ratio, name }: {
-    layers: CanvasLayer[];
-    bgColor: string;
-    ratio: CanvasRatio;
-    name: string;
-}) {
-    const canvasRatio = CANVAS_RATIOS.find(item => item.value === ratio) ?? CANVAS_RATIOS[0];
-    const backgroundColor = bgColor === 'transparent'
-        ? 'transparent'
-        : bgColor === 'black' ? '#000000' : '#ffffff';
-    const presentationWidth = `min(90vw, calc((100vh - 96px) * ${canvasRatio.w / canvasRatio.h}), 1400px)`;
-
-    return (
-        <div
-            aria-label={name}
-            className="relative flex-none overflow-hidden shadow-2xl"
-            style={{
-                aspectRatio: `${canvasRatio.w} / ${canvasRatio.h}`,
-                backgroundColor,
-                width: presentationWidth,
-                backgroundImage: bgColor === 'transparent'
-                    ? 'linear-gradient(45deg,#555 25%,transparent 25%),linear-gradient(-45deg,#555 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#555 75%),linear-gradient(-45deg,transparent 75%,#555 75%)'
-                    : undefined,
-                backgroundSize: bgColor === 'transparent' ? '24px 24px' : undefined,
-                backgroundPosition: bgColor === 'transparent' ? '0 0,0 12px,12px -12px,-12px 0' : undefined,
-            }}
-        >
-            {layers.map(layer => (
-                <img
-                    key={layer.id}
-                    src={layer.src}
-                    alt=""
-                    draggable={false}
-                    className="pointer-events-none absolute"
-                    style={{
-                        left: `${layer.x * 100}%`,
-                        top: `${layer.y * 100}%`,
-                        width: `${layer.w * 100}%`,
-                        height: `${layer.h * 100}%`,
-                        filter: `brightness(${layer.brightness ?? 100}%)`,
-                        transform: `translate(-50%, -50%) rotate(${layer.rotation ?? 0}deg)`,
-                    }}
-                />
-            ))}
-        </div>
-    );
-}
-
 export default function PhotoStudioModal({
     file,
     folderId,
@@ -977,7 +607,8 @@ export default function PhotoStudioModal({
                         const parsed = JSON.parse(saved);
                         if (parsed.layers && parsed.layers.length > 0) {
                             const legacyId = 'legacy-' + patientId;
-                            Promise.all((parsed.layers as any[]).map(async (l: any) => {
+                            const legacyLayers = parsed.layers as Array<Omit<CanvasLayer, 'img'>>;
+                            Promise.all(legacyLayers.map(async (l) => {
                                 if (l.src?.startsWith('blob:')) return null;
                                 try { const img = await loadCanvasImage(l.src); return { ...l, img }; }
                                 catch { return null; }
@@ -997,7 +628,8 @@ export default function PhotoStudioModal({
             // Hydrate all canvases from DB
             let lostLayers = 0;
             const hydrated = await Promise.all(data.map(async (row) => {
-                const layers = await Promise.all((row.layers as any[]).map(async (l: any) => {
+                const storedLayers = row.layers as Array<Omit<CanvasLayer, 'img'>>;
+                const layers = await Promise.all(storedLayers.map(async (l) => {
                     // Las URLs blob: mueren al recargar la página: si una capa quedó
                     // guardada así, su imagen ya no existe y se pierde. Se cuentan
                     // para avisar en vez de desaparecer en silencio.
@@ -1330,7 +962,7 @@ export default function PhotoStudioModal({
 
         fileStatesRef.current.set(fileId, state);
         persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
-        if (fileId === activeFileIdRef.current && serializeFileEditState(state) === serializeFileEditState(latestPhotoStateRef.current)) {
+        if (isCurrentPhotoSave(fileId, state, activeFileIdRef.current, latestPhotoStateRef.current)) {
             photoStateDirtyRef.current = false;
         }
     }, [patientId]);
@@ -7541,7 +7173,7 @@ export default function PhotoStudioModal({
                                 ? (canvasLayers.find(l => l.id === canvasSelectedId)?.brightness ?? 100)
                                 : brightness}
                             setBrightness={canvasActive && canvasSelectedId
-                                ? (v) => setCanvasLayers(prev => prev.map(l => l.id === canvasSelectedId ? { ...l, brightness: typeof v === 'function' ? (v as any)(l.brightness) : v } : l))
+                                ? (v) => setCanvasLayers(prev => prev.map(l => l.id === canvasSelectedId ? { ...l, brightness: typeof v === 'function' ? v(l.brightness ?? 100) : v } : l))
                                 : setBrightness}
                             cropActive={cropActive || !!canvasLayerCropId}
                             setCropActive={canvasLayerCropId ? () => {} : setCropActive}
@@ -7559,7 +7191,7 @@ export default function PhotoStudioModal({
                                     setCanvasLayerCropId(canvasSelectedId);
                                     const initialCrop: Crop = { unit: '%', width: 100, height: 100, x: 0, y: 0 };
                                     setCanvasLayerCropSel(initialCrop);
-                                    setCanvasLayerCompletedCrop(initialCrop as any);
+                                    setCanvasLayerCompletedCrop(initialCrop as PixelCrop);
                                     setCanvasLayerCropAspectPreset('free');
                                     setCanvasSelectedId(null);
                                 }
@@ -8500,7 +8132,7 @@ export default function PhotoStudioModal({
                                 <div className="bg-white/5 p-3 rounded-xl space-y-2 text-left w-full text-xs text-white/80">
                                     <p className="font-semibold text-[#C9A96E]">Opciones manuales (Instagram / WhatsApp):</p>
                                     <p><strong>1.</strong> Mantén presionada la imagen de abajo.</p>
-                                    <p><strong>2.</strong> Selecciona <strong>"Guardar en Fotos"</strong> o <strong>"Descargar"</strong>.</p>
+                                    <p><strong>2.</strong> Selecciona <strong>&quot;Guardar en Fotos&quot;</strong> o <strong>&quot;Descargar&quot;</strong>.</p>
                                     <p><strong>3.</strong> Súbela a tu Historia de Instagram o compártela directamente.</p>
                                 </div>
 

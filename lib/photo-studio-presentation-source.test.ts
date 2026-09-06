@@ -19,8 +19,10 @@ test('presentation includes editable canvases as slides', () => {
     assert.match(source, /presentationItems\[presentationIdx\]\?\.kind === 'canvas'/);
 });
 
+const previewSource = readFileSync(new URL('../components/patients/drive/CanvasPreviews.tsx', import.meta.url), 'utf8');
+
 test('presentation canvases preserve their aspect ratio within the viewport', () => {
-    assert.match(source, /calc\(\(100vh - 96px\) \* \$\{canvasRatio\.w \/ canvasRatio\.h\}\)/);
-    assert.doesNotMatch(source, /width: canvasRatio\.w >= canvasRatio\.h/);
-    assert.doesNotMatch(source, /height: canvasRatio\.h > canvasRatio\.w/);
+    assert.match(previewSource, /calc\(\(100vh - 96px\) \* \$\{canvasRatio\.w \/ canvasRatio\.h\}\)/);
+    assert.doesNotMatch(previewSource, /width: canvasRatio\.w >= canvasRatio\.h/);
+    assert.doesNotMatch(previewSource, /height: canvasRatio\.h > canvasRatio\.w/);
 });
