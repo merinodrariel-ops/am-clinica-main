@@ -783,6 +783,10 @@ export default function PhotoStudioModal({
     function addBudgetPreset(preset: PhotoBudgetAlternative) {
         setBudgetDraft(current => {
             if (current.some(item => item.title === preset.title)) return current;
+            const emptyIndex = current.findIndex(item => !item.title.trim() && !item.description.trim() && item.total === 0);
+            if (emptyIndex >= 0) {
+                return current.map((item, index) => index === emptyIndex ? structuredClone(preset) : item);
+            }
             if (current.length >= 3) return current;
             return [...current, structuredClone(preset)];
         });
