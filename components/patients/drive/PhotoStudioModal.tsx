@@ -90,13 +90,28 @@ interface PhotoStudioModalProps {
 }
 
 const PHOTO_BUDGET_PRESETS: PhotoBudgetAlternative[] = [
-    { title: 'Micro diseño de sonrisa x10 · Cerámica AM', description: 'Rehabilitación estética en cerámica · Ariel Merino', total: 0, currency: 'USD' },
-    { title: 'Micro diseño de sonrisa x10 · Cerámica staff', description: 'Rehabilitación estética en cerámica · Staff', total: 0, currency: 'USD' },
-    { title: 'Micro diseño de sonrisa x10 · Resinas AM', description: 'Diseño de sonrisa en resinas · Ariel Merino', total: 0, currency: 'USD' },
-    { title: 'Micro diseño de sonrisa x10 · Resinas staff', description: 'Diseño de sonrisa en resinas · Staff', total: 0, currency: 'USD' },
+    { title: 'Micro diseño de sonrisa x10 · Resinas AM', description: 'Incluye 10 piezas anteriores de un maxilar en resina · Ariel Merino', total: 0, currency: 'USD' },
+    { title: 'Micro diseño de sonrisa x10 · Resinas staff', description: 'Incluye 10 piezas anteriores de un maxilar en resina · Staff', total: 0, currency: 'USD' },
+    { title: 'Diseño de sonrisa x10 · Cerámicas AM', description: 'Incluye 10 piezas anteriores de un maxilar en cerámica · Ariel Merino', total: 0, currency: 'USD' },
+    { title: 'Diseño de sonrisa x10 · Cerámicas staff', description: 'Incluye 10 piezas anteriores de un maxilar en cerámica · Staff', total: 0, currency: 'USD' },
     { title: 'Rehabilitación cerámica total · AM', description: 'Rehabilitación cerámica total · Ariel Merino', total: 0, currency: 'USD' },
     { title: 'Rehabilitación cerámica total · staff', description: 'Rehabilitación cerámica total · Staff', total: 0, currency: 'USD' },
 ];
+
+function parseBudgetAmount(value: string): number {
+    const raw = value.trim().replace(/\s/g, '');
+    if (!raw) return 0;
+    // Clinic convention: 15.000 means fifteen thousand; comma remains decimal separator.
+    const normalized = raw.includes(',')
+        ? raw.replace(/\./g, '').replace(',', '.')
+        : raw.replace(/\./g, '');
+    const amount = Number(normalized.replace(/[^\d.-]/g, ''));
+    return Number.isFinite(amount) ? amount : 0;
+}
+
+function formatBudgetAmount(value: number): string {
+    return value > 0 ? new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(value) : '';
+}
 
 /**
  * Heuristically guesses the category from a filename string.
@@ -775,7 +790,7 @@ export default function PhotoStudioModal({
 
     function updateBudgetDraft(index: number, key: keyof PhotoBudgetAlternative, value: string) {
         setBudgetDraft(current => current.map((item, itemIndex) => itemIndex === index
-            ? { ...item, [key]: key === 'total' ? Number(value) || 0 : value }
+            ? { ...item, [key]: key === 'total' ? parseBudgetAmount(value) : value }
             : item));
     }
 
@@ -6450,7 +6465,7 @@ export default function PhotoStudioModal({
                                                     <input value={item.description} onChange={event => updateBudgetDraft(index, 'description', event.target.value)} placeholder="Descripción breve (opcional)" className="mb-2 w-full rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
                                                     <div className="flex gap-2">
                                                         <select value={item.currency} onChange={event => updateBudgetDraft(index, 'currency', event.target.value)} className="rounded-md border border-white/10 bg-black/20 px-2 text-xs outline-none focus:border-[#C9A96E]"><option value="USD">USD</option><option value="ARS">ARS</option></select>
-                                                        <input type="number" value={item.total || ''} onChange={event => updateBudgetDraft(index, 'total', event.target.value)} placeholder="Importe" className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
+                                                        <input type="text" inputMode="decimal" value={formatBudgetAmount(item.total)} onChange={event => updateBudgetDraft(index, 'total', event.target.value)} placeholder="Importe (ej. 15.000)" className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
                                                     </div>
                                                 </div>
                                             ))}
