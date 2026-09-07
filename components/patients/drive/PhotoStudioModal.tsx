@@ -787,7 +787,7 @@ export default function PhotoStudioModal({
             if (emptyIndex >= 0) {
                 return current.map((item, index) => index === emptyIndex ? structuredClone(preset) : item);
             }
-            if (current.length >= 3) return current;
+            if (current.length >= 4) return current;
             return [...current, structuredClone(preset)];
         });
     }
@@ -6448,7 +6448,7 @@ export default function PhotoStudioModal({
                                                         <button
                                                             key={preset.title}
                                                             onClick={() => addBudgetPreset(preset)}
-                                                            disabled={selected || budgetDraft.length >= 3}
+                                                            disabled={selected || budgetDraft.length >= 4}
                                                             className={`rounded-lg border px-3 py-2 text-left transition-colors ${selected ? 'border-[#C9A96E]/60 bg-[#C9A96E]/15 text-[#C9A96E]' : 'border-white/10 bg-white/[0.03] text-white/75 hover:border-[#C9A96E]/50 hover:bg-[#C9A96E]/10'} disabled:cursor-default disabled:opacity-70`}
                                                         >
                                                             <span className="block text-[11px] font-semibold leading-tight">{preset.title}</span>
@@ -6475,7 +6475,7 @@ export default function PhotoStudioModal({
                                             ))}
                                         </div>
                                         <div className="mt-3 flex items-center justify-between gap-2">
-                                            <button disabled={budgetDraft.length >= 3} onClick={() => setBudgetDraft(current => [...current, { title: '', description: '', total: 0, currency: 'USD' }])} className="text-xs font-semibold text-[#C9A96E] disabled:opacity-40">+ Agregar alternativa</button>
+                                            <button disabled={budgetDraft.length >= 4} onClick={() => setBudgetDraft(current => [...current, { title: '', description: '', total: 0, currency: 'USD' }])} className="text-xs font-semibold text-[#C9A96E] disabled:opacity-40">+ Agregar alternativa</button>
                                             <button onClick={saveBudgetPanel} className="rounded-md bg-[#C9A96E] px-3 py-2 text-xs font-semibold text-black hover:bg-[#D8B878]">Guardar</button>
                                         </div>
                                     </div>

@@ -8,7 +8,7 @@ import {
     listPatientPresupuestos,
     updatePatientPresupuesto,
 } from '@/app/actions/presupuestos';
-import type { PresupuestoPayload, PresupuestoRecord } from '@/lib/presupuesto-types';
+import { MAX_PRESUPUESTO_ALTERNATIVES, type PresupuestoPayload, type PresupuestoRecord } from '@/lib/presupuesto-types';
 import { AM_REFERENCE_CASES, DEFAULT_CASE_SLUGS } from '@/lib/presupuesto-brand';
 import { buildFinancingRows, generatePresupuestoPdf } from '@/lib/presupuesto-pdf';
 import type { PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
@@ -64,7 +64,7 @@ export default function PatientBudgetsPanel({
     const [payload, setPayload] = useState<PresupuestoPayload>(() => ({
         ...initialPayload(patientName),
         photoUrls: initialPhotoUrls,
-        alternatives: initialAlternatives.length > 0 ? initialAlternatives.slice(0, 3) : [emptyAlternative()],
+        alternatives: initialAlternatives.length > 0 ? initialAlternatives.slice(0, MAX_PRESUPUESTO_ALTERNATIVES) : [emptyAlternative()],
     }));
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -136,7 +136,7 @@ export default function PatientBudgetsPanel({
     }
 
     function addAlternative() {
-        if (payload.alternatives.length >= 3) return;
+        if (payload.alternatives.length >= MAX_PRESUPUESTO_ALTERNATIVES) return;
         updateField('alternatives', [...payload.alternatives, emptyAlternative()]);
     }
 
@@ -278,7 +278,7 @@ export default function PatientBudgetsPanel({
                         </div>
                         <button
                             onClick={addAlternative}
-                            disabled={payload.alternatives.length >= 3}
+                        disabled={payload.alternatives.length >= MAX_PRESUPUESTO_ALTERNATIVES}
                             className="text-xs font-semibold text-indigo-600 disabled:opacity-40"
                         >
                             + Agregar alternativa

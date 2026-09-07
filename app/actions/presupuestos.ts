@@ -6,7 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import { getUserAppProfile } from '@/app/actions/worker-portal';
 import { canManagePresupuestos } from '@/lib/presupuesto-access';
 import { AM_REFERENCE_CASES, DEFAULT_CASE_SLUGS } from '@/lib/presupuesto-brand';
-import type { PresupuestoPayload, PresupuestoRecord } from '@/lib/presupuesto-types';
+import { MAX_PRESUPUESTO_ALTERNATIVES, type PresupuestoPayload, type PresupuestoRecord } from '@/lib/presupuesto-types';
 
 export type { PresupuestoAlternative, PresupuestoPayload, PresupuestoRecord } from '@/lib/presupuesto-types';
 
@@ -25,7 +25,7 @@ function normalizePayload(input: PresupuestoPayload): PresupuestoPayload {
     return {
         patientName: input.patientName.trim().slice(0, 160),
         intro: input.intro.trim().slice(0, 1200),
-        alternatives: input.alternatives.slice(0, 3).map((item) => ({
+        alternatives: input.alternatives.slice(0, MAX_PRESUPUESTO_ALTERNATIVES).map((item) => ({
             title: item.title.trim().slice(0, 120),
             description: item.description.trim().slice(0, 800),
             total: Number.isFinite(item.total) && item.total >= 0 ? item.total : 0,
@@ -51,7 +51,7 @@ function normalizeCaseSlugs(slugs: string[] | undefined): string[] {
 
 function normalizeBaseIndex(index: number | undefined, alternativesCount: number): number {
     if (!Number.isInteger(index) || index === undefined) return 0;
-    if (index < 0 || index >= Math.min(alternativesCount, 3)) return 0;
+    if (index < 0 || index >= Math.min(alternativesCount, MAX_PRESUPUESTO_ALTERNATIVES)) return 0;
     return index;
 }
 
