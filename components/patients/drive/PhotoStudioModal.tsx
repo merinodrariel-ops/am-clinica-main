@@ -89,6 +89,15 @@ interface PhotoStudioModalProps {
     autoStartSmile?: boolean;
 }
 
+const PHOTO_BUDGET_PRESETS: PhotoBudgetAlternative[] = [
+    { title: 'Micro diseño de sonrisa x10 · Cerámica AM', description: 'Rehabilitación estética en cerámica · Ariel Merino', total: 0, currency: 'USD' },
+    { title: 'Micro diseño de sonrisa x10 · Cerámica staff', description: 'Rehabilitación estética en cerámica · Staff', total: 0, currency: 'USD' },
+    { title: 'Micro diseño de sonrisa x10 · Resinas AM', description: 'Diseño de sonrisa en resinas · Ariel Merino', total: 0, currency: 'USD' },
+    { title: 'Micro diseño de sonrisa x10 · Resinas staff', description: 'Diseño de sonrisa en resinas · Staff', total: 0, currency: 'USD' },
+    { title: 'Rehabilitación cerámica total · AM', description: 'Rehabilitación cerámica total · Ariel Merino', total: 0, currency: 'USD' },
+    { title: 'Rehabilitación cerámica total · staff', description: 'Rehabilitación cerámica total · Staff', total: 0, currency: 'USD' },
+];
+
 /**
  * Heuristically guesses the category from a filename string.
  */
@@ -754,6 +763,14 @@ export default function PhotoStudioModal({
         setBudgetAlternatives(budgetDraft.filter(item => item.title.trim() || item.description.trim() || item.total > 0));
         setBudgetPanelOpen(false);
         toast.success('Propuesta privada guardada en esta foto');
+    }
+
+    function addBudgetPreset(preset: PhotoBudgetAlternative) {
+        setBudgetDraft(current => {
+            if (current.some(item => item.title === preset.title)) return current;
+            if (current.length >= 3) return current;
+            return [...current, structuredClone(preset)];
+        });
     }
 
     function updateBudgetDraft(index: number, key: keyof PhotoBudgetAlternative, value: string) {
@@ -6393,7 +6410,7 @@ export default function PhotoStudioModal({
                                 </button>
                                 {budgetPanelOpen && (
                                     <div
-                                        className="absolute top-14 right-3 z-40 w-[min(380px,calc(100%-24px))] rounded-xl border border-[#C9A96E]/35 bg-[#12121A]/98 p-4 text-white shadow-2xl backdrop-blur-sm"
+                                        className="absolute bottom-3 left-3 right-3 z-40 rounded-xl border border-[#C9A96E]/35 bg-[#12121A]/98 p-4 text-white shadow-2xl backdrop-blur-sm"
                                         onClick={event => event.stopPropagation()}
                                     >
                                         <div className="mb-3 flex items-start justify-between gap-3">
@@ -6402,6 +6419,25 @@ export default function PhotoStudioModal({
                                                 <p className="mt-0.5 text-[11px] text-white/55">Se adjunta a esta foto y luego precarga el presupuesto.</p>
                                             </div>
                                             <button onClick={() => setBudgetPanelOpen(false)} className="text-white/45 hover:text-white" aria-label="Cerrar"><X size={16} /></button>
+                                        </div>
+                                        <div className="mb-3">
+                                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">Propuestas frecuentes · clic para agregar</p>
+                                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                                {PHOTO_BUDGET_PRESETS.map(preset => {
+                                                    const selected = budgetDraft.some(item => item.title === preset.title);
+                                                    return (
+                                                        <button
+                                                            key={preset.title}
+                                                            onClick={() => addBudgetPreset(preset)}
+                                                            disabled={selected || budgetDraft.length >= 3}
+                                                            className={`rounded-lg border px-3 py-2 text-left transition-colors ${selected ? 'border-[#C9A96E]/60 bg-[#C9A96E]/15 text-[#C9A96E]' : 'border-white/10 bg-white/[0.03] text-white/75 hover:border-[#C9A96E]/50 hover:bg-[#C9A96E]/10'} disabled:cursor-default disabled:opacity-70`}
+                                                        >
+                                                            <span className="block text-[11px] font-semibold leading-tight">{preset.title}</span>
+                                                            <span className="mt-1 block text-[10px] text-white/45">{selected ? 'Agregada' : 'Agregar opción'}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                         <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1">
                                             {budgetDraft.map((item, index) => (
