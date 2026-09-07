@@ -50,6 +50,7 @@ import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 import NuevaPrestacionModal from './NuevaPrestacionModal';
 import PatientBudgetsPanel from './PatientBudgetsPanel';
+import type { PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
 import { canManagePresupuestos } from '@/lib/presupuesto-access';
 import { crearPlanFinanciacionAction } from '@/app/actions/financiacion-cuotas';
 import { getPatientInventoryMaterials, type PatientMaterialRecord } from '@/app/actions/inventory-stock';
@@ -143,11 +144,13 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const hidePaymentTabs = role !== 'admin' && role !== 'owner';
     const hideContactData = isAsistente || isOdontologo || isLaboratorio || isMarketing;
     const [budgetPhotoUrls, setBudgetPhotoUrls] = useState<string[]>([]);
+    const [budgetPhotoAlternatives, setBudgetPhotoAlternatives] = useState<PhotoBudgetAlternative[]>([]);
     const [budgetEditorNonce, setBudgetEditorNonce] = useState(0);
 
-    function handleBudgetFilesSelected(files: Array<{ id: string }>) {
+    function handleBudgetFilesSelected(files: Array<{ id: string }>, alternatives: PhotoBudgetAlternative[] = []) {
         const urls = files.map((file) => `/api/drive/file/${file.id}`);
         setBudgetPhotoUrls(urls);
+        setBudgetPhotoAlternatives(alternatives.slice(0, 3));
         setBudgetEditorNonce((value) => value + 1);
         requestAnimationFrame(() => document.getElementById('presupuestos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     }
@@ -494,6 +497,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 patientId={patient.id_paciente}
                                 patientName={`${patient.nombre} ${patient.apellido}`}
                                 initialPhotoUrls={budgetPhotoUrls}
+                                initialAlternatives={budgetPhotoAlternatives}
                             />
                         </PatientSection>
                     )}

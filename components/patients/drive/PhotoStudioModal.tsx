@@ -20,7 +20,7 @@ import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage as loadCanvasImage, makeLayer as makeCanvasLayer, getLayerCorners, hitTestCorner as hitTestLayerCorner, hitTestLayerBody } from './CanvasCompositor';
 import { prepareSmileDesignSavePayload } from '@/lib/photo-studio/smile-save';
 import { CanvasThumbnailPreview, CanvasPresentationPreview } from './CanvasPreviews';
-import { normalizeRotation, normalizeFileEditState, serializeFileEditState, DEFAULT_TEXT_ANNOTATION_WIDTH, isCurrentPhotoSave, type DrawColor, type DrawPoint, type DrawShape, type TextAnnotation, type FileEditState } from '@/lib/photo-studio/edit-state';
+import { normalizeRotation, normalizeFileEditState, serializeFileEditState, DEFAULT_TEXT_ANNOTATION_WIDTH, isCurrentPhotoSave, type DrawColor, type DrawPoint, type DrawShape, type TextAnnotation, type FileEditState, type PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
 import FabricCanvasStage from './FabricCanvasStage';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, shouldPreserveCanvasLayerAlpha, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
@@ -85,7 +85,7 @@ interface PhotoStudioModalProps {
     canSave: boolean;              // whether the current user can write to Drive
     onClose: () => void;
     onSaved: (options?: { silent?: boolean; coverFileId?: string }) => void; // called after successful save → triggers folder refresh
-    onBudgetFilesSelected?: (files: DriveFile[]) => void;
+    onBudgetFilesSelected?: (files: DriveFile[], alternatives?: PhotoBudgetAlternative[]) => void;
     autoStartSmile?: boolean;
 }
 
@@ -732,15 +732,35 @@ export default function PhotoStudioModal({
 
     // Text annotation state
     const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>([]);
+    const [budgetAlternatives, setBudgetAlternatives] = useState<PhotoBudgetAlternative[]>([]);
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     const [textToolActive, setTextToolActive] = useState(false);
     const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+    const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
+    const [budgetDraft, setBudgetDraft] = useState<PhotoBudgetAlternative[]>([]);
     const textDragRef = useRef<{ id: string; lastNx: number; lastNy: number } | null>(null);
     const textResizeDragRef = useRef<{ id: string; startNx: number; startWidth: number } | null>(null);
     const textMetricsRef = useRef<Map<string, { hNorm: number }>>(new Map());
     const justFinishedEditRef = useRef<string | null>(null); // guards against blur-then-click creating new text
     const textClipboardRef = useRef<TextAnnotation | null>(null);
     const selectedText = useMemo(() => textAnnotations.find(t => t.id === selectedTextId) ?? null, [textAnnotations, selectedTextId]);
+
+    function openBudgetPanel() {
+        setBudgetDraft(structuredClone(budgetAlternatives));
+        setBudgetPanelOpen(true);
+    }
+
+    function saveBudgetPanel() {
+        setBudgetAlternatives(budgetDraft.filter(item => item.title.trim() || item.description.trim() || item.total > 0));
+        setBudgetPanelOpen(false);
+        toast.success('Propuesta privada guardada en esta foto');
+    }
+
+    function updateBudgetDraft(index: number, key: keyof PhotoBudgetAlternative, value: string) {
+        setBudgetDraft(current => current.map((item, itemIndex) => itemIndex === index
+            ? { ...item, [key]: key === 'total' ? Number(value) || 0 : value }
+            : item));
+    }
 
     const [zoom, setZoom] = useState(1);
     const zoomRef = useRef(1); // mirrors zoom for non-reactive wheel handler
@@ -841,6 +861,7 @@ export default function PhotoStudioModal({
         drawShapes: DrawShape[];
         currentPoints: DrawPoint[];
         textAnnotations: TextAnnotation[];
+        budgetAlternatives?: PhotoBudgetAlternative[];
     };
     type CanvasLayerSnapshot = {
         kind: 'canvas-layer';
@@ -859,8 +880,8 @@ export default function PhotoStudioModal({
     }, [activeFile]);
 
     useEffect(() => {
-        latestPhotoStateRef.current = normalizeFileEditState({ rotation, brightness, drawShapes, textAnnotations });
-    }, [rotation, brightness, drawShapes, textAnnotations]);
+        latestPhotoStateRef.current = normalizeFileEditState({ rotation, brightness, drawShapes, textAnnotations, budgetAlternatives });
+    }, [rotation, brightness, drawShapes, textAnnotations, budgetAlternatives]);
 
     useEffect(() => {
         if (!patientId) return;
@@ -898,6 +919,7 @@ export default function PhotoStudioModal({
                         brightness: row.brightness,
                         drawShapes: Array.isArray(row.draw_shapes) ? row.draw_shapes as DrawShape[] : [],
                         textAnnotations: Array.isArray(row.text_annotations) ? row.text_annotations as TextAnnotation[] : [],
+                        budgetAlternatives: Array.isArray(row.budget_alternatives) ? row.budget_alternatives as PhotoBudgetAlternative[] : [],
                     }));
                 });
             }
@@ -919,6 +941,7 @@ export default function PhotoStudioModal({
                 setBrightness(currentSaved.brightness);
                 setDrawShapes(currentSaved.drawShapes);
                 setTextAnnotations(currentSaved.textAnnotations);
+                setBudgetAlternatives(currentSaved.budgetAlternatives ?? []);
             }
         };
 
@@ -953,6 +976,7 @@ export default function PhotoStudioModal({
             brightness: state.brightness,
             drawShapes: state.drawShapes,
             textAnnotations: state.textAnnotations,
+            budgetAlternatives: state.budgetAlternatives,
         });
 
         if (error) {
@@ -975,7 +999,7 @@ export default function PhotoStudioModal({
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'patient_photo_edit_states', filter: `patient_id=eq.${patientId}` },
-                (payload: { new: { file_id?: string; rotation?: number; brightness?: number; draw_shapes?: unknown; text_annotations?: unknown } | null }) => {
+                (payload: { new: { file_id?: string; rotation?: number; brightness?: number; draw_shapes?: unknown; text_annotations?: unknown; budget_alternatives?: unknown } | null }) => {
                     const row = payload.new;
                     if (!row?.file_id) return;
 
@@ -984,6 +1008,7 @@ export default function PhotoStudioModal({
                         brightness: row.brightness,
                         drawShapes: Array.isArray(row.draw_shapes) ? row.draw_shapes as DrawShape[] : [],
                         textAnnotations: Array.isArray(row.text_annotations) ? row.text_annotations as TextAnnotation[] : [],
+                        budgetAlternatives: Array.isArray(row.budget_alternatives) ? row.budget_alternatives as PhotoBudgetAlternative[] : [],
                     });
 
                     fileStatesRef.current.set(row.file_id, nextState);
@@ -1004,8 +1029,9 @@ export default function PhotoStudioModal({
                     skipNextPhotoStateAutosaveRef.current = true;
                     setRotation(normalizeRotation(nextState.rotation));
                     setBrightness(nextState.brightness);
-                    setDrawShapes(nextState.drawShapes);
-                    setTextAnnotations(nextState.textAnnotations);
+                        setDrawShapes(nextState.drawShapes);
+                        setTextAnnotations(nextState.textAnnotations);
+                        setBudgetAlternatives(nextState.budgetAlternatives ?? []);
                 }
             )
             .subscribe();
@@ -1021,7 +1047,7 @@ export default function PhotoStudioModal({
         // Capture current state into ref before saving
         if (activeFile) {
             fileStatesRef.current.set(activeFile.id, normalizeFileEditState({
-                rotation, brightness, drawShapes, textAnnotations,
+                rotation, brightness, drawShapes, textAnnotations, budgetAlternatives,
             }));
         }
 
@@ -1907,14 +1933,17 @@ export default function PhotoStudioModal({
             setDrawShapes(sessionDraft.drawShapes);
             setCurrentPoints(sessionDraft.currentPoints);
             setTextAnnotations(sessionDraft.textAnnotations);
+            setBudgetAlternatives(sessionDraft.budgetAlternatives ?? []);
         } else if (saved) {
             setRotation(normalizeRotation(saved.rotation));
             setBrightness(saved.brightness);
             setDrawShapes(saved.drawShapes);
             setTextAnnotations(saved.textAnnotations);
+            setBudgetAlternatives(saved.budgetAlternatives ?? []);
             setImageUrl(driveImageUrl(newFile));
         } else {
             setImageUrl(driveImageUrl(newFile));
+            setBudgetAlternatives([]);
         }
         setActiveFile(newFile);
     }
@@ -2054,6 +2083,7 @@ export default function PhotoStudioModal({
             drawShapes: structuredClone(drawShapes),
             currentPoints: structuredClone(currentPoints),
             textAnnotations: structuredClone(textAnnotations),
+            budgetAlternatives: structuredClone(budgetAlternatives),
         };
     }
 
@@ -2127,6 +2157,7 @@ export default function PhotoStudioModal({
         setDrawShapes(structuredClone(snap.drawShapes));
         setCurrentPoints(structuredClone(snap.currentPoints));
         setTextAnnotations(structuredClone(snap.textAnnotations));
+        setBudgetAlternatives(structuredClone(snap.budgetAlternatives ?? []));
         setSelectedShapeId(null);
         setSelectedTextId(null);
         setEditingTextId(null);
@@ -2575,6 +2606,7 @@ export default function PhotoStudioModal({
             drawShapes: structuredClone(drawShapes),
             currentPoints: structuredClone(currentPoints),
             textAnnotations: structuredClone(textAnnotations),
+            budgetAlternatives: structuredClone(budgetAlternatives),
         });
         const editedCanvas = offscreenCanvasRef.current;
         const img = editedCanvas ? null : await loadCanvasImage(imageUrl);
@@ -5372,13 +5404,15 @@ export default function PhotoStudioModal({
         }
     }
 
-    function handleAddSelectedToBudget() {
+    async function handleAddSelectedToBudget() {
         const files = imageFiles.filter((file) => selectedIds.has(file.id));
         if (files.length === 0) {
             toast.info('Seleccioná al menos una foto para agregar al presupuesto');
             return;
         }
-        onBudgetFilesSelected?.(files);
+        await flushPhotoStateSave();
+        const alternatives = files.flatMap(file => fileStatesRef.current.get(file.id)?.budgetAlternatives ?? []);
+        onBudgetFilesSelected?.(files, alternatives);
         toast.success(`${files.length} foto${files.length !== 1 ? 's' : ''} agregada${files.length !== 1 ? 's' : ''} al presupuesto`);
         onClose();
     }
@@ -6346,6 +6380,52 @@ export default function PhotoStudioModal({
                                     {selectedText.visibility === 'internal' ? 'Privada' : 'Compartida'}
                                 </button>
                             </div>
+                        )}
+                        {!canvasActive && activeFile && (
+                            <>
+                                <button
+                                    onClick={(event) => { event.stopPropagation(); openBudgetPanel(); }}
+                                    className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-lg border border-[#C9A96E]/40 bg-[#12121A]/95 px-3 py-2 text-xs font-semibold text-[#C9A96E] shadow-lg backdrop-blur-sm hover:bg-[#C9A96E]/15"
+                                    title="Cargar alternativas privadas para esta foto"
+                                >
+                                    <FileText size={14} />
+                                    Propuesta{budgetAlternatives.length > 0 ? ` (${budgetAlternatives.length})` : ''}
+                                </button>
+                                {budgetPanelOpen && (
+                                    <div
+                                        className="absolute top-14 right-3 z-40 w-[min(380px,calc(100%-24px))] rounded-xl border border-[#C9A96E]/35 bg-[#12121A]/98 p-4 text-white shadow-2xl backdrop-blur-sm"
+                                        onClick={event => event.stopPropagation()}
+                                    >
+                                        <div className="mb-3 flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-[#C9A96E]">Propuesta privada</p>
+                                                <p className="mt-0.5 text-[11px] text-white/55">Se adjunta a esta foto y luego precarga el presupuesto.</p>
+                                            </div>
+                                            <button onClick={() => setBudgetPanelOpen(false)} className="text-white/45 hover:text-white" aria-label="Cerrar"><X size={16} /></button>
+                                        </div>
+                                        <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1">
+                                            {budgetDraft.map((item, index) => (
+                                                <div key={`budget-option-${index}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">Alternativa {index + 1}</span>
+                                                        <button onClick={() => setBudgetDraft(current => current.filter((_, itemIndex) => itemIndex !== index))} className="text-white/35 hover:text-red-300" aria-label="Eliminar alternativa"><Trash2 size={13} /></button>
+                                                    </div>
+                                                    <input value={item.title} onChange={event => updateBudgetDraft(index, 'title', event.target.value)} placeholder="Ej. Cerámicas x10" className="mb-2 w-full rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
+                                                    <input value={item.description} onChange={event => updateBudgetDraft(index, 'description', event.target.value)} placeholder="Descripción breve (opcional)" className="mb-2 w-full rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
+                                                    <div className="flex gap-2">
+                                                        <select value={item.currency} onChange={event => updateBudgetDraft(index, 'currency', event.target.value)} className="rounded-md border border-white/10 bg-black/20 px-2 text-xs outline-none focus:border-[#C9A96E]"><option value="USD">USD</option><option value="ARS">ARS</option></select>
+                                                        <input type="number" value={item.total || ''} onChange={event => updateBudgetDraft(index, 'total', event.target.value)} placeholder="Importe" className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-3 flex items-center justify-between gap-2">
+                                            <button disabled={budgetDraft.length >= 3} onClick={() => setBudgetDraft(current => [...current, { title: '', description: '', total: 0, currency: 'USD' }])} className="text-xs font-semibold text-[#C9A96E] disabled:opacity-40">+ Agregar alternativa</button>
+                                            <button onClick={saveBudgetPanel} className="rounded-md bg-[#C9A96E] px-3 py-2 text-xs font-semibold text-black hover:bg-[#D8B878]">Guardar</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
                         <div ref={artboardContainerRef} style={{

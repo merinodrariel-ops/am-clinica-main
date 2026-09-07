@@ -11,6 +11,7 @@ import {
 import type { PresupuestoPayload, PresupuestoRecord } from '@/lib/presupuesto-types';
 import { AM_REFERENCE_CASES, DEFAULT_CASE_SLUGS } from '@/lib/presupuesto-brand';
 import { buildFinancingRows, generatePresupuestoPdf } from '@/lib/presupuesto-pdf';
+import type { PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
 
 const emptyAlternative = () => ({ title: '', description: '', total: 0, currency: 'USD' as const });
 
@@ -51,16 +52,19 @@ export default function PatientBudgetsPanel({
     patientId,
     patientName,
     initialPhotoUrls = [],
+    initialAlternatives = [],
 }: {
     patientId: string;
     patientName: string;
     initialPhotoUrls?: string[];
+    initialAlternatives?: PhotoBudgetAlternative[];
 }) {
     const [records, setRecords] = useState<PresupuestoRecord[]>([]);
     const [active, setActive] = useState<PresupuestoRecord | null>(null);
     const [payload, setPayload] = useState<PresupuestoPayload>(() => ({
         ...initialPayload(patientName),
         photoUrls: initialPhotoUrls,
+        alternatives: initialAlternatives.length > 0 ? initialAlternatives.slice(0, 3) : [emptyAlternative()],
     }));
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);

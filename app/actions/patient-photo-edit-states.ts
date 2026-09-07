@@ -10,6 +10,7 @@ export interface PatientPhotoEditStateRow {
   brightness: number;
   draw_shapes: unknown[];
   text_annotations: unknown[];
+  budget_alternatives: unknown[];
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +42,7 @@ export async function savePatientPhotoEditStateAction(params: {
   brightness: number;
   drawShapes: unknown[];
   textAnnotations: unknown[];
+  budgetAlternatives?: unknown[];
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -56,6 +58,7 @@ export async function savePatientPhotoEditStateAction(params: {
       brightness: params.brightness,
       draw_shapes: params.drawShapes,
       text_annotations: params.textAnnotations,
+      budget_alternatives: params.budgetAlternatives ?? [],
       updated_by: user.id,
     }, { onConflict: 'file_id' });
 

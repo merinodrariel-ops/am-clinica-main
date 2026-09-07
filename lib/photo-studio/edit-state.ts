@@ -36,11 +36,19 @@ export interface TextAnnotation {
     visibility?: 'shared' | 'internal';
 }
 
+export interface PhotoBudgetAlternative {
+    title: string;
+    description: string;
+    total: number;
+    currency: 'USD' | 'ARS';
+}
+
 export interface FileEditState {
     rotation: number;
     brightness: number;
     drawShapes: DrawShape[];
     textAnnotations: TextAnnotation[];
+    budgetAlternatives?: PhotoBudgetAlternative[];
 }
 
 export function normalizeFileEditState(state?: Partial<FileEditState> | null): FileEditState {
@@ -49,6 +57,7 @@ export function normalizeFileEditState(state?: Partial<FileEditState> | null): F
         brightness: state?.brightness ?? 100,
         drawShapes: state?.drawShapes ?? [],
         textAnnotations: (state?.textAnnotations ?? []).map(normalizeTextAnnotation),
+        budgetAlternatives: Array.isArray(state?.budgetAlternatives) ? state?.budgetAlternatives : [],
     };
 }
 
