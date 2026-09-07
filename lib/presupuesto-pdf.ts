@@ -499,7 +499,7 @@ function renderFinancing(
         pdf.block(payload.financing, { size: 6.8, color: AM_COLORS.muted, gap: 3 });
     }
     pdf.block(
-        `TNA 18% anual sobre el saldo financiado (${financing.plans[0].breakdown.monthlyInterestPct.toFixed(2)}% mensual). Financiación sujeta a evaluación y preaprobación de cada caso.`,
+        'Financiación sujeta a evaluación y preaprobación de cada caso.',
         { size: 6, color: AM_COLORS.muted, gap: 4 },
     );
     pdf.linkRow('Simular otras combinaciones', AM_LINKS.financing);

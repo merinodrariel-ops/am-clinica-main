@@ -32,6 +32,8 @@ export interface TextAnnotation {
     width: number; // normalized 0–1 — controls the wrap box width
     fontSize: number;
     align: 'left' | 'center' | 'right';
+    /** Internal budget notes stay in the studio and never export to the image. */
+    visibility?: 'shared' | 'internal';
 }
 
 export interface FileEditState {
@@ -65,6 +67,7 @@ export function normalizeTextAnnotation(annotation: Partial<TextAnnotation>): Te
         width: annotation.width ?? DEFAULT_TEXT_ANNOTATION_WIDTH,
         fontSize: annotation.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
         align: annotation.align ?? 'left',
+        visibility: annotation.visibility ?? 'internal',
     };
 }
 

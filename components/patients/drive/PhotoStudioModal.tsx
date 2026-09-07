@@ -9,7 +9,7 @@ import {
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2, Share2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
-    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Eraser, FileText
+    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Eraser, FileText, Lock, Unlock
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -4523,6 +4523,7 @@ export default function PhotoStudioModal({
                     width: getDefaultTextAnnotationWidth(nx),
                     fontSize: DEFAULT_TEXT_FONT_SIZE,
                     align: 'left',
+                    visibility: 'internal',
                 };
                 setTextAnnotations(prev => [...prev, newTA]);
                 setSelectedTextId(newId);
@@ -5065,7 +5066,7 @@ export default function PhotoStudioModal({
             const displayW = drawCanvasRef.current?.clientWidth || canvasW;
             ctx.textBaseline = 'top';
             for (const ta of textAnnotations) {
-                if (!ta.text.trim()) continue;
+                if (!ta.text.trim() || ta.visibility === 'internal') continue;
                 const tx = ta.x * canvasW;
                 const ty = ta.y * canvasH;
                 const maxWidthPx = ta.width * canvasW;
@@ -6326,6 +6327,24 @@ export default function PhotoStudioModal({
                                         </button>
                                     );
                                 })}
+                                <div className="mx-1 h-5 w-px bg-white/10" />
+                                <button
+                                    onClick={() => {
+                                        pushHistory();
+                                        setTextAnnotations(prev => prev.map(t => t.id === selectedText.id
+                                            ? { ...t, visibility: t.visibility === 'internal' ? 'shared' : 'internal' }
+                                            : t));
+                                    }}
+                                    className={`flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-colors ${
+                                        selectedText.visibility === 'internal'
+                                            ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
+                                            : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                                    }`}
+                                    title={selectedText.visibility === 'internal' ? 'Nota privada: no se exporta' : 'Nota compartida: se exporta con la foto'}
+                                >
+                                    {selectedText.visibility === 'internal' ? <Lock size={13} /> : <Unlock size={13} />}
+                                    {selectedText.visibility === 'internal' ? 'Privada' : 'Compartida'}
+                                </button>
                             </div>
                         )}
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
