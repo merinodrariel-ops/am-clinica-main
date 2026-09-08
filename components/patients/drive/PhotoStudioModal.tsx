@@ -9,7 +9,7 @@ import {
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2, Share2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
-    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Eraser, FileText, Lock, Unlock
+    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Eraser, FileText, Lock, Unlock, Settings
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -762,6 +762,25 @@ export default function PhotoStudioModal({
     const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
     const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
     const [budgetDraft, setBudgetDraft] = useState<PhotoBudgetAlternative[]>([]);
+    const [budgetPresets, setBudgetPresets] = useState<PhotoBudgetAlternative[]>(PHOTO_BUDGET_PRESETS);
+    const [budgetPresetConfigOpen, setBudgetPresetConfigOpen] = useState(false);
+    const [draggingPresetIndex, setDraggingPresetIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+        try {
+            const saved = window.localStorage.getItem('am-photo-budget-presets');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) setBudgetPresets(parsed);
+            }
+        } catch {
+            // Keep the built-in presets if local storage is unavailable or malformed.
+        }
+    }, []);
+
+    useEffect(() => {
+        window.localStorage.setItem('am-photo-budget-presets', JSON.stringify(budgetPresets));
+    }, [budgetPresets]);
     const textDragRef = useRef<{ id: string; lastNx: number; lastNy: number } | null>(null);
     const textResizeDragRef = useRef<{ id: string; startNx: number; startWidth: number } | null>(null);
     const textMetricsRef = useRef<Map<string, { hNorm: number }>>(new Map());
@@ -795,6 +814,22 @@ export default function PhotoStudioModal({
         setBudgetDraft(current => current.map((item, itemIndex) => itemIndex === index
             ? { ...item, [key]: key === 'total' ? parseBudgetAmount(value) : value }
             : item));
+    }
+
+    function updateBudgetPreset(index: number, key: keyof PhotoBudgetAlternative, value: string) {
+        setBudgetPresets(current => current.map((item, itemIndex) => itemIndex === index
+            ? { ...item, [key]: key === 'total' ? parseBudgetAmount(value) : value }
+            : item));
+    }
+
+    function moveBudgetPreset(from: number, to: number) {
+        if (from === to || from < 0 || to < 0 || from >= budgetPresets.length || to >= budgetPresets.length) return;
+        setBudgetPresets(current => {
+            const next = [...current];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            return next;
+        });
     }
 
     const [zoom, setZoom] = useState(1);
@@ -6439,9 +6474,43 @@ export default function PhotoStudioModal({
                                             <button onClick={() => setBudgetPanelOpen(false)} className="text-white/45 hover:text-white" aria-label="Cerrar"><X size={16} /></button>
                                         </div>
                                         <div className="mb-3">
-                                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">Propuestas frecuentes · clic para agregar</p>
+                                            <div className="mb-2 flex items-center justify-between gap-2">
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">Propuestas frecuentes · clic para agregar</p>
+                                                <button
+                                                    onClick={() => setBudgetPresetConfigOpen(value => !value)}
+                                                    className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${budgetPresetConfigOpen ? 'bg-[#C9A96E]/20 text-[#C9A96E]' : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'}`}
+                                                >
+                                                    <Settings size={12} /> Configuración
+                                                </button>
+                                            </div>
+                                            {budgetPresetConfigOpen ? (
+                                                <div className="space-y-2 rounded-lg border border-[#C9A96E]/25 bg-black/20 p-2">
+                                                    <p className="text-[10px] text-white/50">Editá, arrastrá o agregá las opciones frecuentes.</p>
+                                                    <div className="max-h-[34vh] space-y-2 overflow-y-auto pr-1">
+                                                        {budgetPresets.map((preset, index) => (
+                                                            <div
+                                                                key={`preset-config-${index}`}
+                                                                draggable
+                                                                onDragStart={() => setDraggingPresetIndex(index)}
+                                                                onDragOver={event => event.preventDefault()}
+                                                                onDrop={() => {
+                                                                    if (draggingPresetIndex !== null) moveBudgetPreset(draggingPresetIndex, index);
+                                                                    setDraggingPresetIndex(null);
+                                                                }}
+                                                                onDragEnd={() => setDraggingPresetIndex(null)}
+                                                                className={`rounded-md border border-white/10 bg-white/[0.03] p-2 ${draggingPresetIndex === index ? 'opacity-50' : ''}`}
+                                                            >
+                                                                <div className="mb-1 flex items-center gap-2 text-[10px] text-white/45"><span className="cursor-grab">⠿</span> Opción frecuente {index + 1}</div>
+                                                                <input value={preset.title} onChange={event => updateBudgetPreset(index, 'title', event.target.value)} className="mb-1 w-full rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[#C9A96E]" placeholder="Nombre" />
+                                                                <input value={preset.description} onChange={event => updateBudgetPreset(index, 'description', event.target.value)} className="w-full rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[#C9A96E]" placeholder="Descripción" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <button onClick={() => setBudgetPresets(current => [...current, { title: 'Nueva opción', description: '', total: 0, currency: 'USD' }])} className="text-xs font-semibold text-[#C9A96E]">+ Agregar opción frecuente</button>
+                                                </div>
+                                            ) : (
                                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                                {PHOTO_BUDGET_PRESETS.map(preset => {
+                                                {budgetPresets.map(preset => {
                                                     const selected = budgetDraft.some(item => item.title === preset.title);
                                                     return (
                                                         <button
@@ -6456,6 +6525,7 @@ export default function PhotoStudioModal({
                                                     );
                                                 })}
                                             </div>
+                                            )}
                                         </div>
                                         <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1">
                                             {budgetDraft.map((item, index) => (
