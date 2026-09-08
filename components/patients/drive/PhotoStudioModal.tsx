@@ -782,7 +782,6 @@ export default function PhotoStudioModal({
 
     function addBudgetPreset(preset: PhotoBudgetAlternative) {
         setBudgetDraft(current => {
-            if (current.some(item => item.title === preset.title)) return current;
             const emptyIndex = current.findIndex(item => !item.title.trim() && !item.description.trim() && item.total === 0);
             if (emptyIndex >= 0) {
                 return current.map((item, index) => index === emptyIndex ? structuredClone(preset) : item);
@@ -6448,11 +6447,11 @@ export default function PhotoStudioModal({
                                                         <button
                                                             key={preset.title}
                                                             onClick={() => addBudgetPreset(preset)}
-                                                            disabled={selected || budgetDraft.length >= 10}
+                                                            disabled={budgetDraft.length >= 10}
                                                             className={`rounded-lg border px-3 py-2 text-left transition-colors ${selected ? 'border-[#C9A96E]/60 bg-[#C9A96E]/15 text-[#C9A96E]' : 'border-white/10 bg-white/[0.03] text-white/75 hover:border-[#C9A96E]/50 hover:bg-[#C9A96E]/10'} disabled:cursor-default disabled:opacity-70`}
                                                         >
                                                             <span className="block text-[11px] font-semibold leading-tight">{preset.title}</span>
-                                                            <span className="mt-1 block text-[10px] text-white/45">{selected ? 'Agregada' : 'Agregar opción'}</span>
+                                                            <span className="mt-1 block text-[10px] text-white/45">{selected ? 'Agregar otra copia' : 'Agregar opción'}</span>
                                                         </button>
                                                     );
                                                 })}
