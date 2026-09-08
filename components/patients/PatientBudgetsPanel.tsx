@@ -69,6 +69,7 @@ export default function PatientBudgetsPanel({
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [exporting, setExporting] = useState(false);
+    const [draggingAlternative, setDraggingAlternative] = useState<number | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -136,8 +137,26 @@ export default function PatientBudgetsPanel({
     }
 
     function addAlternative() {
-        if (payload.alternatives.length >= MAX_PRESUPUESTO_ALTERNATIVES) return;
-        updateField('alternatives', [...payload.alternatives, emptyAlternative()]);
+        setPayload((current) => {
+            if (current.alternatives.length >= MAX_PRESUPUESTO_ALTERNATIVES) return current;
+            return { ...current, alternatives: [...current.alternatives, emptyAlternative()] };
+        });
+    }
+
+    function moveAlternative(from: number, to: number) {
+        if (from === to || from < 0 || to < 0 || from >= payload.alternatives.length || to >= payload.alternatives.length) return;
+        setPayload((current) => {
+            const alternatives = [...current.alternatives];
+            const [moved] = alternatives.splice(from, 1);
+            alternatives.splice(to, 0, moved);
+            return {
+                ...current,
+                alternatives,
+                financingBaseIndex: current.financingBaseIndex === from
+                    ? to
+                    : current.financingBaseIndex,
+            };
+        });
     }
 
     function removeAlternative(index: number) {
@@ -230,17 +249,26 @@ export default function PatientBudgetsPanel({
                         </label>
                     </Section>
 
-                    <Section title="Alternativas" hint="Sólo nombre, descripción breve y total. Máximo tres.">
+                    <Section title="Alternativas" hint="Arrastrá cada tarjeta para ordenar las opciones. Máximo seis.">
                         <div className="space-y-3">
                             {payload.alternatives.map((item, index) => (
-                                <div key={index} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                                <div
+                                    key={index}
+                                    draggable
+                                    onDragStart={() => setDraggingAlternative(index)}
+                                    onDragOver={(event) => event.preventDefault()}
+                                    onDrop={() => {
+                                        if (draggingAlternative !== null) moveAlternative(draggingAlternative, index);
+                                        setDraggingAlternative(null);
+                                    }}
+                                    onDragEnd={() => setDraggingAlternative(null)}
+                                    className={`rounded-lg border border-gray-200 p-3 transition dark:border-gray-700 ${draggingAlternative === index ? 'opacity-50' : ''}`}
+                                >
                                     <div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500">
-                                        Opción {String(index + 1).padStart(2, '0')}
-                                        {payload.alternatives.length > 1 && (
-                                            <button onClick={() => removeAlternative(index)} aria-label="Quitar alternativa">
-                                                <X size={14} />
-                                            </button>
-                                        )}
+                                        <span className="flex items-center gap-2"><span className="cursor-grab text-gray-400">⠿</span> Opción {String(index + 1).padStart(2, '0')}</span>
+                                        <button type="button" onClick={() => removeAlternative(index)} aria-label="Quitar alternativa" disabled={payload.alternatives.length === 1}>
+                                            <X size={14} />
+                                        </button>
                                     </div>
                                     <input
                                         placeholder="Nombre del tratamiento"
@@ -277,7 +305,9 @@ export default function PatientBudgetsPanel({
                             ))}
                         </div>
                         <button
+                            type="button"
                             onClick={addAlternative}
+                            onMouseDown={(event) => event.preventDefault()}
                             disabled={payload.alternatives.length >= MAX_PRESUPUESTO_ALTERNATIVES}
                             className="text-xs font-semibold text-indigo-600 disabled:opacity-40"
                         >
