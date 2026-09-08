@@ -249,7 +249,7 @@ export default function PatientBudgetsPanel({
                         </label>
                     </Section>
 
-                    <Section title="Alternativas" hint="Arrastrá cada tarjeta para ordenar las opciones. Máximo seis.">
+                    <Section title="Alternativas" hint="Arrastrá cada tarjeta para ordenar las opciones. Máximo diez.">
                         <div className="space-y-3">
                             {payload.alternatives.map((item, index) => (
                                 <div

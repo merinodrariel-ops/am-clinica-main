@@ -5,7 +5,7 @@ export type PresupuestoAlternative = {
     currency: 'USD' | 'ARS';
 };
 
-export const MAX_PRESUPUESTO_ALTERNATIVES = 6;
+export const MAX_PRESUPUESTO_ALTERNATIVES = 10;
 
 export type PresupuestoPayload = {
     patientName: string;
