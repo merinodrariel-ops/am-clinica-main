@@ -278,10 +278,10 @@ export default function PatientBudgetsPanel({
                         </div>
                         <button
                             onClick={addAlternative}
-                        disabled={payload.alternatives.length >= MAX_PRESUPUESTO_ALTERNATIVES}
+                            disabled={payload.alternatives.length >= MAX_PRESUPUESTO_ALTERNATIVES}
                             className="text-xs font-semibold text-indigo-600 disabled:opacity-40"
                         >
-                            + Agregar alternativa
+                            + Agregar alternativa ({payload.alternatives.length}/{MAX_PRESUPUESTO_ALTERNATIVES})
                         </button>
                     </Section>
 

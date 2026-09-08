@@ -150,7 +150,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     function handleBudgetFilesSelected(files: Array<{ id: string }>, alternatives: PhotoBudgetAlternative[] = []) {
         const urls = files.map((file) => `/api/drive/file/${file.id}`);
         setBudgetPhotoUrls(urls);
-        setBudgetPhotoAlternatives(alternatives.slice(0, 4));
+        setBudgetPhotoAlternatives(alternatives.slice(0, 6));
         setBudgetEditorNonce((value) => value + 1);
         requestAnimationFrame(() => document.getElementById('presupuestos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     }
