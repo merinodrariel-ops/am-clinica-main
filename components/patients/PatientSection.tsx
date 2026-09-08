@@ -9,10 +9,12 @@ interface PatientSectionProps {
     title: string;
     icon: LucideIcon;
     defaultOpen?: boolean;
+    /** Incrementing this value opens the section without requiring a header click. */
+    openSignal?: number;
     children: ReactNode;
 }
 
-export default function PatientSection({ id, title, icon: Icon, defaultOpen = false, children }: PatientSectionProps) {
+export default function PatientSection({ id, title, icon: Icon, defaultOpen = false, openSignal, children }: PatientSectionProps) {
     const [open, setOpen] = useState(defaultOpen);
     const [mounted, setMounted] = useState(defaultOpen);
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -36,6 +38,15 @@ export default function PatientSection({ id, title, icon: Icon, defaultOpen = fa
         obs.observe(el);
         return () => obs.disconnect();
     }, []);
+
+    useEffect(() => {
+        if (openSignal === undefined) return;
+        const frame = requestAnimationFrame(() => {
+            setMounted(true);
+            setOpen(true);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [openSignal]);
 
     return (
         <div ref={wrapperRef} id={id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">

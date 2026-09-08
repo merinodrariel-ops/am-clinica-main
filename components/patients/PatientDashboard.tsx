@@ -146,12 +146,14 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
     const [budgetPhotoUrls, setBudgetPhotoUrls] = useState<string[]>([]);
     const [budgetPhotoAlternatives, setBudgetPhotoAlternatives] = useState<PhotoBudgetAlternative[]>([]);
     const [budgetEditorNonce, setBudgetEditorNonce] = useState(0);
+    const [budgetSectionOpenSignal, setBudgetSectionOpenSignal] = useState<number | undefined>(undefined);
 
     function handleBudgetFilesSelected(files: Array<{ id: string }>, alternatives: PhotoBudgetAlternative[] = []) {
         const urls = files.map((file) => `/api/drive/file/${file.id}`);
         setBudgetPhotoUrls(urls);
         setBudgetPhotoAlternatives(alternatives.slice(0, 10));
         setBudgetEditorNonce((value) => value + 1);
+        setBudgetSectionOpenSignal((value) => (value ?? 0) + 1);
         requestAnimationFrame(() => document.getElementById('presupuestos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     }
 
@@ -491,7 +493,7 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                     </PatientSection>
 
                     {canManagePresupuestos(role) && (
-                        <PatientSection id="presupuestos" title="Presupuestos" icon={FileText}>
+                        <PatientSection id="presupuestos" title="Presupuestos" icon={FileText} openSignal={budgetSectionOpenSignal}>
                             <PatientBudgetsPanel
                                 key={budgetEditorNonce}
                                 patientId={patient.id_paciente}
