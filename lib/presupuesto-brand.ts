@@ -120,7 +120,9 @@ export const AM_REFERENCE_CASES: ReferenceCase[] = [
         stat: 'CASO PERSONALIZADO',
         headline: 'Un solo diente puede cambiar toda una sonrisa.',
         detail: 'Incisivo central oscurecido por traumatismo, resuelto con blanqueamiento, resinas y una cerámica estratificada.',
-        image: caseImage('casos/carilla-unitaria-incisivo-central-oscurecido/carilla-unitaria-incisivo-central-oscurecido-antes-despues-portada-dr-ariel-merino-am-estetica-dental-puerto-madero'),
+        // La imagen que figura como "portada" en el sitio es sólo el antes.
+        // Para presupuestos usamos la comparativa real antes/después del caso.
+        image: caseImage('casos/carilla-unitaria-incisivo-central-oscurecido/carilla-unitaria-incisivo-central-comparativa-labios-sonrisa-resinas-blanqueamiento-am-estetica-dental'),
         url: `${AM_SITE}/casos/carilla-unitaria-incisivo-central-oscurecido`,
     },
     {
