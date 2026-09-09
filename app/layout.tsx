@@ -7,6 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import Providers from "@/components/Providers";
 import MainLayout from "@/components/MainLayout";
 import CategoriaSwitcher from "@/components/CategoriaSwitcher";
+import { getOperationalNow } from '@/lib/local-date';
 
 // Re-triggering Vercel deployment due to previous infrastructure delay
 
@@ -36,13 +37,19 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+    children: React.ReactNode;
 }>) {
+  const serverNow = getOperationalNow().getTime();
   return (
     <html lang="es" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${cormorant.variable} ${geistMono.variable} antialiased`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__AM_OPERATING_CLOCK_OFFSET_MS__ = ${serverNow} - Date.now();`,
+          }}
+        />
         <Providers>
           <Sidebar />
           <MainLayout>

@@ -1,13 +1,35 @@
-export function getLocalISODate(date: Date = new Date()): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+export const AM_OPERATING_TIME_ZONE = 'America/Argentina/Buenos_Aires';
+
+const CLOCK_OFFSET_KEY = '__AM_OPERATING_CLOCK_OFFSET_MS__';
+
+function getBrowserClockOffset(): number {
+    if (typeof window === 'undefined') return 0;
+    const value = (window as Window & { [CLOCK_OFFSET_KEY]?: unknown })[CLOCK_OFFSET_KEY];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * Uses AM Clínica's server-synchronised clock in browsers. On the server it
+ * naturally uses the host clock; dates are always rendered in Buenos Aires.
+ */
+export function getOperationalNow(): Date {
+    return new Date(Date.now() + getBrowserClockOffset());
+}
+
+export function syncOperationalClock(serverNow: string): boolean {
+    const serverMs = Date.parse(serverNow);
+    if (!Number.isFinite(serverMs) || typeof window === 'undefined') return false;
+    (window as Window & { [CLOCK_OFFSET_KEY]?: number })[CLOCK_OFFSET_KEY] = serverMs - Date.now();
+    return true;
+}
+
+export function getLocalISODate(date?: Date): string {
+    return getISODateInTimeZone(date || getOperationalNow(), AM_OPERATING_TIME_ZONE);
 }
 
 export function getISODateInTimeZone(
     date: Date = new Date(),
-    timeZone: string = 'America/Argentina/Buenos_Aires'
+    timeZone: string = AM_OPERATING_TIME_ZONE
 ): string {
     const parts = new Intl.DateTimeFormat('en-CA', {
         timeZone,
@@ -20,10 +42,14 @@ export function getISODateInTimeZone(
     return `${values.year}-${values.month}-${values.day}`;
 }
 
-export function getLocalYearMonth(date: Date = new Date()): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
+export function getLocalYearMonth(date?: Date): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: AM_OPERATING_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+    }).formatToParts(date || getOperationalNow());
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}`;
 }
 
 function parseDateOnlyAsLocal(dateValue: string): Date {
