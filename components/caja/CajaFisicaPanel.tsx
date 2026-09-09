@@ -10,6 +10,7 @@ import {
     abrirCajaFisica,
     canOpenCajaFisica,
     cerrarCajaFisica,
+    getFechaOperativaCaja,
     getSaldoCajaFisica,
     type SaldoCajaFisica,
 } from '@/lib/caja-fisica';
@@ -41,6 +42,7 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
     const [observaciones, setObservaciones] = useState('');
     const [showExpense, setShowExpense] = useState(false);
     const [showWithdrawal, setShowWithdrawal] = useState(false);
+    const [fechaOperativa, setFechaOperativa] = useState<string | null>(null);
 
     const usuario = useMemo(
         () => profile?.full_name || user?.email || 'Usuario de caja',
@@ -51,7 +53,9 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
         setLoading(true);
         setError(null);
         try {
-            const current = await getSaldoCajaFisica(sucursalId);
+            const fecha = await getFechaOperativaCaja();
+            const current = await getSaldoCajaFisica(sucursalId, fecha);
+            setFechaOperativa(fecha);
             setSaldo(current);
             onSaldoChange?.(current);
             setContadoArs(current.ars);
@@ -72,7 +76,9 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
         setSubmitting(true);
         setError(null);
         try {
-            await abrirCajaFisica({ sucursalId, usuario, tcBna });
+            const fecha = await getFechaOperativaCaja();
+            setFechaOperativa(fecha);
+            await abrirCajaFisica({ sucursalId, usuario, tcBna, fecha });
             await load();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo abrir la caja.');
@@ -85,6 +91,8 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
         setSubmitting(true);
         setError(null);
         try {
+            const fecha = saldo?.arqueo_fecha || fechaOperativa;
+            if (!fecha) throw new Error('No se pudo determinar la fecha operativa de la caja.');
             await cerrarCajaFisica({
                 sucursalId,
                 usuario,
@@ -92,7 +100,7 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
                 contadoUsd,
                 tcBna,
                 observaciones,
-                fecha: saldo?.arqueo_fecha || undefined,
+                fecha,
             });
             setShowClose(false);
             await load();
@@ -149,6 +157,11 @@ export default function CajaFisicaPanel({ sucursalId, tcBna, compact = false, on
                                             ? 'Caja cerrada'
                                             : 'Caja pendiente de apertura'}
                             </h2>
+                            {fechaOperativa && (
+                                <p className="mt-1 text-xs text-slate-400">
+                                    Fecha operativa: {new Date(`${fechaOperativa}T12:00:00`).toLocaleDateString('es-AR')}
+                                </p>
+                            )}
                         </div>
                     </div>
 

@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/client';
-import { getLocalISODate } from '@/lib/local-date';
 import {
     normalizeSaldoCajaFisica,
     resolveSaldoCajaFisicaForDate,
@@ -29,9 +28,17 @@ export interface CajaFisicaArqueo {
     observaciones?: string | null;
 }
 
+export async function getFechaOperativaCaja(): Promise<string> {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('caja_fecha_operativa');
+    if (error) throw new Error(error.message);
+    if (typeof data !== 'string' || !data) throw new Error('No se pudo obtener la fecha operativa de caja.');
+    return data;
+}
+
 export async function getSaldoCajaFisica(
     sucursalId: string,
-    fecha = getLocalISODate(),
+    fecha: string,
 ): Promise<SaldoCajaFisica> {
     const supabase = createClient();
     const { data, error } = await supabase.rpc('caja_saldo_fisico', {
@@ -60,12 +67,12 @@ export async function abrirCajaFisica(params: {
     sucursalId: string;
     usuario: string;
     tcBna?: number | null;
-    fecha?: string;
+    fecha: string;
 }): Promise<CajaFisicaArqueo> {
     const supabase = createClient();
     const { data, error } = await supabase.rpc('abrir_caja_fisica', {
         p_sucursal_id: params.sucursalId,
-        p_fecha: params.fecha || getLocalISODate(),
+        p_fecha: params.fecha,
         p_usuario: params.usuario,
         p_tc_bna: params.tcBna || null,
     });
@@ -81,7 +88,7 @@ export async function cerrarCajaFisica(params: {
     contadoUsd: number;
     tcBna?: number | null;
     observaciones?: string;
-    fecha?: string;
+    fecha: string;
 }): Promise<CajaFisicaArqueo> {
     if (params.contadoArs < 0 || params.contadoUsd < 0) {
         throw new Error('El conteo físico no puede ser negativo.');
@@ -90,7 +97,7 @@ export async function cerrarCajaFisica(params: {
     const supabase = createClient();
     const { data, error } = await supabase.rpc('cerrar_caja_fisica', {
         p_sucursal_id: params.sucursalId,
-        p_fecha: params.fecha || getLocalISODate(),
+        p_fecha: params.fecha,
         p_usuario: params.usuario,
         p_contado_ars: params.contadoArs,
         p_contado_usd: params.contadoUsd,
