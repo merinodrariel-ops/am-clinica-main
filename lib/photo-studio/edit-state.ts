@@ -41,6 +41,8 @@ export interface PhotoBudgetAlternative {
     description: string;
     total: number;
     currency: 'USD' | 'ARS';
+    /** Links an imported alternative to its source annotation while it remains in Photo Studio. */
+    sourceTextId?: string;
 }
 
 export interface FileEditState {

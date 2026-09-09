@@ -9,7 +9,7 @@ import {
     RotateCw, Save, ImageIcon, Grid, ArrowLeft, Undo2, Redo2,
     Play, ChevronLeft, ChevronRight, CheckSquare2, Globe2, Share2,
     PanelRightClose, PanelRightOpen, PenLine, Eye, EyeOff, ArrowLeftRight, Type, Plus, Copy, MessageCircle, Tag, Edit2, Zap, Trash2,
-    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Eraser, FileText, Lock, Unlock, Settings
+    AlignLeft, AlignCenter, AlignRight, Minus, Sparkles, Eraser, FileText, Lock, Unlock
 } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -21,6 +21,7 @@ import { type CanvasLayer, type CanvasRatio, RATIOS as CANVAS_RATIOS, loadImage 
 import { prepareSmileDesignSavePayload } from '@/lib/photo-studio/smile-save';
 import { CanvasThumbnailPreview, CanvasPresentationPreview } from './CanvasPreviews';
 import { normalizeRotation, normalizeFileEditState, serializeFileEditState, DEFAULT_TEXT_ANNOTATION_WIDTH, isCurrentPhotoSave, type DrawColor, type DrawPoint, type DrawShape, type TextAnnotation, type FileEditState, type PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
+import { budgetAlternativeFromPhotoText } from '@/lib/photo-studio/budget-from-text';
 import FabricCanvasStage from './FabricCanvasStage';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, shouldPreserveCanvasLayerAlpha, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
@@ -87,30 +88,6 @@ interface PhotoStudioModalProps {
     onSaved: (options?: { silent?: boolean; coverFileId?: string }) => void; // called after successful save → triggers folder refresh
     onBudgetFilesSelected?: (files: DriveFile[], alternatives?: PhotoBudgetAlternative[]) => void;
     autoStartSmile?: boolean;
-}
-
-const PHOTO_BUDGET_PRESETS: PhotoBudgetAlternative[] = [
-    { title: 'Micro diseño de sonrisa x10 · Resinas AM', description: 'Incluye 10 piezas anteriores de un maxilar en resina · Ariel Merino', total: 0, currency: 'USD' },
-    { title: 'Micro diseño de sonrisa x10 · Resinas staff', description: 'Incluye 10 piezas anteriores de un maxilar en resina · Staff', total: 0, currency: 'USD' },
-    { title: 'Diseño de sonrisa x10 · Cerámicas AM', description: 'Incluye 10 piezas anteriores de un maxilar en cerámica · Ariel Merino', total: 0, currency: 'USD' },
-    { title: 'Diseño de sonrisa x10 · Cerámicas staff', description: 'Incluye 10 piezas anteriores de un maxilar en cerámica · Staff', total: 0, currency: 'USD' },
-    { title: 'Rehabilitación cerámica total · AM', description: 'Rehabilitación cerámica total · Ariel Merino', total: 0, currency: 'USD' },
-    { title: 'Rehabilitación cerámica total · staff', description: 'Rehabilitación cerámica total · Staff', total: 0, currency: 'USD' },
-];
-
-function parseBudgetAmount(value: string): number {
-    const raw = value.trim().replace(/\s/g, '');
-    if (!raw) return 0;
-    // Clinic convention: 15.000 means fifteen thousand; comma remains decimal separator.
-    const normalized = raw.includes(',')
-        ? raw.replace(/\./g, '').replace(',', '.')
-        : raw.replace(/\./g, '');
-    const amount = Number(normalized.replace(/[^\d.-]/g, ''));
-    return Number.isFinite(amount) ? amount : 0;
-}
-
-function formatBudgetAmount(value: number): string {
-    return value > 0 ? new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(value) : '';
 }
 
 /**
@@ -565,7 +542,7 @@ export default function PhotoStudioModal({
     const [currentPoints, setCurrentPoints] = useState<DrawPoint[]>([]);
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
     const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; textId?: string } | null>(null);
     const [thumbnailContextMenu, setThumbnailContextMenu] = useState<{
         x: number;
         y: number;
@@ -760,27 +737,6 @@ export default function PhotoStudioModal({
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     const [textToolActive, setTextToolActive] = useState(false);
     const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
-    const [budgetPanelOpen, setBudgetPanelOpen] = useState(false);
-    const [budgetDraft, setBudgetDraft] = useState<PhotoBudgetAlternative[]>([]);
-    const [budgetPresets, setBudgetPresets] = useState<PhotoBudgetAlternative[]>(PHOTO_BUDGET_PRESETS);
-    const [budgetPresetConfigOpen, setBudgetPresetConfigOpen] = useState(false);
-    const [draggingPresetIndex, setDraggingPresetIndex] = useState<number | null>(null);
-
-    useEffect(() => {
-        try {
-            const saved = window.localStorage.getItem('am-photo-budget-presets');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) setBudgetPresets(parsed);
-            }
-        } catch {
-            // Keep the built-in presets if local storage is unavailable or malformed.
-        }
-    }, []);
-
-    useEffect(() => {
-        window.localStorage.setItem('am-photo-budget-presets', JSON.stringify(budgetPresets));
-    }, [budgetPresets]);
     const textDragRef = useRef<{ id: string; lastNx: number; lastNy: number } | null>(null);
     const textResizeDragRef = useRef<{ id: string; startNx: number; startWidth: number } | null>(null);
     const textMetricsRef = useRef<Map<string, { hNorm: number }>>(new Map());
@@ -788,48 +744,20 @@ export default function PhotoStudioModal({
     const textClipboardRef = useRef<TextAnnotation | null>(null);
     const selectedText = useMemo(() => textAnnotations.find(t => t.id === selectedTextId) ?? null, [textAnnotations, selectedTextId]);
 
-    function openBudgetPanel() {
-        setBudgetDraft(structuredClone(budgetAlternatives));
-        setBudgetPanelOpen(true);
-    }
-
-    function saveBudgetPanel() {
-        setBudgetAlternatives(budgetDraft.filter(item => item.title.trim() || item.description.trim() || item.total > 0));
-        setBudgetPanelOpen(false);
-        toast.success('Propuesta privada guardada en esta foto');
-    }
-
-    function addBudgetPreset(preset: PhotoBudgetAlternative) {
-        setBudgetDraft(current => {
-            const emptyIndex = current.findIndex(item => !item.title.trim() && !item.description.trim() && item.total === 0);
-            if (emptyIndex >= 0) {
-                return current.map((item, index) => index === emptyIndex ? structuredClone(preset) : item);
+    function addTextToBudget(annotation: TextAnnotation) {
+        if (!annotation.text.trim()) {
+            toast.error('Primero escribí el texto de la alternativa');
+            return;
+        }
+        const alternative = budgetAlternativeFromPhotoText(annotation.text, annotation.id);
+        setBudgetAlternatives(current => {
+            const existingIndex = current.findIndex(item => item.sourceTextId === annotation.id);
+            if (existingIndex >= 0) {
+                return current.map((item, index) => index === existingIndex ? alternative : item);
             }
-            if (current.length >= 10) return current;
-            return [...current, structuredClone(preset)];
+            return [...current, alternative];
         });
-    }
-
-    function updateBudgetDraft(index: number, key: keyof PhotoBudgetAlternative, value: string) {
-        setBudgetDraft(current => current.map((item, itemIndex) => itemIndex === index
-            ? { ...item, [key]: key === 'total' ? parseBudgetAmount(value) : value }
-            : item));
-    }
-
-    function updateBudgetPreset(index: number, key: keyof PhotoBudgetAlternative, value: string) {
-        setBudgetPresets(current => current.map((item, itemIndex) => itemIndex === index
-            ? { ...item, [key]: key === 'total' ? parseBudgetAmount(value) : value }
-            : item));
-    }
-
-    function moveBudgetPreset(from: number, to: number) {
-        if (from === to || from < 0 || to < 0 || from >= budgetPresets.length || to >= budgetPresets.length) return;
-        setBudgetPresets(current => {
-            const next = [...current];
-            const [moved] = next.splice(from, 1);
-            next.splice(to, 0, moved);
-            return next;
-        });
+        toast.success('Alternativa privada lista para el presupuesto');
     }
 
     const [zoom, setZoom] = useState(1);
@@ -5067,6 +4995,13 @@ export default function PhotoStudioModal({
         e.preventDefault();
         const canvas = drawCanvasRef.current!;
         const [nx, ny] = getDrawNormXY(e);
+        const textHit = hitTestTextAnnotation(textAnnotations, nx, ny);
+        if (textHit) {
+            setSelectedTextId(textHit.id);
+            const { x, y } = clampMenuToViewport(e.clientX, e.clientY, 250, 80);
+            setContextMenu({ x, y, textId: textHit.id });
+            return;
+        }
         const hit = hitTestAnyShape(drawShapes, nx, ny, canvas);
 
         // If right-clicking on a shape while others are already multi-selected, include it
@@ -6449,107 +6384,16 @@ export default function PhotoStudioModal({
                                     {selectedText.visibility === 'internal' ? <Lock size={13} /> : <Unlock size={13} />}
                                     {selectedText.visibility === 'internal' ? 'Privada' : 'Compartida'}
                                 </button>
-                            </div>
-                        )}
-                        {!canvasActive && activeFile && (
-                            <>
+                                <div className="mx-1 h-5 w-px bg-white/10" />
                                 <button
-                                    onClick={(event) => { event.stopPropagation(); openBudgetPanel(); }}
-                                    className="absolute top-3 right-3 z-30 flex items-center gap-2 rounded-lg border border-[#C9A96E]/40 bg-[#12121A]/95 px-3 py-2 text-xs font-semibold text-[#C9A96E] shadow-lg backdrop-blur-sm hover:bg-[#C9A96E]/15"
-                                    title="Cargar alternativas privadas para esta foto"
+                                    onClick={() => addTextToBudget(selectedText)}
+                                    className="flex h-8 items-center gap-1 rounded-md bg-[#C9A96E]/15 px-2 text-xs font-semibold text-[#C9A96E] transition-colors hover:bg-[#C9A96E]/25"
+                                    title="Crear o actualizar una alternativa privada con este texto"
                                 >
-                                    <FileText size={14} />
-                                    Propuesta{budgetAlternatives.length > 0 ? ` (${budgetAlternatives.length})` : ''}
+                                    <FileText size={13} />
+                                    {budgetAlternatives.some(item => item.sourceTextId === selectedText.id) ? 'Actualizar presupuesto' : 'Al presupuesto'}
                                 </button>
-                                {budgetPanelOpen && (
-                                    <div
-                                        className="absolute bottom-3 left-3 right-3 z-40 rounded-xl border border-[#C9A96E]/35 bg-[#12121A]/98 p-4 text-white shadow-2xl backdrop-blur-sm"
-                                        onClick={event => event.stopPropagation()}
-                                    >
-                                        <div className="mb-3 flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="text-sm font-semibold text-[#C9A96E]">Propuesta privada</p>
-                                                <p className="mt-0.5 text-[11px] text-white/55">Se adjunta a esta foto y luego precarga el presupuesto.</p>
-                                            </div>
-                                            <button onClick={() => setBudgetPanelOpen(false)} className="text-white/45 hover:text-white" aria-label="Cerrar"><X size={16} /></button>
-                                        </div>
-                                        <div className="mb-3">
-                                            <div className="mb-2 flex items-center justify-between gap-2">
-                                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">Propuestas frecuentes · clic para agregar</p>
-                                                <button
-                                                    onClick={() => setBudgetPresetConfigOpen(value => !value)}
-                                                    className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${budgetPresetConfigOpen ? 'bg-[#C9A96E]/20 text-[#C9A96E]' : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'}`}
-                                                >
-                                                    <Settings size={12} /> Configuración
-                                                </button>
-                                            </div>
-                                            {budgetPresetConfigOpen ? (
-                                                <div className="space-y-2 rounded-lg border border-[#C9A96E]/25 bg-black/20 p-2">
-                                                    <p className="text-[10px] text-white/50">Editá, arrastrá o agregá las opciones frecuentes.</p>
-                                                    <div className="max-h-[34vh] space-y-2 overflow-y-auto pr-1">
-                                                        {budgetPresets.map((preset, index) => (
-                                                            <div
-                                                                key={`preset-config-${index}`}
-                                                                draggable
-                                                                onDragStart={() => setDraggingPresetIndex(index)}
-                                                                onDragOver={event => event.preventDefault()}
-                                                                onDrop={() => {
-                                                                    if (draggingPresetIndex !== null) moveBudgetPreset(draggingPresetIndex, index);
-                                                                    setDraggingPresetIndex(null);
-                                                                }}
-                                                                onDragEnd={() => setDraggingPresetIndex(null)}
-                                                                className={`rounded-md border border-white/10 bg-white/[0.03] p-2 ${draggingPresetIndex === index ? 'opacity-50' : ''}`}
-                                                            >
-                                                                <div className="mb-1 flex items-center gap-2 text-[10px] text-white/45"><span className="cursor-grab">⠿</span> Opción frecuente {index + 1}</div>
-                                                                <input value={preset.title} onChange={event => updateBudgetPreset(index, 'title', event.target.value)} className="mb-1 w-full rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[#C9A96E]" placeholder="Nombre" />
-                                                                <input value={preset.description} onChange={event => updateBudgetPreset(index, 'description', event.target.value)} className="w-full rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[#C9A96E]" placeholder="Descripción" />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    <button onClick={() => setBudgetPresets(current => [...current, { title: 'Nueva opción', description: '', total: 0, currency: 'USD' }])} className="text-xs font-semibold text-[#C9A96E]">+ Agregar opción frecuente</button>
-                                                </div>
-                                            ) : (
-                                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                                {budgetPresets.map(preset => {
-                                                    const selected = budgetDraft.some(item => item.title === preset.title);
-                                                    return (
-                                                        <button
-                                                            key={preset.title}
-                                                            onClick={() => addBudgetPreset(preset)}
-                                                            disabled={budgetDraft.length >= 10}
-                                                            className={`rounded-lg border px-3 py-2 text-left transition-colors ${selected ? 'border-[#C9A96E]/60 bg-[#C9A96E]/15 text-[#C9A96E]' : 'border-white/10 bg-white/[0.03] text-white/75 hover:border-[#C9A96E]/50 hover:bg-[#C9A96E]/10'} disabled:cursor-default disabled:opacity-70`}
-                                                        >
-                                                            <span className="block text-[11px] font-semibold leading-tight">{preset.title}</span>
-                                                            <span className="mt-1 block text-[10px] text-white/45">{selected ? 'Agregar otra copia' : 'Agregar opción'}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                            )}
-                                        </div>
-                                        <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1">
-                                            {budgetDraft.map((item, index) => (
-                                                <div key={`budget-option-${index}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                                                    <div className="mb-2 flex items-center justify-between">
-                                                        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/55">Alternativa {index + 1}</span>
-                                                        <button onClick={() => setBudgetDraft(current => current.filter((_, itemIndex) => itemIndex !== index))} className="text-white/35 hover:text-red-300" aria-label="Eliminar alternativa"><Trash2 size={13} /></button>
-                                                    </div>
-                                                    <input value={item.title} onChange={event => updateBudgetDraft(index, 'title', event.target.value)} placeholder="Ej. Cerámicas x10" className="mb-2 w-full rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
-                                                    <input value={item.description} onChange={event => updateBudgetDraft(index, 'description', event.target.value)} placeholder="Descripción breve (opcional)" className="mb-2 w-full rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
-                                                    <div className="flex gap-2">
-                                                        <select value={item.currency} onChange={event => updateBudgetDraft(index, 'currency', event.target.value)} className="rounded-md border border-white/10 bg-black/20 px-2 text-xs outline-none focus:border-[#C9A96E]"><option value="USD">USD</option><option value="ARS">ARS</option></select>
-                                                        <input type="text" inputMode="decimal" value={formatBudgetAmount(item.total)} onChange={event => updateBudgetDraft(index, 'total', event.target.value)} placeholder="Importe (ej. 15.000)" className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/20 px-2.5 py-2 text-xs outline-none focus:border-[#C9A96E]" />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="mt-3 flex items-center justify-between gap-2">
-                                            <button disabled={budgetDraft.length >= 10} onClick={() => setBudgetDraft(current => [...current, { title: '', description: '', total: 0, currency: 'USD' }])} className="text-xs font-semibold text-[#C9A96E] disabled:opacity-40">+ Agregar alternativa ({budgetDraft.length}/10)</button>
-                                            <button onClick={saveBudgetPanel} className="rounded-md bg-[#C9A96E] px-3 py-2 text-xs font-semibold text-black hover:bg-[#D8B878]">Guardar</button>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
+                            </div>
                         )}
                         {/* scale() then translate(): translates happen in pre-scale space; handleMouseMove divides by zoom to compensate */}
                         <div ref={artboardContainerRef} style={{
@@ -8053,7 +7897,19 @@ export default function PhotoStudioModal({
                     className="fixed z-[91] bg-[#1A1A24] border border-white/15 rounded-xl shadow-xl py-1.5 min-w-[160px]"
                     style={{ left: contextMenu.x, top: contextMenu.y }}
                 >
-
+                    {contextMenu.textId ? (() => {
+                        const annotation = textAnnotations.find(item => item.id === contextMenu.textId);
+                        if (!annotation) return null;
+                        const linked = budgetAlternatives.some(item => item.sourceTextId === annotation.id);
+                        return (
+                            <button
+                                onClick={() => { addTextToBudget(annotation); setContextMenu(null); }}
+                                className="w-full text-left px-4 py-2 text-sm text-[#C9A96E] hover:bg-[#C9A96E]/15 transition-colors flex items-center gap-2"
+                            >
+                                <FileText size={15} /> {linked ? 'Actualizar alternativa privada' : 'Usar como alternativa de presupuesto'}
+                            </button>
+                        );
+                    })() : <>
                     {/* Agrupar — when 2+ shapes selected */}
                     {(multiSelectedIds.length >= 2 || (multiSelectedIds.length >= 1 && selectedShapeId)) && (
                         <button
@@ -8091,6 +7947,7 @@ export default function PhotoStudioModal({
                             <span>✕</span> Eliminar
                         </button>
                     )}
+                    </>}
                 </div>
             </>
         )}
