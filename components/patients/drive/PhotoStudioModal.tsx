@@ -26,7 +26,7 @@ import FabricCanvasStage from './FabricCanvasStage';
 import { CROP_ASPECT_PRESETS, buildCenteredAspectCrop, getCropAspectPreset, shouldExportPhotoAsPng, shouldPreserveCanvasLayerAlpha, type CropAspectPresetId } from '@/lib/photo-studio/crop-aspects';
 import { isOverLimit, computeScaleForLimit, supportsAlpha, pickFallbackMime, formatBytes } from '@/lib/photo-studio/export-size';
 import { getPhotoAnnotationDisplayScale } from '@/lib/photo-studio/text-scale';
-import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from '@/lib/photo-studio/text-annotations';
+import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste, normalizeClinicalAnnotationText } from '@/lib/photo-studio/text-annotations';
 import {
     DEFAULT_BACKGROUND_BRUSH_MODE,
     DEFAULT_MAGIC_WAND_TOLERANCE,
@@ -737,6 +737,7 @@ export default function PhotoStudioModal({
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     const [textToolActive, setTextToolActive] = useState(false);
     const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+    const [pendingTextTemplate, setPendingTextTemplate] = useState<string | null>(null);
     const textDragRef = useRef<{ id: string; lastNx: number; lastNy: number } | null>(null);
     const textResizeDragRef = useRef<{ id: string; startNx: number; startWidth: number } | null>(null);
     const textMetricsRef = useRef<Map<string, { hNorm: number }>>(new Map());
@@ -4435,8 +4436,11 @@ export default function PhotoStudioModal({
 
     function finishTextEditing(id: string) {
         const edited = textAnnotations.find(t => t.id === id);
-        const hasContent = Boolean(edited?.text.trim());
-        setTextAnnotations(prev => prev.filter(t => t.id !== id || t.text.trim() !== ''));
+        const normalizedText = normalizeClinicalAnnotationText(edited?.text ?? '').trim();
+        const hasContent = Boolean(normalizedText);
+        setTextAnnotations(prev => prev
+            .map(t => t.id === id ? { ...t, text: normalizedText } : t)
+            .filter(t => t.id !== id || t.text.trim() !== ''));
         setEditingTextId(null);
         setSelectedTextId(hasContent ? id : null); // keep visually selected so user can see + drag it
         justFinishedEditRef.current = id;
@@ -4548,7 +4552,7 @@ export default function PhotoStudioModal({
                     id: newId,
                     x: nx,
                     y: ny,
-                    text: '',
+                    text: pendingTextTemplate ?? '',
                     color: drawColor,
                     width: getDefaultTextAnnotationWidth(nx),
                     fontSize: DEFAULT_TEXT_FONT_SIZE,
@@ -4558,6 +4562,7 @@ export default function PhotoStudioModal({
                 setTextAnnotations(prev => [...prev, newTA]);
                 setSelectedTextId(newId);
                 setEditingTextId(newId);
+                setPendingTextTemplate(null);
             }
             return;
         }
@@ -6665,6 +6670,9 @@ export default function PhotoStudioModal({
                                                     value={ta.text}
                                                     placeholder="Texto..."
                                                     rows={1}
+                                                    lang="es-AR"
+                                                    spellCheck
+                                                    autoCapitalize="sentences"
                                                     onChange={e => {
                                                         const canvasWidthPx = drawCanvasRef.current?.clientWidth ?? 0;
                                                         setTextAnnotations(prev => prev.map(t => {
@@ -7366,6 +7374,16 @@ export default function PhotoStudioModal({
                                 }
                                 setEditingTextId(null);
                                 setSelectedTextId(null);
+                            }}
+                            onInsertTextPreset={(text) => {
+                                setPendingTextTemplate(text);
+                                setTextToolActive(true);
+                                setDrawMode('idle');
+                                setCurrentPoints([]);
+                                setBrushMode(null);
+                                setEditingTextId(null);
+                                setSelectedTextId(null);
+                                toast.message('Ahora hacé clic en la foto para ubicar el texto');
                             }}
                             textAnnotationCount={textAnnotations.length}
                             strokeStyle={strokeStyle}
@@ -8299,6 +8317,7 @@ interface ToolsPanelProps {
     onFlipHorizontal: () => void;
     textToolActive: boolean;
     onToggleTextTool: () => void;
+    onInsertTextPreset: (text: string) => void;
     textAnnotationCount: number;
     strokeStyle: string;
     onSetStrokeStyle: (s: string) => void;
@@ -8367,7 +8386,7 @@ function ToolsPanel({
     onUndoLastDrawPoint,
     onClearDraw,
     onFlipHorizontal,
-    textToolActive, onToggleTextTool,
+    textToolActive, onToggleTextTool, onInsertTextPreset,
     textAnnotationCount,
     strokeStyle, onSetStrokeStyle,
     multiSelectedCount, onGroupShapes,
@@ -8956,6 +8975,26 @@ function ToolsPanel({
                         Clic = crear · clic en texto = editar · mantener+arrastrar = mover · Enter o Esc = confirmar
                     </p>
                 )}
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">Textos frecuentes</p>
+                    <div className="grid grid-cols-1 gap-1.5">
+                        {[
+                            'Cerámicas x10 by AM',
+                            'Cerámicas x10 by staff',
+                            'Rehabilitación oral total en cerámica by AM',
+                            'Rehabilitación oral total en cerámica by staff',
+                        ].map((preset) => (
+                            <button
+                                key={preset}
+                                onClick={() => onInsertTextPreset(preset)}
+                                className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 text-left text-xs font-medium leading-snug text-white/75 transition-colors hover:border-[#C9A96E]/50 hover:bg-[#C9A96E]/10 hover:text-white"
+                            >
+                                {preset}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="mt-2 text-[10px] leading-snug text-white/40">Elegí uno y hacé clic en la foto para colocarlo. Después podés editar cantidad, profesional e importe.</p>
+                </div>
                 {textAnnotationCount > 0 && (
                     <p className="text-white/45 text-xs">
                         {textAnnotationCount} texto{textAnnotationCount !== 1 ? 's' : ''}

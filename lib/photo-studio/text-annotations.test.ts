@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste } from './text-annotations';
+import { DEFAULT_TEXT_FONT_SIZE, cloneTextAnnotationForPaste, normalizeClinicalAnnotationText } from './text-annotations';
 
 test('uses 30px as the default text annotation font size', () => {
     assert.equal(DEFAULT_TEXT_FONT_SIZE, 30);
@@ -45,4 +45,11 @@ test('keeps pasted text annotation inside the canvas bounds', () => {
 
     assert.equal(copy.x, 0.98);
     assert.equal(copy.y, 0.98);
+});
+
+test('normalizes frequent clinical words with their accents', () => {
+    assert.equal(
+        normalizeClinicalAnnotationText('rehabilitacion oral total en ceramicas esteticas'),
+        'rehabilitación oral total en cerámicas estéticas',
+    );
 });
