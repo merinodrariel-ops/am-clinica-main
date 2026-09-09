@@ -12,15 +12,16 @@ import {
 import { calculateFinancingBreakdown } from '@/lib/financial-engine';
 import type { PresupuestoPayload } from '@/lib/presupuesto-types';
 
-// Formato vertical 100 x 178 mm: proporción de pantalla de teléfono, porque la
-// propuesta se envía y se lee por WhatsApp, no se imprime en A4.
-const PAGE_W = 100;
-const PAGE_H = 178;
-const MARGIN = 9;
+// A4 editorial: aunque se envíe por WhatsApp, el paciente puede abrirlo,
+// compartirlo e imprimirlo sin que parezca una captura de pantalla angosta.
+const PAGE_W = 210;
+const PAGE_H = 297;
+const MARGIN = 24;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const HEADER_BASE = 12;
-const CONTENT_TOP = 20;
-const FOOTER_RULE = PAGE_H - 13;
+const HEADER_BASE = 16;
+const CONTENT_TOP = 34;
+const FOOTER_RULE = PAGE_H - 20;
+const FONT_SCALE = 1.55;
 
 const PT_TO_MM = 0.3528;
 
@@ -52,14 +53,9 @@ class ProposalDoc {
     readonly doc: jsPDF;
     private cursor = CONTENT_TOP;
     private pageIndex = 0;
-    private totalPages = 1;
 
     constructor() {
         this.doc = new jsPDF({ unit: 'mm', format: [PAGE_W, PAGE_H], compress: true });
-    }
-
-    setTotalPages(total: number) {
-        this.totalPages = total;
     }
 
     get y() {
@@ -81,8 +77,8 @@ class ProposalDoc {
         if (this.pageIndex > 1) this.doc.addPage([PAGE_W, PAGE_H]);
         this.paintBackground();
         this.doc.setDrawColor(...AM_COLORS.goldDeep);
-        this.doc.setLineWidth(0.2);
-        this.doc.rect(5, 5, PAGE_W - 10, PAGE_H - 10);
+        this.doc.setLineWidth(0.18);
+        this.doc.rect(8, 8, PAGE_W - 16, PAGE_H - 16);
         this.cursor = CONTENT_TOP;
     }
 
@@ -91,12 +87,12 @@ class ProposalDoc {
         if (this.pageIndex > 1) this.doc.addPage([PAGE_W, PAGE_H]);
         this.paintBackground();
 
-        this.label(AM_CLINIC.name, MARGIN, HEADER_BASE, 5, AM_COLORS.goldDeep, 0.6);
+        this.label(AM_CLINIC.name, MARGIN, HEADER_BASE, 5.1, AM_COLORS.cream, 0.7);
         this.label(
-            `${String(this.pageIndex).padStart(2, '0')} / ${String(this.totalPages).padStart(2, '0')}`,
+            `PÁG. ${String(this.pageIndex).padStart(2, '0')}`,
             PAGE_W - MARGIN,
             HEADER_BASE,
-            5,
+            4.8,
             AM_COLORS.muted,
             0.4,
             'right',
@@ -104,8 +100,8 @@ class ProposalDoc {
         this.hairline(HEADER_BASE + 2.6, AM_COLORS.goldDeep, 0.12);
 
         this.hairline(FOOTER_RULE, AM_COLORS.goldDeep, 0.12);
-        this.label(AM_CLINIC.tagline, MARGIN, FOOTER_RULE + 4, 4.6, AM_COLORS.muted, 0.4);
-        this.label('amesteticadental.com', PAGE_W - MARGIN, FOOTER_RULE + 4, 4.6, AM_COLORS.goldDeep, 0.3, 'right');
+        this.label(AM_CLINIC.tagline, MARGIN, FOOTER_RULE + 5, 4.4, AM_COLORS.muted, 0.45);
+        this.label('amesteticadental.com', PAGE_W - MARGIN, FOOTER_RULE + 5, 4.4, AM_COLORS.gold, 0.35, 'right');
 
         this.cursor = CONTENT_TOP;
     }
@@ -128,15 +124,30 @@ class ProposalDoc {
         bold = true,
     ) {
         this.doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        this.doc.setFontSize(size);
+        this.doc.setFontSize(size * FONT_SCALE);
         this.doc.setTextColor(...color);
         this.doc.text(text, x, baseline, { charSpace: tracking, align });
     }
 
     /** Etiqueta de sección en versalitas espaciadas, como los kickers del sitio. */
     kicker(text: string, color: Rgb = AM_COLORS.gold) {
-        this.label(text.toUpperCase(), MARGIN, this.cursor + 2, 5.6, color, 0.85);
-        this.cursor += 5.5;
+        this.label(text.toUpperCase(), MARGIN, this.cursor + 3, 5.3, color, 1.1);
+        this.cursor += 9;
+    }
+
+    heading(text: string, options: { gap?: number; align?: 'left' | 'center'; width?: number; x?: number } = {}) {
+        const size = 20;
+        const width = options.width ?? CONTENT_W;
+        const x = options.x ?? MARGIN;
+        this.doc.setFont('times', 'normal');
+        this.doc.setFontSize(size * FONT_SCALE);
+        this.doc.setTextColor(...AM_COLORS.cream);
+        const lines = this.doc.splitTextToSize(text, width) as string[];
+        const lineHeight = size * FONT_SCALE * PT_TO_MM * 1.12;
+        const baseline = this.cursor + size * FONT_SCALE * PT_TO_MM * 0.82;
+        const drawX = options.align === 'center' ? x + width / 2 : x;
+        lines.forEach((line, index) => this.doc.text(line, drawX, baseline + lineHeight * index, { align: options.align ?? 'left' }));
+        this.cursor += lines.length * lineHeight + (options.gap ?? 6);
     }
 
     block(
@@ -162,12 +173,13 @@ class ProposalDoc {
         const style = options.italic ? (options.bold ? 'bolditalic' : 'italic') : options.bold ? 'bold' : 'normal';
 
         this.doc.setFont('helvetica', style);
-        this.doc.setFontSize(size);
+        const scaledSize = size * FONT_SCALE;
+        this.doc.setFontSize(scaledSize);
         this.doc.setTextColor(...color);
 
         const lines = this.doc.splitTextToSize(text, width) as string[];
-        const lineHeight = size * PT_TO_MM * lineFactor;
-        const firstBaseline = this.cursor + size * PT_TO_MM * 0.82;
+        const lineHeight = scaledSize * PT_TO_MM * lineFactor;
+        const firstBaseline = this.cursor + scaledSize * PT_TO_MM * 0.82;
         const drawX = options.align === 'center' ? x + width / 2 : x;
 
         lines.forEach((line, index) => {
@@ -208,13 +220,13 @@ class ProposalDoc {
     }
 
     ctaButton(text: string, url: string) {
-        const height = 11;
+        const height = 14;
         const y = this.cursor;
         const baseline = y + height / 2 + 1.5;
         const upper = text.toUpperCase();
         this.doc.setFillColor(...AM_COLORS.gold);
         this.doc.roundedRect(MARGIN, y, CONTENT_W, height, 1.2, 1.2, 'F');
-        this.label(upper, PAGE_W / 2 - 3, baseline, 7.2, AM_COLORS.ink, 0.6, 'center');
+        this.label(upper, PAGE_W / 2 - 3, baseline, 6.5, AM_COLORS.ink, 0.7, 'center');
         this.arrow(MARGIN + CONTENT_W - 9, baseline, AM_COLORS.ink, 3.4);
         this.doc.link(MARGIN, y, CONTENT_W, height, { url });
         this.cursor = y + height + 4;
@@ -224,7 +236,7 @@ class ProposalDoc {
         try {
             const properties = this.doc.getImageProperties(dataUrl);
             const ratio = properties.width / properties.height;
-            const width = Math.min(CONTENT_W, maxHeight * ratio);
+            const width = Math.min(CONTENT_W, maxHeight * 1.35 * ratio);
             const height = width / ratio;
             const x = MARGIN + (CONTENT_W - width) / 2;
             this.doc.addImage(dataUrl, 'JPEG', x, this.cursor, width, height, undefined, 'FAST');
@@ -233,8 +245,8 @@ class ProposalDoc {
             this.doc.rect(x, this.cursor, width, height);
             this.cursor += height + 2.5;
             if (caption) {
-                this.label(caption.toUpperCase(), PAGE_W / 2, this.cursor + 1.5, 4.8, AM_COLORS.muted, 0.6, 'center');
-                this.cursor += 5;
+                this.label(caption.toUpperCase(), PAGE_W / 2, this.cursor + 2, 4.4, AM_COLORS.muted, 0.7, 'center');
+                this.cursor += 7;
             }
             return true;
         } catch {
@@ -301,8 +313,6 @@ export async function buildPresupuestoPdf(payload: PresupuestoPayload): Promise<
     const financing = buildFinancingRows(payload);
 
     const pdf = new ProposalDoc();
-    const photoPages = usablePhotos.length > 0 ? Math.ceil(usablePhotos.length / 2) : 0;
-    pdf.setTotalPages(1 + photoPages + 1 + (financing ? 1 : 0) + cases.length + 1);
 
     renderCover(pdf, payload, logoData);
     if (usablePhotos.length > 0) renderPatientPhotos(pdf, usablePhotos);
@@ -319,67 +329,60 @@ function renderCover(pdf: ProposalDoc, payload: PresupuestoPayload, logoData: st
 
     if (logoData) {
         try {
-            pdf.doc.addImage(logoData, 'PNG', PAGE_W / 2 - 9, 18, 18, 18);
+            pdf.doc.addImage(logoData, 'PNG', PAGE_W / 2 - 14, 34, 28, 28);
         } catch {
             /* el logo es opcional */
         }
     }
 
-    pdf.y = 46;
-    pdf.label(AM_CLINIC.name, PAGE_W / 2, pdf.y, 7, AM_COLORS.cream, 1.4, 'center');
-    pdf.y += 4.5;
-    pdf.label(AM_CLINIC.tagline, PAGE_W / 2, pdf.y, 4.8, AM_COLORS.muted, 0.9, 'center');
-
-    pdf.y = 68;
-    pdf.hairline(pdf.y, AM_COLORS.goldDeep, 0.15, PAGE_W / 2 - 8, PAGE_W / 2 + 8);
-
     pdf.y = 78;
-    pdf.label('PROPUESTA PERSONALIZADA', PAGE_W / 2, pdf.y, 5.4, AM_COLORS.gold, 0.9, 'center');
+    pdf.label(AM_CLINIC.name, PAGE_W / 2, pdf.y, 6.2, AM_COLORS.cream, 1.6, 'center');
+    pdf.y += 7;
+    pdf.label(AM_CLINIC.tagline, PAGE_W / 2, pdf.y, 4.5, AM_COLORS.muted, 1.0, 'center');
+
+    pdf.y = 103;
+    pdf.hairline(pdf.y, AM_COLORS.goldDeep, 0.16, PAGE_W / 2 - 16, PAGE_W / 2 + 16);
+
+    pdf.y = 118;
+    pdf.label('PROPUESTA PERSONALIZADA', PAGE_W / 2, pdf.y, 5.1, AM_COLORS.gold, 1.15, 'center');
     pdf.y += 8;
-    pdf.block(payload.patientName, {
-        size: 20,
-        color: AM_COLORS.cream,
-        lineFactor: 1.15,
+    pdf.heading(payload.patientName, {
         align: 'center',
         gap: 4,
     });
     pdf.block('Diseño de Sonrisa Digital y plan de tratamiento preparado exclusivamente para vos.', {
-        size: 7.6,
+        size: 8,
         color: AM_COLORS.muted,
         align: 'center',
-        width: CONTENT_W - 8,
-        x: MARGIN + 4,
+        width: CONTENT_W - 28,
+        x: MARGIN + 14,
         gap: 6,
     });
 
     const validUntil = new Date(Date.now() + 7 * 86400000).toLocaleDateString('es-AR');
-    pdf.label(`VÁLIDA HASTA ${validUntil}`, PAGE_W / 2, 128, 5.2, AM_COLORS.gold, 0.7, 'center');
+    pdf.label(`VÁLIDA HASTA ${validUntil}`, PAGE_W / 2, 178, 4.8, AM_COLORS.gold, 0.8, 'center');
 
     // Franja de autoridad: los tres datos que más pesan en la decisión.
-    const stripY = 140;
-    pdf.hairline(stripY, AM_COLORS.goldDeep, 0.12, MARGIN + 4, PAGE_W - MARGIN - 4);
-    const columnWidth = (PAGE_W - MARGIN * 2 - 8) / AM_AUTHORITY.length;
+    const stripY = 210;
+    pdf.hairline(stripY, AM_COLORS.goldDeep, 0.12, MARGIN + 8, PAGE_W - MARGIN - 8);
+    const columnWidth = (PAGE_W - MARGIN * 2 - 16) / AM_AUTHORITY.length;
     AM_AUTHORITY.forEach((item, index) => {
-        const centerX = MARGIN + 4 + columnWidth * index + columnWidth / 2;
-        pdf.label(item.value, centerX, stripY + 8, 10, AM_COLORS.cream, 0, 'center');
+        const centerX = MARGIN + 8 + columnWidth * index + columnWidth / 2;
+        pdf.label(item.value, centerX, stripY + 12, 9.5, AM_COLORS.cream, 0, 'center');
         item.label.split('\n').forEach((line, lineIndex) => {
-            pdf.label(line.toUpperCase(), centerX, stripY + 12.5 + lineIndex * 3.2, 4.2, AM_COLORS.muted, 0.3, 'center', false);
+            pdf.label(line.toUpperCase(), centerX, stripY + 18 + lineIndex * 4.4, 4, AM_COLORS.muted, 0.4, 'center', false);
         });
     });
-    pdf.hairline(stripY + 22, AM_COLORS.goldDeep, 0.12, MARGIN + 4, PAGE_W - MARGIN - 4);
+    pdf.hairline(stripY + 31, AM_COLORS.goldDeep, 0.12, MARGIN + 8, PAGE_W - MARGIN - 8);
 
-    pdf.label(AM_CLINIC.doctor, PAGE_W / 2, PAGE_H - 14, 4.8, AM_COLORS.muted, 0.4, 'center', false);
+    pdf.label(AM_CLINIC.doctor, PAGE_W / 2, PAGE_H - 20, 4.6, AM_COLORS.muted, 0.45, 'center', false);
 }
 
 function renderPatientPhotos(pdf: ProposalDoc, photos: string[]) {
     for (let index = 0; index < photos.length; index += 2) {
         pdf.page();
         pdf.kicker('Tu caso');
-        pdf.block(index === 0 ? 'Tu resultado, antes de empezar.' : 'Tu diseño en detalle.', {
-            size: 13,
-            lineFactor: 1.2,
-            gap: 2.5,
-        });
+        pdf.heading(index === 0 ? 'Tu resultado, antes de empezar.' : 'Tu diseño en detalle.', { gap: 3 });
         pdf.block(
             index === 0
                 ? 'Diseñamos tu sonrisa en 3D sobre tus propias fotos. Ves el resultado, lo aprobás, y recién después lo ejecutamos.'
@@ -398,52 +401,60 @@ function renderPatientPhotos(pdf: ProposalDoc, photos: string[]) {
 function renderProposal(pdf: ProposalDoc, payload: PresupuestoPayload) {
     pdf.page();
     pdf.kicker('Tu propuesta');
-    pdf.block('Tu plan de tratamiento.', { size: 15, lineFactor: 1.15, gap: 3 });
+    pdf.heading('Tu plan de tratamiento.', { gap: 3 });
     if (payload.intro.trim()) {
-        pdf.block(payload.intro, { size: 7.6, color: AM_COLORS.muted, gap: 6 });
+        pdf.block(payload.intro, { size: 7.5, color: AM_COLORS.muted, gap: 8 });
     }
 
     payload.alternatives.forEach((item, index) => {
+        // Las tarjetas necesitan aire. Si la página no alcanza, continúa con
+        // encabezado propio en lugar de cortar un tratamiento en dos.
+        if (pdf.y > FOOTER_RULE - 52) {
+            pdf.page();
+            pdf.kicker('Tu propuesta');
+            pdf.heading('Alternativas de tratamiento.', { gap: 7 });
+        }
         const boxTop = pdf.y;
-        pdf.y = boxTop + 4;
+        const featured = index === 0;
+        pdf.y = boxTop + 7;
 
-        pdf.label(`OPCIÓN ${String(index + 1).padStart(2, '0')}`, MARGIN + 4, pdf.y + 1.5, 4.8, AM_COLORS.goldDeep, 0.7);
-        pdf.y += 5;
+        pdf.label(`OPCIÓN ${String(index + 1).padStart(2, '0')}`, MARGIN + 7, pdf.y + 2, 4.7, featured ? AM_COLORS.gold : AM_COLORS.muted, 0.85);
+        pdf.y += 7;
         pdf.block(item.title || 'Alternativa de tratamiento', {
-            size: 10.5,
+            size: 10,
             color: AM_COLORS.cream,
-            bold: true,
+            bold: false,
             lineFactor: 1.2,
-            x: MARGIN + 4,
-            width: CONTENT_W - 8,
-            gap: 1.5,
+            x: MARGIN + 7,
+            width: CONTENT_W - 14,
+            gap: 2,
         });
         if (item.description.trim()) {
             pdf.block(item.description, {
-                size: 7,
+                size: 6.8,
                 color: AM_COLORS.muted,
-                x: MARGIN + 4,
-                width: CONTENT_W - 8,
-                gap: 2.5,
+                x: MARGIN + 7,
+                width: CONTENT_W - 14,
+                gap: 4,
             });
         }
-        pdf.hairline(pdf.y, AM_COLORS.goldDeep, 0.1, MARGIN + 4, PAGE_W - MARGIN - 4);
-        pdf.y += 3;
-        pdf.label('INVERSIÓN TOTAL', MARGIN + 4, pdf.y + 2, 4.6, AM_COLORS.muted, 0.6);
-        pdf.label(money(item.currency, item.total), PAGE_W - MARGIN - 4, pdf.y + 3, 12, AM_COLORS.gold, 0, 'right');
-        pdf.y += 7;
+        pdf.hairline(pdf.y, AM_COLORS.goldDeep, 0.1, MARGIN + 7, PAGE_W - MARGIN - 7);
+        pdf.y += 5;
+        pdf.label('INVERSIÓN TOTAL', MARGIN + 7, pdf.y + 2, 4.4, AM_COLORS.muted, 0.65);
+        pdf.label(money(item.currency, item.total), PAGE_W - MARGIN - 7, pdf.y + 4, 12, AM_COLORS.gold, 0, 'right');
+        pdf.y += 10;
 
         pdf.doc.setDrawColor(...AM_COLORS.goldDeep);
-        pdf.doc.setLineWidth(0.15);
-        pdf.doc.rect(MARGIN, boxTop, CONTENT_W, pdf.y - boxTop);
-        pdf.y += 4;
+        pdf.doc.setLineWidth(featured ? 0.25 : 0.14);
+        pdf.doc.roundedRect(MARGIN, boxTop, CONTENT_W, pdf.y - boxTop, 1.5, 1.5, 'S');
+        pdf.y += 7;
     });
 
-    if (pdf.y < FOOTER_RULE - 22) {
-        pdf.y = FOOTER_RULE - 22;
+    if (pdf.y < FOOTER_RULE - 30) {
+        pdf.y = FOOTER_RULE - 30;
         pdf.block(
             'Cada caso es personalizado: no trabajamos con sonrisas en serie. El plan se ejecuta con escáner intraoral, diseño 3D y cerámica CAD/CAM.',
-            { size: 6.6, color: AM_COLORS.muted, gap: 2.5 },
+            { size: 6.2, color: AM_COLORS.muted, gap: 3 },
         );
         pdf.linkRow('Ver tratamientos y tecnología', `${AM_LINKS.site}/clinica`);
     }
@@ -456,7 +467,7 @@ function renderFinancing(
 ) {
     pdf.page();
     pdf.kicker('Financiación');
-    pdf.block('Tu tratamiento, en cuotas fijas.', { size: 15, lineFactor: 1.15, gap: 3 });
+    pdf.heading('Tu tratamiento, en cuotas fijas.', { gap: 3 });
     pdf.block(
         `Sobre ${financing.title || 'tu plan'}, con ${financing.upfrontPct}% de anticipo. Cuotas iguales y fijas en ${financing.currency}; podés abonar en pesos al tipo de cambio oficial del Banco Nación del día.`,
         { size: 7.2, color: AM_COLORS.muted, gap: 5 },
@@ -508,7 +519,7 @@ function renderFinancing(
 function renderCase(pdf: ProposalDoc, item: ReferenceCase, imageData: string | null) {
     pdf.page();
     pdf.kicker('Antes y después reales');
-    pdf.block(item.headline, { size: 12, lineFactor: 1.22, gap: 2.5 });
+    pdf.heading(item.headline, { gap: 3 });
     pdf.block(item.detail, { size: 6.8, color: AM_COLORS.muted, gap: 4.5 });
 
     if (imageData) {
@@ -530,7 +541,7 @@ function renderCase(pdf: ProposalDoc, item: ReferenceCase, imageData: string | n
 function renderClose(pdf: ProposalDoc, payload: PresupuestoPayload) {
     pdf.page();
     pdf.kicker('El siguiente paso');
-    pdf.block('Reservá tu lugar en la agenda.', { size: 15, lineFactor: 1.15, gap: 3 });
+    pdf.heading('Reservá tu lugar en la agenda.', { gap: 3 });
     if (payload.cta.trim()) {
         pdf.block(payload.cta, { size: 7.4, color: AM_COLORS.muted, gap: 5 });
     }
