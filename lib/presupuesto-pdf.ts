@@ -130,8 +130,8 @@ class ProposalDoc {
     }
 
     /** Etiqueta de sección en versalitas espaciadas, como los kickers del sitio. */
-    kicker(text: string, color: Rgb = AM_COLORS.gold) {
-        this.label(text.toUpperCase(), MARGIN, this.cursor + 3, 5.3, color, 1.1);
+    kicker(text: string, color: Rgb = AM_COLORS.gold, align: 'left' | 'center' = 'left') {
+        this.label(text.toUpperCase(), align === 'center' ? PAGE_W / 2 : MARGIN, this.cursor + 3, 5.3, color, 1.1, align);
         this.cursor += 9;
     }
 
@@ -381,13 +381,13 @@ function renderCover(pdf: ProposalDoc, payload: PresupuestoPayload, logoData: st
 function renderPatientPhotos(pdf: ProposalDoc, photos: string[]) {
     for (let index = 0; index < photos.length; index += 2) {
         pdf.page();
-        pdf.kicker('Tu caso');
-        pdf.heading(index === 0 ? 'Tu resultado, antes de empezar.' : 'Tu diseño en detalle.', { gap: 3 });
+        pdf.kicker('Tu caso', AM_COLORS.gold, 'center');
+        pdf.heading(index === 0 ? 'Tu resultado, antes de empezar.' : 'Tu diseño en detalle.', { align: 'center', gap: 3 });
         pdf.block(
             index === 0
                 ? 'Diseñamos tu sonrisa en 3D sobre tus propias fotos. Ves el resultado, lo aprobás, y recién después lo ejecutamos.'
                 : 'Cada detalle del diseño se define antes de tocar un solo diente.',
-            { size: 7.4, color: AM_COLORS.muted, gap: 5 },
+            { size: 7.4, color: AM_COLORS.muted, align: 'center', gap: 5 },
         );
 
         const pair = photos.slice(index, index + 2);
@@ -400,10 +400,10 @@ function renderPatientPhotos(pdf: ProposalDoc, photos: string[]) {
 
 function renderProposal(pdf: ProposalDoc, payload: PresupuestoPayload) {
     pdf.page();
-    pdf.kicker('Tu propuesta');
-    pdf.heading('Tu plan de tratamiento.', { gap: 3 });
+    pdf.kicker('Tu propuesta', AM_COLORS.gold, 'center');
+    pdf.heading('Tu plan de tratamiento.', { align: 'center', gap: 3 });
     if (payload.intro.trim()) {
-        pdf.block(payload.intro, { size: 7.5, color: AM_COLORS.muted, gap: 8 });
+        pdf.block(payload.intro, { size: 7.5, color: AM_COLORS.muted, align: 'center', gap: 8 });
     }
 
     payload.alternatives.forEach((item, index) => {
@@ -411,8 +411,8 @@ function renderProposal(pdf: ProposalDoc, payload: PresupuestoPayload) {
         // encabezado propio en lugar de cortar un tratamiento en dos.
         if (pdf.y > FOOTER_RULE - 52) {
             pdf.page();
-            pdf.kicker('Tu propuesta');
-            pdf.heading('Alternativas de tratamiento.', { gap: 7 });
+            pdf.kicker('Tu propuesta', AM_COLORS.gold, 'center');
+            pdf.heading('Alternativas de tratamiento.', { align: 'center', gap: 7 });
         }
         const boxTop = pdf.y;
         const featured = index === 0;
@@ -466,11 +466,11 @@ function renderFinancing(
     financing: NonNullable<ReturnType<typeof buildFinancingRows>>,
 ) {
     pdf.page();
-    pdf.kicker('Financiación');
-    pdf.heading('Tu tratamiento, en cuotas fijas.', { gap: 3 });
+    pdf.kicker('Financiación', AM_COLORS.gold, 'center');
+    pdf.heading('Tu tratamiento, en cuotas fijas.', { align: 'center', gap: 3 });
     pdf.block(
         `Sobre ${financing.title || 'tu plan'}, con ${financing.upfrontPct}% de anticipo. Cuotas iguales y fijas en ${financing.currency}; podés abonar en pesos al tipo de cambio oficial del Banco Nación del día.`,
-        { size: 7.2, color: AM_COLORS.muted, gap: 5 },
+        { size: 7.2, color: AM_COLORS.muted, align: 'center', gap: 5 },
     );
 
     // Bloque anticipo / saldo, igual que el simulador público.
@@ -518,9 +518,9 @@ function renderFinancing(
 
 function renderCase(pdf: ProposalDoc, item: ReferenceCase, imageData: string | null) {
     pdf.page();
-    pdf.kicker('Antes y después reales');
-    pdf.heading(item.headline, { gap: 3 });
-    pdf.block(item.detail, { size: 6.8, color: AM_COLORS.muted, gap: 4.5 });
+    pdf.kicker('Antes y después reales', AM_COLORS.gold, 'center');
+    pdf.heading(item.headline, { align: 'center', gap: 3 });
+    pdf.block(item.detail, { size: 6.8, color: AM_COLORS.muted, align: 'center', gap: 4.5 });
 
     if (imageData) {
         pdf.framedImage(imageData, 78, `${item.kicker} · ${item.stat}`);
@@ -540,10 +540,10 @@ function renderCase(pdf: ProposalDoc, item: ReferenceCase, imageData: string | n
 
 function renderClose(pdf: ProposalDoc, payload: PresupuestoPayload) {
     pdf.page();
-    pdf.kicker('El siguiente paso');
-    pdf.heading('Reservá tu lugar en la agenda.', { gap: 3 });
+    pdf.kicker('El siguiente paso', AM_COLORS.gold, 'center');
+    pdf.heading('Reservá tu lugar en la agenda.', { align: 'center', gap: 3 });
     if (payload.cta.trim()) {
-        pdf.block(payload.cta, { size: 7.4, color: AM_COLORS.muted, gap: 5 });
+        pdf.block(payload.cta, { size: 7.4, color: AM_COLORS.muted, align: 'center', gap: 5 });
     }
 
     pdf.ctaButton(
