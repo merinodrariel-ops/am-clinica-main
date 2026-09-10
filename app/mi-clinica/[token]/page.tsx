@@ -1,6 +1,6 @@
 'use client';
 
-import { type MouseEvent, use, useEffect, useState, useRef } from 'react';
+import { type MouseEvent, use, useEffect, useState } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import {
     Calendar,
@@ -103,57 +103,6 @@ interface PortalData {
     } | null;
 }
 
-// ─── Smile before/after slider ────────────────────────────────────────────────
-
-function SmileSlider({ before, after, label }: { before: string; after: string; label: string }) {
-    const [pos, setPos] = useState(50);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const dragging = useRef(false);
-
-    function updatePos(clientX: number) {
-        if (!containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        const pct = Math.max(5, Math.min(95, ((clientX - rect.left) / rect.width) * 100));
-        setPos(pct);
-    }
-
-    return (
-        <div className="space-y-2">
-            <p className="text-xs text-white/50 uppercase tracking-widest">{label}</p>
-            <div
-                ref={containerRef}
-                className="relative h-64 rounded-2xl overflow-hidden cursor-ew-resize select-none border border-white/10"
-                onMouseDown={e => { dragging.current = true; updatePos(e.clientX); }}
-                onMouseMove={e => { if (dragging.current) updatePos(e.clientX); }}
-                onMouseUp={() => { dragging.current = false; }}
-                onMouseLeave={() => { dragging.current = false; }}
-                onTouchStart={e => { dragging.current = true; updatePos(e.touches[0].clientX); }}
-                onTouchMove={e => { if (dragging.current) updatePos(e.touches[0].clientX); }}
-                onTouchEnd={() => { dragging.current = false; }}
-            >
-                {/* Before image */}
-                <img src={before} alt="Antes" className="absolute inset-0 w-full h-full object-cover" />
-
-                {/* After image - clipped */}
-                <div className="absolute inset-0 overflow-hidden" style={{ width: `${pos}%` }}>
-                    <img src={after} alt="Después" className="absolute inset-0 h-full object-cover" style={{ width: `${10000 / pos}%` }} />
-                </div>
-
-                {/* Divider */}
-                <div className="absolute top-0 bottom-0 w-0.5 bg-white/80 shadow-lg" style={{ left: `${pos}%` }}>
-                    <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-10 w-10 rounded-full bg-white shadow-xl flex items-center justify-center">
-                        <span className="text-gray-800 text-xs font-bold select-none">↔</span>
-                    </div>
-                </div>
-
-                {/* Labels */}
-                <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 rounded-lg text-xs text-white/80 backdrop-blur">Antes</div>
-                <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 rounded-lg text-xs text-white/80 backdrop-blur">Después</div>
-            </div>
-        </div>
-    );
-}
-
 // ─── Section wrapper with scroll animation ────────────────────────────────────
 
 function FadeIn({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
@@ -249,9 +198,10 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
 
     const stlFiles = files.filter(f => f.file_type === 'stl');
     const smileFiles = files.filter(f => f.file_type === 'smile_design');
-    const beforePhotos = files.filter(f => f.file_type === 'photo_before');
-    const afterPhotos = files.filter(f => f.file_type === 'photo_after');
-    const comparisonPhotos = files.filter(f => f.file_type === 'photo_comparison');
+    const comparisonPhotos = files.filter(f =>
+        f.file_type === 'photo_comparison'
+        && !/antes y despu[eé]s \(\d+%\)/i.test(f.label || '')
+    );
     const smileMotionFiles = files.filter(f => f.file_type === 'smile_motion');
     const docFiles = files.filter(f => f.file_type === 'document' || f.file_type === 'comprobante');
 
@@ -455,22 +405,13 @@ export default function MiClinicaPortal({ params }: { params: Promise<{ token: s
                 )}
 
                 {/* ── Smile Design Gallery ── */}
-                {(smileFiles.length > 0 || comparisonPhotos.length > 0 || (beforePhotos.length > 0 && afterPhotos.length > 0)) && (
+                {(smileFiles.length > 0 || comparisonPhotos.length > 0) && (
                     <FadeIn delay={0.15}>
                         <div className="rounded-3xl bg-[#14141A] border border-white/5 p-6 space-y-6">
                             <div className="flex items-center gap-2">
                                 <Smile size={16} className="text-[#C9A96E]" />
                                 <h2 className="text-white font-bold text-lg">Tu Diseño de Sonrisa</h2>
                             </div>
-
-                            {/* Before/After slider (first pair) */}
-                            {beforePhotos.length > 0 && afterPhotos.length > 0 && (
-                                <SmileSlider
-                                    before={beforePhotos[0].file_url}
-                                    after={afterPhotos[0].file_url}
-                                    label="Simulador de Sonrisa"
-                                />
-                            )}
 
                             {/* Prominent Comparison Image */}
                             {comparisonPhotos.length > 0 && (

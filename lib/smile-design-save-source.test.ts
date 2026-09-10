@@ -47,4 +47,17 @@ test('saved comparison is vertical and does not preserve an interactive divider'
   assert.match(saveSource, /fillText\('DESPUÉS'/);
   assert.doesNotMatch(saveSource, /generateSliceBase64/);
   assert.doesNotMatch(source, /BeforeAfterSlider/);
+  assert.doesNotMatch(actionSource, /Smile Design - Antes -/);
+  assert.doesNotMatch(actionSource, /file_type: 'photo_before'/);
+});
+
+test('patient portal never reconstructs the discarded before-after slider', () => {
+  const portalSource = fs.readFileSync(
+    path.join(process.cwd(), 'app/mi-clinica/[token]/page.tsx'),
+    'utf8'
+  );
+
+  assert.doesNotMatch(portalSource, /function SmileSlider/);
+  assert.doesNotMatch(portalSource, /cursor-ew-resize/);
+  assert.match(portalSource, /antes y despu\[eé\]s/);
 });

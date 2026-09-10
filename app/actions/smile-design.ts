@@ -75,23 +75,6 @@ export async function saveSmileDesignResult(
       .from('patient-portal-files')
       .getPublicUrl(afterPath);
 
-    // Upload before image
-    const beforeBase64 = params.beforeDataUrl.includes(',')
-      ? params.beforeDataUrl.split(',')[1]
-      : params.beforeDataUrl;
-    const beforeBytes = Buffer.from(beforeBase64, 'base64');
-    const beforePath = `portal/${params.patientId}/${baseName}_Antes.jpg`;
-
-    console.log(`[saveSmileDesignResult] Saving ANTES to ${beforePath}`);
-
-    const beforeUpload = await adminClient.storage
-      .from('patient-portal-files')
-      .upload(beforePath, beforeBytes, { contentType: 'image/jpeg', upsert: false });
-
-    const beforeUrl = !beforeUpload.error
-      ? adminClient.storage.from('patient-portal-files').getPublicUrl(beforePath).data.publicUrl
-      : '';
-
     // Upload comparison image if provided
     let comparisonUrl = '';
     let comparisonBytes: Buffer | null = null;
@@ -130,16 +113,7 @@ export async function saveSmileDesignResult(
         driveFileId = driveUpload.fileId;
       }
 
-      // 2. Upload "Antes"
-      const beforeFileName = `Smile Design - Antes - ${label}.jpg`;
-      await uploadFileToFolder(
-        params.folderId,
-        beforeFileName,
-        beforeBytes,
-        'image/jpeg'
-      );
-
-      // 3. Upload fixed vertical comparison (before above / after below).
+      // 2. Upload fixed vertical comparison (before above / after below).
       if (comparisonBytes) {
         const compFileName = `Smile Design - Comparativa vertical Antes y Después - ${label}.jpg`;
         const comparisonDriveUpload = await uploadFileToFolder(
@@ -154,15 +128,9 @@ export async function saveSmileDesignResult(
       }
     }
 
-    // Save to patient_files (4 records: before, after, comparison, smile_design)
+    // Save only the useful result records. The original photo already exists in
+    // Drive, and the before/after is represented by the fixed vertical comparison.
     const records = [
-      {
-        patient_id: params.patientId,
-        file_type: 'photo_before',
-        label: `${label} – Antes`,
-        file_url: beforeUrl + cacheBuster,
-        is_visible_to_patient: true,
-      },
       {
         patient_id: params.patientId,
         file_type: 'photo_after',
