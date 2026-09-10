@@ -345,7 +345,7 @@ export default function PublicCasePublishModal({ files, patientId, patientName, 
             title="Subir caso a la web"
             className="max-w-6xl"
         >
-            <div className="space-y-5 p-5">
+            <div className="modal-body space-y-5 overflow-y-scroll overscroll-contain p-5 [scrollbar-gutter:stable]">
                 <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
                     Publicación directa: las fotos se alojan en Cloudinary y el caso aparece en amesteticadental.com sin descargar archivos.
                 </div>
