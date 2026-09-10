@@ -64,7 +64,6 @@ import { useSmileDesign } from '@/hooks/useSmileDesign';
 import { useSmileMotion } from '@/hooks/useSmileMotion';
 import SmileDesignPanel from './SmileDesignPanel';
 import WarpBrush from './WarpBrush';
-import BeforeAfterSlider from './BeforeAfterSlider';
 import SubjectTransformOverlay from './SubjectTransformOverlay';
 import { saveSmileDesignResult, getSmileShareUrl, saveSmileMotionVideo } from '@/app/actions/smile-design';
 
@@ -1405,7 +1404,6 @@ export default function PhotoStudioModal({
     const [smileProcessingTime, setSmileProcessingTime] = useState<number | null>(null);
     const [showWarpBrush, setShowWarpBrush] = useState(false);
     const smileStartTimeRef = useRef<number | null>(null);
-    const slicePosRef = useRef<number>(50); // tracks the current BeforeAfterSlider divider position
     const autoStartSmileRef = useRef(autoStartSmile ?? false);
 
     // Auto-trigger Smile Design when opened via quick-access button
@@ -6752,16 +6750,16 @@ export default function PhotoStudioModal({
                             />
                         )}
 
-                        {/* Smile Design before/after overlay */}
+                        {/* Smile Design result: the fixed vertical comparison is saved separately for PDF/WhatsApp. */}
                         {smileMode && smileDesign.result && (
                             <div className="absolute inset-0 flex items-center justify-center p-4 bg-[#0D0D12] z-10">
-                                <div className="relative w-full h-full">
-                                    <BeforeAfterSlider
-                                        beforeSrc={smileDesign.result.beforeDataUrl}
-                                        afterSrc={smileDesign.result.afterDataUrl}
-                                        className="w-full h-full"
-                                        onPosChange={(p) => { slicePosRef.current = p; }}
+                                <div className="relative flex h-full w-full items-center justify-center">
+                                    <img
+                                        src={smileDesign.result.afterDataUrl}
+                                        alt="Resultado del Smile Design"
+                                        className="h-full w-full object-contain"
                                     />
+                                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-white/85 backdrop-blur-sm">RESULTADO</span>
                                     {showSmileGrid && smileDesign.gridData && (
                                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" xmlns="http://www.w3.org/2000/svg">
                                             <defs>
@@ -7085,8 +7083,7 @@ export default function PhotoStudioModal({
                                     try {
                                         const prepared = await prepareSmileDesignSavePayload(
                                             smileDesign.result.beforeDataUrl,
-                                            smileDesign.result.afterDataUrl,
-                                            slicePosRef.current
+                                            smileDesign.result.afterDataUrl
                                         );
                                         
                                         // saveSmileDesignResult handles uploads to Drive AND DB records
@@ -7097,8 +7094,6 @@ export default function PhotoStudioModal({
                                             afterBase64: prepared.afterBase64,
                                             afterMime: prepared.afterMime,
                                             comparisonBase64: prepared.comparisonBase64,
-                                            sliceBase64: prepared.sliceBase64,
-                                            slicePos: prepared.slicePos,
                                             settings: smileDesign.settings,
                                         });
                                         
@@ -7119,10 +7114,10 @@ export default function PhotoStudioModal({
                                                 if (selectionError || !selectionFilesComplete) {
                                                     toast.warning("Smile Design guardado en el portal, pero no pudo pasar a Selección", {
                                                         id: saveToastId,
-                                                        description: selectionError || "No se obtuvo el resultado o el antes/después en Drive",
+                                                    description: selectionError || "No se obtuvo el resultado o la comparativa vertical en Drive",
                                                     });
                                                 } else {
-                                                    toast.success("Resultado y antes/después guardados en el portal y en Selección", { id: saveToastId });
+                                                    toast.success("Resultado y comparativa vertical guardados en el portal y en Selección", { id: saveToastId });
                                                 }
                                             } else {
                                                 toast.warning("Smile Design guardado en el portal, pero no pudo pasar a Selección", {

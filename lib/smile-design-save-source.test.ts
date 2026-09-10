@@ -25,9 +25,9 @@ test('Smile Design save reports the real preparation or server-action error', ()
   assert.doesNotMatch(source, /toast\.error\("Error al generar imágenes del Smile Design"/);
 });
 
-test('Smile Design save moves the result and minimal before/after slice to Selección after portal persistence', () => {
-  assert.match(actionSource, /beforeAfterDriveUpload\.success/);
-  assert.match(actionSource, /beforeAfterDriveFileId = beforeAfterDriveUpload\.fileId/);
+test('Smile Design save moves the result and vertical comparison to Selección after portal persistence', () => {
+  assert.match(actionSource, /comparisonDriveUpload\.success/);
+  assert.match(actionSource, /beforeAfterDriveFileId = comparisonDriveUpload\.fileId/);
   assert.match(actionSource, /driveFileId,\s*beforeAfterDriveFileId,/);
   assert.match(
     source,
@@ -35,14 +35,16 @@ test('Smile Design save moves the result and minimal before/after slice to Selec
   );
   assert.match(source, /selectionFilesComplete = selectionDriveFileIds\.length === 2/);
   assert.match(source, /syncEditedPhotosToSelectionAction\(\s*folderId,\s*selectionDriveFileIds\s*\)/);
-  assert.match(source, /Resultado y antes\/después guardados en el portal y en Selección/);
+  assert.match(source, /Resultado y comparativa vertical guardados en el portal y en Selección/);
   assert.match(source, /guardado en el portal, pero no pudo pasar a Selección/);
 });
 
-test('saved before/after uses the visible divider position and contains no purple handle', () => {
-  assert.match(source, /prepareSmileDesignSavePayload\([\s\S]*?slicePosRef\.current/);
-  assert.match(source, /slicePos: prepared\.slicePos/);
-  assert.match(saveSource, /rgba\(255,255,255,0\.88\)/);
-  assert.doesNotMatch(saveSource, /rgba\(168,85,247/);
-  assert.doesNotMatch(saveSource, /ctx\.arc\(cx, cy, r/);
+test('saved comparison is vertical and does not preserve an interactive divider', () => {
+  assert.match(saveSource, /canvas\.height = sh \* 2/);
+  assert.match(saveSource, /ctx\.drawImage\(imgBefore, 0, 0, sw, sh\)/);
+  assert.match(saveSource, /ctx\.drawImage\(imgAfter, 0, sh, sw, sh\)/);
+  assert.match(saveSource, /fillText\('ANTES'/);
+  assert.match(saveSource, /fillText\('DESPUÉS'/);
+  assert.doesNotMatch(saveSource, /generateSliceBase64/);
+  assert.doesNotMatch(source, /BeforeAfterSlider/);
 });

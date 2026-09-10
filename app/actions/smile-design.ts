@@ -11,9 +11,7 @@ export interface SaveSmileDesignParams {
   beforeDataUrl: string;  // data:image/...;base64,...
   afterBase64: string;    // base64 only (no prefix)
   afterMime: string;
-  comparisonBase64?: string; // base64 only (optional side-by-side)
-  sliceBase64?: string;      // base64 only (optional before/after slice view)
-  slicePos?: number;         // divider position 0-100 (default 50)
+  comparisonBase64?: string; // base64 only (optional vertical: before above, after below)
   settings: {
     level: string;
     identity: string;
@@ -111,23 +109,6 @@ export async function saveSmileDesignResult(
       }
     }
 
-    // Upload slice image if provided
-    let sliceUrl = '';
-    let sliceBytes: Buffer | null = null;
-    if (params.sliceBase64) {
-      sliceBytes = Buffer.from(params.sliceBase64, 'base64');
-      const slicePath = `portal/${params.patientId}/${baseName}_Slice.jpg`;
-      console.log(`[saveSmileDesignResult] Saving SLICE to ${slicePath}`);
-
-      const sliceUpload = await adminClient.storage
-        .from('patient-portal-files')
-        .upload(slicePath, sliceBytes, { contentType: 'image/jpeg', upsert: false });
-
-      if (!sliceUpload.error) {
-        sliceUrl = adminClient.storage.from('patient-portal-files').getPublicUrl(slicePath).data.publicUrl;
-      }
-    }
-
     const cacheBuster = `?t=${ts}`;
     const label = `Smile Design ${dateStr} · ${params.settings.identity} · ${params.settings.level}`;
 
@@ -158,29 +139,17 @@ export async function saveSmileDesignResult(
         'image/jpeg'
       );
 
-      // 3. Upload Comparison (Side-by-Side)
+      // 3. Upload fixed vertical comparison (before above / after below).
       if (comparisonBytes) {
-        const compFileName = `Smile Design - Comparativa - ${label}.jpg`;
-        await uploadFileToFolder(
+        const compFileName = `Smile Design - Comparativa vertical Antes y Después - ${label}.jpg`;
+        const comparisonDriveUpload = await uploadFileToFolder(
           params.folderId,
           compFileName,
           comparisonBytes,
           'image/jpeg'
         );
-      }
-
-      // 4. Upload Slice
-      if (sliceBytes) {
-        const slicePos = params.slicePos ?? 50;
-        const sliceFileName = `Smile Design - Antes y Después ${Math.round(slicePos)}pct - ${label}.jpg`;
-        const beforeAfterDriveUpload = await uploadFileToFolder(
-          params.folderId,
-          sliceFileName,
-          sliceBytes,
-          'image/jpeg'
-        );
-        if (beforeAfterDriveUpload.success) {
-          beforeAfterDriveFileId = beforeAfterDriveUpload.fileId;
+        if (comparisonDriveUpload.success) {
+          beforeAfterDriveFileId = comparisonDriveUpload.fileId;
         }
       }
     }
@@ -214,19 +183,8 @@ export async function saveSmileDesignResult(
       records.push({
         patient_id: params.patientId,
         file_type: 'photo_comparison',
-        label: `${label} – Comparativa`,
+        label: `${label} – Comparativa vertical (Antes / Después)`,
         file_url: comparisonUrl + cacheBuster,
-        is_visible_to_patient: true,
-      });
-    }
-
-    if (sliceUrl) {
-      const slicePos = params.slicePos ?? 50;
-      records.push({
-        patient_id: params.patientId,
-        file_type: 'photo_comparison',
-        label: `${label} – Antes y después (${Math.round(slicePos)}%)`,
-        file_url: sliceUrl + cacheBuster,
         is_visible_to_patient: true,
       });
     }
