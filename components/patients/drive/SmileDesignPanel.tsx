@@ -7,6 +7,7 @@ import type {
   SmileResult,
   CentralLength,
   SmileIdentity,
+  SmileExpression,
   SmileShade,
 } from '@/hooks/useSmileDesign';
 import { DEFAULT_SMILE_SETTINGS } from '@/hooks/useSmileDesign';
@@ -43,6 +44,10 @@ const IDENTITY_OPTIONS: { value: SmileIdentity; label: string; hint: string }[] 
   { value: 'Fiel', label: 'Fiel al paciente', hint: 'Conserva tamaño, proporciones y personalidad dental.' },
   { value: 'Equilibrado', label: 'Equilibrado', hint: 'Híbrido entre identidad real y sonrisa armónica.' },
   { value: 'Idealizado', label: 'Idealizado', hint: 'Mayor corrección, simetría y perfección estética.' },
+];
+const EXPRESSION_OPTIONS: { value: SmileExpression; label: string; hint: string }[] = [
+  { value: 'Sonrisa suave', label: 'Sonrisa suave', hint: 'Afloja apenas una expresión rígida, sin exagerarla.' },
+  { value: 'Original', label: 'Expresión original', hint: 'No modifica labios ni expresión facial.' },
 ];
 const LEVEL_OPTIONS: { value: SmileShade; label: string }[] = [
   { value: 'Tono original', label: 'Tono original' },
@@ -141,6 +146,30 @@ export default function SmileDesignPanel({
                     {opt.value === DEFAULT_SMILE_SETTINGS.identity && settings.identity === opt.value && (
                       <span className="float-right text-[8px] text-purple-400">default</span>
                     )}
+                  </div>
+                  <div className="mt-0.5 text-[8px] leading-tight text-gray-500">{opt.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Facial expression */}
+          <div>
+            <div className="text-[9px] text-gray-500 uppercase tracking-wide mb-1.5">Expresión</div>
+            <div className="grid grid-cols-2 gap-1">
+              {EXPRESSION_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => onSettingsChange({ expression: opt.value })}
+                  title={opt.hint}
+                  className={`text-left px-2 py-1.5 rounded border transition-colors ${
+                    settings.expression === opt.value
+                      ? 'bg-purple-900/50 border-purple-500 text-purple-200'
+                      : 'bg-[#1e2130] border-[#2a2d3a] text-gray-400 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="text-[10px] font-semibold">
+                    {settings.expression === opt.value && '● '}{opt.label}
                   </div>
                   <div className="mt-0.5 text-[8px] leading-tight text-gray-500">{opt.hint}</div>
                 </button>

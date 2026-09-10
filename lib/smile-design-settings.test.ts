@@ -11,6 +11,30 @@ import { buildSmileDesignPrompt } from './smile-design-prompt';
 test('defaults to an equilibrated identity with a minimally improved original shade', () => {
   assert.equal(DEFAULT_SMILE_SETTINGS.identity, 'Equilibrado');
   assert.equal(DEFAULT_SMILE_SETTINGS.level, 'Original mejorado');
+  assert.equal(DEFAULT_SMILE_SETTINGS.expression, 'Sonrisa suave');
+});
+
+test('soft smile relaxes only the lower facial expression without forcing a grin', () => {
+  const prompt = buildSmileDesignPrompt(DEFAULT_SMILE_SETTINGS);
+
+  assert.match(prompt, /EXPRESIÓN NATURAL AM/);
+  assert.match(prompt, /eleva de manera mínima.*las comisuras/i);
+  assert.match(prompt, /tejidos blandos periorales del tercio inferior/i);
+  assert.match(prompt, /No generes una carcajada, sonrisa forzada/i);
+  assert.match(prompt, /No alteres.*nariz, ojos/i);
+  assert.doesNotMatch(prompt, /Modifica únicamente los dientes visibles/);
+});
+
+test('original expression keeps lips and facial soft tissues unchanged', () => {
+  const prompt = buildSmileDesignPrompt({
+    ...DEFAULT_SMILE_SETTINGS,
+    expression: 'Original',
+  });
+
+  assert.match(prompt, /EXPRESIÓN ORIGINAL/);
+  assert.match(prompt, /Conserva exactamente la expresión/i);
+  assert.match(prompt, /Modifica únicamente los dientes visibles/);
+  assert.match(prompt, /No alteres labios/i);
 });
 
 test('quick actions move identity and shade independently', () => {

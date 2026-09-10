@@ -76,6 +76,22 @@ export function buildSmileDesignPrompt(settings: SmileSettings): string {
     );
   }
 
+  const expressionInstructions = settings.expression === 'Sonrisa suave'
+    ? `EXPRESIÓN NATURAL AM:
+- Si la persona aparece rígida o neutra, vuelve su expresión apenas más amable y naturalmente sonriente.
+- Relaja sutilmente la tensión labial y eleva de manera mínima, simétrica y verosímil las comisuras.
+- Limita el cambio a los labios y tejidos blandos periorales del tercio inferior; debe ser apenas perceptible y compatible con la anatomía original.
+- Conserva una apertura labial natural. No inventes exposición dental o gingival excesiva.
+- No generes una carcajada, sonrisa forzada, mejillas infladas, ojos entrecerrados ni cambios de edad o identidad.`
+    : `EXPRESIÓN ORIGINAL:
+- Conserva exactamente la expresión, posición y tensión de los labios y los tejidos blandos faciales.`;
+
+  const preservationInstructions = settings.expression === 'Sonrisa suave'
+    ? `- Modifica los dientes visibles y, únicamente para suavizar la expresión, permite un ajuste mínimo de labios y tejidos periorales del tercio inferior.
+- No alteres encía fuera de lo necesario para la integración dental, nariz, ojos, cejas, piel, forma facial, cabello, fondo, encuadre ni exposición general.`
+    : `- Modifica únicamente los dientes visibles.
+- No alteres labios, encía, nariz, ojos, piel, forma facial, cabello, fondo, encuadre ni exposición general.`;
+
   return `Realiza una simulación estética fotorrealista de la sonrisa de esta persona.
 
 PRIORIDAD 1 — IDENTIDAD Y GEOMETRÍA:
@@ -100,9 +116,10 @@ REALISMO ÓPTICO OBLIGATORIO:
 AJUSTES FINOS:
 ${anatomyLines.length > 0 ? anatomyLines.map(line => `- ${line}`).join('\n') : '- Sin ajustes adicionales.'}
 
+${expressionInstructions}
+
 PRESERVACIÓN:
-- Modifica únicamente los dientes visibles.
-- No alteres labios, encía, nariz, ojos, piel, forma facial, cabello, fondo, encuadre ni exposición general.
+${preservationInstructions}
 - No agregues ni elimines dientes visibles.
 - Devuelve solo la imagen final editada.`;
 }

@@ -5,6 +5,7 @@ import { buildSmileDesignPrompt } from '@/lib/smile-design-prompt';
 import {
     DEFAULT_SMILE_SETTINGS,
     type SmileIdentity,
+    type SmileExpression,
     type SmileSettings,
     type SmileShade,
 } from '@/lib/smile-design-settings';
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     try {
         const {
             imageBase64, mimeType,
-            level, identity, edges, edgesIntensity, texture, textureIntensity, shape, centralLength,
+            level, identity, expression, edges, edgesIntensity, texture, textureIntensity, shape, centralLength,
             intensity, // legacy
         } = await req.json();
 
@@ -58,11 +59,16 @@ export async function POST(req: NextRequest) {
         const resolvedIdentity: SmileIdentity = allowedIdentities.includes(identity)
             ? identity
             : DEFAULT_SMILE_SETTINGS.identity;
+        const allowedExpressions: SmileExpression[] = ['Original', 'Sonrisa suave'];
+        const resolvedExpression: SmileExpression = allowedExpressions.includes(expression)
+            ? expression
+            : DEFAULT_SMILE_SETTINGS.expression;
 
         const settings: SmileSettings = {
             ...DEFAULT_SMILE_SETTINGS,
             level: resolvedLevel,
             identity: resolvedIdentity,
+            expression: resolvedExpression,
             edges: typeof edges === 'boolean' ? edges : DEFAULT_SMILE_SETTINGS.edges,
             edgesIntensity: edgesIntensity ?? DEFAULT_SMILE_SETTINGS.edgesIntensity,
             texture: typeof texture === 'boolean' ? texture : DEFAULT_SMILE_SETTINGS.texture,
@@ -73,7 +79,7 @@ export async function POST(req: NextRequest) {
         const prompt = buildSmileDesignPrompt(settings);
 
 
-        console.log(`[smile-design/enhance] level=${resolvedLevel}, identity=${resolvedIdentity}, edges=${settings.edges}, texture=${settings.texture}, shape=${settings.shape}, payloadBytes=${imageBase64.length}`);
+        console.log(`[smile-design/enhance] level=${resolvedLevel}, identity=${resolvedIdentity}, expression=${resolvedExpression}, edges=${settings.edges}, texture=${settings.texture}, shape=${settings.shape}, payloadBytes=${imageBase64.length}`);
 
         const ai = getAI();
         const response = await ai.models.generateContent({

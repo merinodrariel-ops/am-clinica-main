@@ -6,6 +6,7 @@ export type SmileShade =
   | 'Ultra blanco';
 
 export type SmileIdentity = 'Fiel' | 'Equilibrado' | 'Idealizado';
+export type SmileExpression = 'Original' | 'Sonrisa suave';
 
 export type SmileIntensity3 = 'Sutil' | 'Medio' | 'Marcado';
 export type CentralLength = 'Cortos' | 'Natural' | 'Largos';
@@ -13,6 +14,7 @@ export type CentralLength = 'Cortos' | 'Natural' | 'Largos';
 export interface SmileSettings {
   level: SmileShade;
   identity: SmileIdentity;
+  expression: SmileExpression;
   edges: boolean;
   edgesIntensity: SmileIntensity3;
   texture: boolean;
@@ -24,6 +26,7 @@ export interface SmileSettings {
 export const DEFAULT_SMILE_SETTINGS: SmileSettings = {
   level: 'Original mejorado',
   identity: 'Equilibrado',
+  expression: 'Sonrisa suave',
   edges: true,
   edgesIntensity: 'Medio',
   texture: true,
