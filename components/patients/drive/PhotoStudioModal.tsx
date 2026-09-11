@@ -5419,7 +5419,22 @@ export default function PhotoStudioModal({
             toast.info('Seleccioná al menos una foto para agregar al presupuesto');
             return;
         }
-        await flushPhotoStateSave();
+        // React state may have changed milliseconds before the multi-selection
+        // click. Capture the active photo synchronously so its just-created
+        // budget alternatives are included instead of reading an older ref.
+        if (activeFile) {
+            const currentState = normalizeFileEditState({
+                rotation,
+                brightness,
+                drawShapes,
+                textAnnotations,
+                budgetAlternatives,
+            });
+            fileStatesRef.current.set(activeFile.id, currentState);
+            await flushPhotoStateSave({ fileId: activeFile.id, state: currentState });
+        } else {
+            await flushPhotoStateSave();
+        }
         const alternatives = files.flatMap(file => fileStatesRef.current.get(file.id)?.budgetAlternatives ?? []);
         onBudgetFilesSelected?.(files, alternatives);
         toast.success(`${files.length} foto${files.length !== 1 ? 's' : ''} agregada${files.length !== 1 ? 's' : ''} al presupuesto`);
