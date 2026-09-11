@@ -49,7 +49,7 @@ test('keeps pasted text annotation inside the canvas bounds', () => {
 
 test('normalizes frequent clinical words with their accents', () => {
     assert.equal(
-        normalizeClinicalAnnotationText('rehabilitacion oral total en ceramicas esteticas'),
-        'rehabilitación oral total en cerámicas estéticas',
+        normalizeClinicalAnnotationText('rehabilitacion oral total en ceramicas esteticas con laser y alineadores'),
+        'rehabilitación oral total en cerámicas estéticas con láser y alineadores',
     );
 });

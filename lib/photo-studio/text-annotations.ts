@@ -15,6 +15,9 @@ export function normalizeClinicalAnnotationText(value: string): string {
         [/\bdisenos\b/gi, 'diseños'],
         [/\bprotesis\b/gi, 'prótesis'],
         [/\bodontologia\b/gi, 'odontología'],
+        [/\blaser\b/gi, 'láser'],
+        [/\balineador\b/gi, 'alineador'],
+        [/\balineadores\b/gi, 'alineadores'],
         [/\bmaxilar\b/gi, 'maxilar'],
     ];
 

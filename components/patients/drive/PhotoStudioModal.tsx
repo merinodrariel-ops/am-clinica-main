@@ -749,7 +749,8 @@ export default function PhotoStudioModal({
             toast.error('Primero escribí el texto de la alternativa');
             return;
         }
-        const alternative = budgetAlternativeFromPhotoText(annotation.text, annotation.id);
+        const normalizedText = normalizeClinicalAnnotationText(annotation.text);
+        const alternative = budgetAlternativeFromPhotoText(normalizedText, annotation.id);
         setBudgetAlternatives(current => {
             const existingIndex = current.findIndex(item => item.sourceTextId === annotation.id);
             if (existingIndex >= 0) {
