@@ -1050,7 +1050,7 @@ export default function PhotoStudioModal({
         }
 
         persistFileStatesToLocalStorage(patientId, fileStatesRef.current);
-    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations]);
+    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations, budgetAlternatives]);
 
     useEffect(() => {
         if (!patientId || !activeFile) return;
@@ -1061,7 +1061,7 @@ export default function PhotoStudioModal({
             return;
         }
 
-        const nextState = normalizeFileEditState({ rotation, brightness, drawShapes, textAnnotations });
+        const nextState = normalizeFileEditState({ rotation, brightness, drawShapes, textAnnotations, budgetAlternatives });
         photoStateDirtyRef.current = true;
 
         if (photoStateSaveTimerRef.current) clearTimeout(photoStateSaveTimerRef.current);
@@ -1072,7 +1072,7 @@ export default function PhotoStudioModal({
         return () => {
             if (photoStateSaveTimerRef.current) clearTimeout(photoStateSaveTimerRef.current);
         };
-    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations, photoStateReady, flushPhotoStateSave]);
+    }, [patientId, activeFile, rotation, brightness, drawShapes, textAnnotations, budgetAlternatives, photoStateReady, flushPhotoStateSave]);
 
     // Rebake crop source when user adjusts rotation while crop mode is active.
     // This lets the user simultaneously rotate and crop (like Keynote / Google Slides).

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Download, FileText, Loader2, Plus, Save, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -70,6 +70,7 @@ export default function PatientBudgetsPanel({
     const [saving, setSaving] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [draggingAlternative, setDraggingAlternative] = useState<number | null>(null);
+    const autoDraftSavedRef = useRef(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -83,6 +84,24 @@ export default function PatientBudgetsPanel({
             cancelled = true;
         };
     }, [patientId]);
+
+    // Passing material from the live consultation must create a durable draft.
+    // Otherwise the data only exists in the current dashboard session and a
+    // later login by Claudia starts with a blank proposal.
+    useEffect(() => {
+        if (autoDraftSavedRef.current || initialAlternatives.length === 0) return;
+        autoDraftSavedRef.current = true;
+        void createPatientPresupuesto(patientId, payload).then((result) => {
+            if (!result.success || !result.data) {
+                autoDraftSavedRef.current = false;
+                toast.error(result.error || 'No se pudo guardar el borrador del presupuesto.');
+                return;
+            }
+            setActive(result.data);
+            setRecords((current) => [result.data!, ...current]);
+            toast.success('Borrador guardado para el presupuesto formal');
+        });
+    }, [initialAlternatives.length, patientId, payload]);
 
     const selectedCases = payload.caseSlugs?.length ? payload.caseSlugs : DEFAULT_CASE_SLUGS;
     const financing = useMemo(() => buildFinancingRows(payload), [payload]);
