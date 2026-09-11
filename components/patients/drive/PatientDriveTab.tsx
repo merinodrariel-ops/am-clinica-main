@@ -51,6 +51,7 @@ import DriveFileCard from './DriveFileCard';
 import ExocadProjectCard from './ExocadProjectCard';
 import DrivePreviewModal from './DrivePreviewModal';
 import DriveUploadButton from './DriveUploadButton';
+import type { PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
 import ShareWithPatientModal from './ShareWithPatientModal';
 import PhotoTagPanel from './PhotoTagPanel';
 import PublicCasePublishModal from './PublicCasePublishModal';
@@ -360,7 +361,7 @@ interface PatientDriveTabProps {
     patientName: string;
     motherFolderUrl: string | null | undefined;
     initialCoverFileId?: string | null;
-    onBudgetFilesSelected?: (files: DriveFile[]) => void;
+    onBudgetFilesSelected?: (files: DriveFile[], alternatives?: PhotoBudgetAlternative[]) => void;
 }
 
 export default function PatientDriveTab({ patientId, patientName, motherFolderUrl, initialCoverFileId, onBudgetFilesSelected }: PatientDriveTabProps) {

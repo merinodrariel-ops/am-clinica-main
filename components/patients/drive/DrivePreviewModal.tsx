@@ -5,6 +5,7 @@ import { X, ExternalLink, Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import PhotoStudioModal from './PhotoStudioModal';
+import type { PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
 
 const STLViewer = dynamic(() => import('@/components/portal-paciente/STLViewer'), {
     ssr: false,
@@ -25,7 +26,7 @@ interface DrivePreviewModalProps {
     canSave: boolean;
     onClose: () => void;
     onSaved: (options?: { silent?: boolean; coverFileId?: string }) => void;
-    onBudgetFilesSelected?: (files: DriveFile[]) => void;
+    onBudgetFilesSelected?: (files: DriveFile[], alternatives?: PhotoBudgetAlternative[]) => void;
     autoStartSmile?: boolean;
 }
 
