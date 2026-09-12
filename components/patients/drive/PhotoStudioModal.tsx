@@ -5422,6 +5422,7 @@ export default function PhotoStudioModal({
         // React state may have changed milliseconds before the multi-selection
         // click. Capture the active photo synchronously so its just-created
         // budget alternatives are included instead of reading an older ref.
+        let activeAlternatives: PhotoBudgetAlternative[] = [];
         if (activeFile) {
             const currentState = normalizeFileEditState({
                 rotation,
@@ -5430,14 +5431,23 @@ export default function PhotoStudioModal({
                 textAnnotations,
                 budgetAlternatives,
             });
+            activeAlternatives = currentState.budgetAlternatives ?? [];
             fileStatesRef.current.set(activeFile.id, currentState);
             await flushPhotoStateSave({ fileId: activeFile.id, state: currentState });
         } else {
             await flushPhotoStateSave();
         }
-        const alternatives = files.flatMap(file => fileStatesRef.current.get(file.id)?.budgetAlternatives ?? []);
+        const alternatives = [...files.flatMap(file => fileStatesRef.current.get(file.id)?.budgetAlternatives ?? [])];
+        for (const alternative of activeAlternatives) {
+            const alreadyIncluded = alternatives.some((item) =>
+                item.sourceTextId && alternative.sourceTextId
+                    ? item.sourceTextId === alternative.sourceTextId
+                    : item.title === alternative.title && item.total === alternative.total,
+            );
+            if (!alreadyIncluded) alternatives.push(alternative);
+        }
         onBudgetFilesSelected?.(files, alternatives);
-        toast.success(`${files.length} foto${files.length !== 1 ? 's' : ''} agregada${files.length !== 1 ? 's' : ''} al presupuesto`);
+        toast.success(`${files.length} foto${files.length !== 1 ? 's' : ''} y ${alternatives.length} alternativa${alternatives.length !== 1 ? 's' : ''} enviada${alternatives.length !== 1 ? 's' : ''} al presupuesto`);
         onClose();
     }
 
