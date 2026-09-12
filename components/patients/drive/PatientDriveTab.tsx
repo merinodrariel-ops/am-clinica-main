@@ -46,6 +46,7 @@ import {
     saveFotosOrderAction,
     deleteDriveFileAction,
 } from '@/app/actions/patient-files-drive';
+import { listPatientPhotoEditStatesAction } from '@/app/actions/patient-photo-edit-states';
 import type { DriveFile } from '@/app/actions/patient-files-drive';
 import DriveFileCard from './DriveFileCard';
 import ExocadProjectCard from './ExocadProjectCard';
@@ -544,12 +545,21 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
         closePhotoContextMenu();
     }
 
-    function handleAddToBudget(targetIds = selectedPhotoIds) {
+    async function handleAddToBudget(targetIds = selectedPhotoIds) {
         const targetFiles = getPhotoSelectionFiles(targetIds);
         if (targetFiles.length === 0) return;
-        onBudgetFilesSelected?.(targetFiles);
+        const { data, error } = await listPatientPhotoEditStatesAction(patientId);
+        if (error) {
+            toast.error('No se pudieron cargar las alternativas escritas en las fotos');
+            return;
+        }
+        const selectedIds = new Set(targetFiles.map((file) => file.id));
+        const alternatives = data
+            .filter((state) => selectedIds.has(state.file_id) && Array.isArray(state.budget_alternatives))
+            .flatMap((state) => state.budget_alternatives as PhotoBudgetAlternative[]);
+        onBudgetFilesSelected?.(targetFiles, alternatives);
         closePhotoContextMenu();
-        toast.success(`${targetFiles.length} foto${targetFiles.length !== 1 ? 's' : ''} agregada${targetFiles.length !== 1 ? 's' : ''} al presupuesto`);
+        toast.success(`${targetFiles.length} foto${targetFiles.length !== 1 ? 's' : ''} y ${alternatives.length} alternativa${alternatives.length !== 1 ? 's' : ''} enviada${alternatives.length !== 1 ? 's' : ''} al presupuesto`);
     }
 
     async function handleDownloadFiles(targetIds: string[]) {
