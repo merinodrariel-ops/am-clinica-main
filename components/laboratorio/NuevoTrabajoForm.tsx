@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Search, User, Loader2, Calendar, FlaskConical, Stethoscope, Landmark, Plus, Mic, MicOff } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { createLaboratoryOrderAction, getLaboratoryRecipientDirectory } from '@/app/actions/laboratorio';
 
 const supabase = createClient();
 import MoneyInput from '@/components/ui/MoneyInput';
@@ -39,6 +40,8 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
     const [searchLoading, setSearchLoading] = useState(false);
 
     const [profesionales, setProfesionales] = useState<Profesional[]>([]);
+    const [recipients, setRecipients] = useState<{ name: string; email: string }[]>([]);
+    const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
 
     // Form data
     const [formData, setFormData] = useState({
@@ -103,6 +106,10 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
     useEffect(() => {
         if (isOpen) {
             loadProfesionales();
+            getLaboratoryRecipientDirectory().then(({ contacts, defaultEmails }) => {
+                setRecipients(contacts);
+                setSelectedRecipients(defaultEmails);
+            }).catch(() => setRecipients([]));
             if (initialPatient) {
                 setFormData(prev => ({ ...prev, paciente_id: initialPatient.id, paciente_nombre: initialPatient.name }));
             }
@@ -150,29 +157,23 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
             setIsRecording(false);
         }
         try {
-            const technicalDetails = [
-                `Cantidad: ${formData.cantidad}`,
-                formData.piezas.trim() ? `Piezas: ${formData.piezas.trim()}` : '',
-                formData.color.trim() ? `Color: ${formData.color.trim()}` : '',
-                formData.material.trim() ? `Material: ${formData.material.trim()}` : '',
-                `Escaneado digital: ${formData.escaneado}`,
-                formData.observaciones.trim() ? `Notas: ${formData.observaciones.trim()}` : '',
-            ].filter(Boolean).join('\n');
-            const { error } = await supabase
-                .from('laboratorio_trabajos')
-                .insert({
-                    paciente_id: formData.paciente_id,
-                    profesional_id: formData.profesional_id || null,
-                    tipo_trabajo: formData.tipo_trabajo,
-                    laboratorio_nombre: formData.laboratorio_nombre,
-                    fecha_envio: formData.fecha_envio,
-                    fecha_entrega_estimada: formData.fecha_entrega_estimada || null,
-                    costo_usd: formData.costo_usd,
-                    observaciones: technicalDetails,
-                    estado: 'Enviado'
-                });
-
-            if (error) throw error;
+            const result = await createLaboratoryOrderAction({
+                patientId: formData.paciente_id,
+                type: formData.tipo_trabajo,
+                professionalId: formData.profesional_id,
+                laboratoryName: formData.laboratorio_nombre,
+                sendDate: formData.fecha_envio,
+                estimatedDelivery: formData.fecha_entrega_estimada,
+                costUsd: formData.costo_usd,
+                quantity: formData.cantidad,
+                pieces: formData.piezas,
+                color: formData.color,
+                material: formData.material,
+                scanned: formData.escaneado,
+                notes: formData.observaciones,
+                recipientEmails: selectedRecipients,
+            });
+            if (!result.ok) throw new Error(result.error || 'No se pudo guardar la orden');
             onSuccess();
             onClose();
             // Reset form
@@ -193,6 +194,7 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
                 escaneado: 'Sí'
             });
             setSearchQuery('');
+            setSelectedRecipients([]);
         } catch (error) {
             console.error('Error saving lab work:', error);
             alert('Error al guardar el trabajo');
@@ -353,6 +355,18 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
                                     onChange={(e) => setFormData(prev => ({ ...prev, laboratorio_nombre: e.target.value }))}
                                 />
                             </div>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Notificar a</label>
+                            <p className="text-xs text-gray-500">Elegí una o varias personas. Sus emails están configurados en el directorio del equipo.</p>
+                            <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 max-h-32 overflow-y-auto">
+                                {recipients.length === 0 ? <span className="text-xs text-gray-400">No hay contactos activos con email.</span> : recipients.map(recipient => {
+                                    const selected = selectedRecipients.includes(recipient.email);
+                                    return <button key={recipient.email} type="button" onClick={() => setSelectedRecipients(prev => selected ? prev.filter(email => email !== recipient.email) : [...prev, recipient.email])} className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${selected ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-indigo-300'}`}>{recipient.name || recipient.email}</button>;
+                                })}
+                            </div>
+                            {selectedRecipients.length > 0 && <p className="text-xs text-indigo-600">Se notificará a {selectedRecipients.length} destinatario{selectedRecipients.length === 1 ? '' : 's'} por email.</p>}
                         </div>
 
                         {/* Dates */}
