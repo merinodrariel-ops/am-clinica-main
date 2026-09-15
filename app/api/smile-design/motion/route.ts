@@ -1,4 +1,4 @@
-import { GenerateVideosOperation, GoogleGenAI, VideoCompressionQuality } from '@google/genai';
+import { GenerateVideosOperation, GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { canManagePatientDrive } from '@/lib/patient-drive-access';
 import { createAdminClient } from '@/utils/supabase/admin';
@@ -131,7 +131,6 @@ export async function POST(request: NextRequest) {
         resolution: '720p',
         personGeneration: 'allow_adult',
         negativePrompt: NEGATIVE_PROMPT,
-        compressionQuality: VideoCompressionQuality.OPTIMIZED,
       },
     });
 
