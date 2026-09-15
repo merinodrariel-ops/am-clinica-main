@@ -84,6 +84,21 @@ export interface PlanTratamiento {
     observaciones?: string;
 }
 
+export interface LaboratorioTrabajo {
+    id: string;
+    paciente_id: string;
+    profesional_id?: string | null;
+    tipo_trabajo: string;
+    laboratorio_nombre?: string | null;
+    fecha_envio: string;
+    fecha_entrega_estimada?: string | null;
+    fecha_entrega_real?: string | null;
+    estado: 'Enviado' | 'Recibido' | 'Colocado' | 'Anulado' | string;
+    costo_usd?: number | null;
+    pagado?: boolean | null;
+    observaciones?: string | null;
+}
+
 // =============================================
 // CRUD Operations
 // =============================================
@@ -395,6 +410,24 @@ export async function getPlanesTratamiento(
     }
 
     return data || [];
+}
+
+export async function getLaboratorioTrabajos(
+    supabase: SupabaseClient,
+    pacienteId: string
+): Promise<LaboratorioTrabajo[]> {
+    const { data, error } = await supabase
+        .from('laboratorio_trabajos')
+        .select('id, paciente_id, profesional_id, tipo_trabajo, laboratorio_nombre, fecha_envio, fecha_entrega_estimada, fecha_entrega_real, estado, costo_usd, pagado, observaciones')
+        .eq('paciente_id', pacienteId)
+        .order('fecha_envio', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching laboratorio trabajos:', error);
+        return [];
+    }
+
+    return (data || []) as LaboratorioTrabajo[];
 }
 
 export async function createPlanTratamiento(

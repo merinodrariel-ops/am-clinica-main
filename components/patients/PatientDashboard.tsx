@@ -29,6 +29,7 @@ import {
     Package,
     Star,
     X,
+    FlaskConical,
 } from 'lucide-react';
 import MoneyInput from '@/components/ui/MoneyInput';
 import PatientPortalPanel from './PatientPortalPanel';
@@ -41,7 +42,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { createClient } from '@/utils/supabase/client';
-import { Paciente, HistoriaClinica, PlanTratamiento, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
+import { Paciente, HistoriaClinica, PlanTratamiento, LaboratorioTrabajo, calculateAge, formatWhatsAppLink, formatMailtoLink } from '@/lib/patients';
 import { formatCalendarDateForLocale, formatDateForLocale } from '@/lib/local-date';
 import { updatePatientAction } from '@/app/actions/patients';
 import { PrestacionConProfesional } from '@/app/actions/prestaciones';
@@ -49,6 +50,7 @@ import type { PlanFinanciacion } from '@/lib/financiacion';
 import PatientCadence from '@/components/recalls/PatientCadence';
 import PatientPaymentHistory from '@/components/caja/PatientPaymentHistory';
 import NuevaPrestacionModal from './NuevaPrestacionModal';
+import PatientLaboratoryPanel from './PatientLaboratoryPanel';
 import PatientBudgetsPanel from './PatientBudgetsPanel';
 import type { PhotoBudgetAlternative } from '@/lib/photo-studio/edit-state';
 import { canManagePresupuestos } from '@/lib/presupuesto-access';
@@ -112,6 +114,7 @@ interface PatientDashboardProps {
     prestaciones?: PrestacionConProfesional[];
     financingPlan?: PlanFinanciacion | null;
     designReview?: DesignReview | null;
+    laboratorioTrabajos?: LaboratorioTrabajo[];
 }
 
 const AEO_REVIEW_TEMPLATE_OPTIONS: Array<{
@@ -132,7 +135,7 @@ const AEO_REVIEW_TEMPLATE_OPTIONS: Array<{
     },
 ];
 
-export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null, designReview = null }: PatientDashboardProps) {
+export default function PatientDashboard({ patient, historiaClinica, planes, payments, appointments, prestaciones = [], financingPlan = null, designReview = null, laboratorioTrabajos = [] }: PatientDashboardProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { categoria: role, profile } = useAuth();
@@ -687,6 +690,14 @@ export default function PatientDashboard({ patient, historiaClinica, planes, pay
                                 )
                             ) : null}
                         </div>
+                    </PatientSection>
+
+                    <PatientSection id="laboratorio" title="Laboratorio" icon={FlaskConical} defaultOpen>
+                        <PatientLaboratoryPanel
+                            patientId={patient.id_paciente}
+                            patientName={`${patient.nombre} ${patient.apellido}`}
+                            initialTrabajos={laboratorioTrabajos}
+                        />
                     </PatientSection>
 
                     {/* 3. Datos Personales — solo roles con acceso a contacto */}

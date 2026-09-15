@@ -1,4 +1,4 @@
-import { getPacienteById, getHistoriaClinica, getPlanesTratamiento } from '@/lib/patients';
+import { getPacienteById, getHistoriaClinica, getPlanesTratamiento, getLaboratorioTrabajos } from '@/lib/patients';
 import { createClient } from '@/utils/supabase/server';
 import PatientDashboard from '@/components/patients/PatientDashboard';
 import { getPrestacionesByPaciente } from '@/app/actions/prestaciones';
@@ -39,6 +39,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
     let prestaciones;
     let financingPlan: PlanFinanciacion | null = null;
     let designReview: Awaited<ReturnType<typeof getPatientDesignReview>>['review'] = null;
+    let laboratorioTrabajos: Awaited<ReturnType<typeof getLaboratorioTrabajos>> = [];
     let errorMsg;
 
     try {
@@ -57,6 +58,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 canViewFinancialData ? getPlanesTratamiento(adminSupabase, id) : Promise.resolve([]),
                 canViewFinancialData ? getMovimientosPorPaciente(id, adminSupabase) : Promise.resolve([]),
                 canViewFinancialData ? getPrestacionesByPaciente(id) : Promise.resolve([]),
+                isMarketing ? Promise.resolve([]) : getLaboratorioTrabajos(adminSupabase, id),
             ]);
 
             historiaClinica = relatedData[0];
@@ -64,6 +66,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             planes = relatedData[2];
             payments = relatedData[3] || [];
             prestaciones = relatedData[4];
+            laboratorioTrabajos = relatedData[5];
 
             if (canViewFinancialData) {
                 const { data: fpData } = await adminSupabase
@@ -80,6 +83,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 const { review: dr } = await getPatientDesignReview(patient.id_paciente);
                 designReview = dr;
             }
+
         }
     } catch (error) {
         console.error('Error fetching patient details:', error);
@@ -144,6 +148,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             prestaciones={prestaciones || []}
             financingPlan={financingPlan}
             designReview={designReview}
+            laboratorioTrabajos={laboratorioTrabajos}
         />
     );
 }

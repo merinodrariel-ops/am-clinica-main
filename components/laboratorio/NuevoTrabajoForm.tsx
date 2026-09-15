@@ -23,9 +23,10 @@ interface NuevoTrabajoFormProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    initialPatient?: { id: string; name: string };
 }
 
-export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTrabajoFormProps) {
+export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPatient }: NuevoTrabajoFormProps) {
     const [saving, setSaving] = useState(false);
 
     // Search states
@@ -45,14 +46,22 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
         fecha_envio: new Date().toISOString().split('T')[0],
         fecha_entrega_estimada: '',
         costo_usd: 0,
-        observaciones: ''
+        observaciones: '',
+        cantidad: 1,
+        piezas: '',
+        color: '',
+        material: '',
+        escaneado: 'Sí'
     });
 
     useEffect(() => {
         if (isOpen) {
             loadProfesionales();
+            if (initialPatient) {
+                setFormData(prev => ({ ...prev, paciente_id: initialPatient.id, paciente_nombre: initialPatient.name }));
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, initialPatient]);
 
     async function loadProfesionales() {
         const { data } = await supabase.from('profesionales').select('id, nombre').eq('activo', true);
@@ -91,6 +100,14 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
 
         setSaving(true);
         try {
+            const technicalDetails = [
+                `Cantidad: ${formData.cantidad}`,
+                formData.piezas.trim() ? `Piezas: ${formData.piezas.trim()}` : '',
+                formData.color.trim() ? `Color: ${formData.color.trim()}` : '',
+                formData.material.trim() ? `Material: ${formData.material.trim()}` : '',
+                `Escaneado digital: ${formData.escaneado}`,
+                formData.observaciones.trim() ? `Notas: ${formData.observaciones.trim()}` : '',
+            ].filter(Boolean).join('\n');
             const { error } = await supabase
                 .from('laboratorio_trabajos')
                 .insert({
@@ -101,7 +118,7 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
                     fecha_envio: formData.fecha_envio,
                     fecha_entrega_estimada: formData.fecha_entrega_estimada || null,
                     costo_usd: formData.costo_usd,
-                    observaciones: formData.observaciones,
+                    observaciones: technicalDetails,
                     estado: 'Enviado'
                 });
 
@@ -118,7 +135,12 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
                 fecha_envio: new Date().toISOString().split('T')[0],
                 fecha_entrega_estimada: '',
                 costo_usd: 0,
-                observaciones: ''
+                observaciones: '',
+                cantidad: 1,
+                piezas: '',
+                color: '',
+                material: '',
+                escaneado: 'Sí'
             });
             setSearchQuery('');
         } catch (error) {
@@ -161,7 +183,7 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
                                         <User size={18} className="text-indigo-600" />
                                         <span className="font-semibold text-gray-900 dark:text-white">{formData.paciente_nombre}</span>
                                     </div>
-                                    <button
+                                    {!initialPatient && <button
                                         type="button"
                                         onClick={() => {
                                             setFormData(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }));
@@ -170,7 +192,7 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
                                         className="text-gray-400 hover:text-red-500"
                                     >
                                         <X size={16} />
-                                    </button>
+                                    </button>}
                                 </div>
                             ) : (
                                 <div className="relative">
@@ -239,6 +261,33 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess }: NuevoTr
                                 onChange={(e) => setFormData(prev => ({ ...prev, tipo_trabajo: e.target.value }))}
                                 required
                             />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Cantidad *</label>
+                            <input type="number" min={1} max={99} required value={formData.cantidad} onChange={e => setFormData(prev => ({ ...prev, cantidad: Math.max(1, Number(e.target.value) || 1) }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Piezas / números dentarios</label>
+                            <input type="text" placeholder="Ej: 11, 12, 21 y 22" value={formData.piezas} onChange={e => setFormData(prev => ({ ...prev, piezas: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Color</label>
+                            <input type="text" placeholder="Ej: A1, BL2, bleach" value={formData.color} onChange={e => setFormData(prev => ({ ...prev, color: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Material</label>
+                            <input type="text" placeholder="Ej: disilicato, zirconia, resina" value={formData.material} onChange={e => setFormData(prev => ({ ...prev, material: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">¿Escaneado digital?</label>
+                            <select value={formData.escaneado} onChange={e => setFormData(prev => ({ ...prev, escaneado: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option>Sí</option><option>No</option><option>Pendiente</option>
+                            </select>
                         </div>
 
                         {/* Lab Name */}
