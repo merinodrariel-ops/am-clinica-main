@@ -43,6 +43,7 @@ interface DriveFileCardProps {
     onShareWithPatient?: (file: DriveFile) => void;
     onShareEmail?: (file: DriveFile) => void;
     onTag?: (file: DriveFile) => void;
+    onGenerateSmileMotion?: (file: DriveFile) => void;
     photoTag?: PhotoTag | null;
     isPortada?: boolean;
     patientFolder?: string;
@@ -126,6 +127,7 @@ export default function DriveFileCard({
     onShareWithPatient,
     onShareEmail,
     onTag,
+    onGenerateSmileMotion,
     photoTag,
     isPortada,
     patientFolder,
@@ -201,6 +203,7 @@ export default function DriveFileCard({
     const canDownload = category !== 'google-doc';
     const size = formatFileSize(file.size);
     const hasShare = onShare || onShareWithPatient || onShareEmail || canDownload;
+    const isSmileResult = category === 'image' && /resultado|despu[eé]s|after/i.test(file.name);
 
     // Serve grid thumbnails through our cached proxy (small, reliable, 1-week edge cache)
     // instead of Google's raw thumbnailLink. `v=modifiedTime` busts the cache when a
@@ -450,6 +453,17 @@ export default function DriveFileCard({
                     </button>
                 )}
             </div>
+
+            {isSmileResult && onGenerateSmileMotion && (
+                <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); onGenerateSmileMotion(file); }}
+                    className="mt-1 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/15 px-2 py-1.5 text-[11px] font-semibold text-purple-300 transition hover:bg-purple-500/25"
+                    title="Abrir el resultado para generar Smile Motion"
+                >
+                    <Video size={12} /> Generar video
+                </button>
+            )}
 
             {/* File info */}
             <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={file.name}>

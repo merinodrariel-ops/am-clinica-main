@@ -78,6 +78,7 @@ function SortableFileCard({
     onShareWithPatient,
     onShareEmail,
     onTag,
+    onGenerateSmileMotion,
     photoTag,
     patientFolder,
     selectionEnabled,
@@ -94,6 +95,7 @@ function SortableFileCard({
     onShareWithPatient?: (f: DriveFile) => void;
     onShareEmail?: (f: DriveFile) => void;
     onTag?: (f: DriveFile) => void;
+    onGenerateSmileMotion?: (f: DriveFile) => void;
     photoTag?: PhotoTag | null;
     patientFolder?: string;
     selectionEnabled?: boolean;
@@ -136,6 +138,7 @@ function SortableFileCard({
                 onShareWithPatient={onShareWithPatient}
                 onShareEmail={onShareEmail}
                 onTag={onTag}
+                onGenerateSmileMotion={onGenerateSmileMotion}
                 photoTag={photoTag}
                 isPortada={isPortada}
                 patientFolder={patientFolder}
@@ -1115,6 +1118,7 @@ export default function PatientDriveTab({ patientId, patientName, motherFolderUr
                                                             onShareWithPatient={canManageDrive ? setSharePatientFile : undefined}
                                                             onShareEmail={canManageDrive ? handleShareEmail : undefined}
                                                             onTag={canManageDrive ? setTagFile : undefined}
+                                                            onGenerateSmileMotion={canManageDrive ? (selectedFile => openSmileDesign(selectedFile, motherFolderId)) : undefined}
                                                             photoTag={photoTags[file.id]}
                                                             patientFolder={getFormattedFolderName(patientName)}
                                                             selectionEnabled={canManageDrive}
