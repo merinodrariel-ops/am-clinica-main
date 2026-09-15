@@ -73,6 +73,15 @@ function generationError(error: unknown): NextResponse {
   if (/RESOURCE_EXHAUSTED|quota|billing|paid tier/i.test(message)) {
     return NextResponse.json({ error: 'La cuenta de Google Video no tiene saldo o cuota disponible.' }, { status: 429 });
   }
+  if (/INVALID_ARGUMENT|invalid argument|bad request|unsupported/i.test(message)) {
+    return NextResponse.json({ error: 'Google rechazó la configuración del video. La generación necesita una corrección técnica.' }, { status: 422 });
+  }
+  if (/API_KEY_INVALID|permission denied|PERMISSION_DENIED|unauthorized|401/i.test(message)) {
+    return NextResponse.json({ error: 'La cuenta de Google Video no está autorizada para usar este modelo.' }, { status: 401 });
+  }
+  if (/NOT_FOUND|not found|does not exist/i.test(message)) {
+    return NextResponse.json({ error: 'El modelo de video de Google no está disponible en esta cuenta.' }, { status: 502 });
+  }
   if (/safety|personGeneration|filtered|rai/i.test(message)) {
     return NextResponse.json({ error: 'Google no pudo generar el video con esta foto por sus controles de seguridad.' }, { status: 422 });
   }
@@ -121,7 +130,6 @@ export async function POST(request: NextRequest) {
         aspectRatio: '9:16',
         resolution: '720p',
         personGeneration: 'allow_adult',
-        generateAudio: false,
         negativePrompt: NEGATIVE_PROMPT,
         compressionQuality: VideoCompressionQuality.OPTIMIZED,
       },

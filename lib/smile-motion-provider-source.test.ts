@@ -14,6 +14,7 @@ test('Smile Motion uses one low-cost Google Veo Lite generation from the after i
   assert.match(routeSource, /image: \{ imageBytes: afterBase64, mimeType \}/);
   assert.match(routeSource, /numberOfVideos: 1/);
   assert.match(routeSource, /durationSeconds: 8/);
+  assert.doesNotMatch(routeSource, /generateAudio: false/);
   assert.doesNotMatch(routeSource, /FAL_KEY|fal\.subscribe|beforeBase64/);
 });
 
