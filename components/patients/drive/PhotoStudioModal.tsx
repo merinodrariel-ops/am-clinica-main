@@ -6785,6 +6785,26 @@ export default function PhotoStudioModal({
                                         alt="Resultado del Smile Design"
                                         className="h-full w-full object-contain"
                                     />
+                                    {(smileMotion.state === 'idle' || smileMotion.state === 'error') && (
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                await smileMotion.generate(
+                                                    smileDesign.result!.afterDataUrl,
+                                                    patientId,
+                                                    `${patientName.replace(/\s+/g, '_')}_${activeFile.name.replace(/\.[^.]+$/, '')}`
+                                                );
+                                            }}
+                                            className="absolute right-3 top-3 z-30 rounded-xl border border-purple-400/40 bg-purple-700/85 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm transition hover:bg-purple-600"
+                                        >
+                                            🎬 Generar video del Después
+                                        </button>
+                                    )}
+                                    {smileMotion.state === 'generating' && (
+                                        <div className="absolute right-3 top-3 z-30 rounded-xl border border-purple-400/30 bg-black/65 px-3 py-2 text-xs text-purple-100 backdrop-blur-sm">
+                                            ⟳ Generando video…
+                                        </div>
+                                    )}
                                     <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-white/85 backdrop-blur-sm">RESULTADO</span>
                                     {showSmileGrid && smileDesign.gridData && (
                                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" xmlns="http://www.w3.org/2000/svg">
