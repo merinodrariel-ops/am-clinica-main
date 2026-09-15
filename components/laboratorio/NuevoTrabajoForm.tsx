@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, Search, User, Loader2, Calendar, FlaskConical, Stethoscope, Landmark, Plus } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Search, User, Loader2, Calendar, FlaskConical, Stethoscope, Landmark, Plus, Mic, MicOff } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 const supabase = createClient();
@@ -28,6 +28,10 @@ interface NuevoTrabajoFormProps {
 
 export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPatient }: NuevoTrabajoFormProps) {
     const [saving, setSaving] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const finalTranscriptRef = useRef('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognitionRef = useRef<any>(null);
 
     // Search states
     const [searchQuery, setSearchQuery] = useState('');
@@ -53,6 +57,48 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
         material: '',
         escaneado: 'Sí'
     });
+
+    function toggleDictation() {
+        if (isRecording) {
+            recognitionRef.current?.stop();
+            setIsRecording(false);
+            return;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const SpeechRecognition = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Tu navegador no soporta dictado por voz. Usá Chrome o Edge.');
+            return;
+        }
+
+        finalTranscriptRef.current = formData.observaciones;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const recognition = new SpeechRecognition() as any;
+        recognition.lang = 'es-AR';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recognition.onresult = (event: any) => {
+            let interim = '';
+            let finals = '';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const result of Array.from(event.results) as any[]) {
+                if (result.isFinal) finals += result[0].transcript;
+                else interim += result[0].transcript;
+            }
+            if (finals) finalTranscriptRef.current = `${finalTranscriptRef.current} ${finals}`.trim();
+            setFormData(prev => ({ ...prev, observaciones: `${finalTranscriptRef.current} ${interim}`.trim() }));
+        };
+        recognition.onend = () => {
+            setFormData(prev => ({ ...prev, observaciones: finalTranscriptRef.current }));
+            setIsRecording(false);
+        };
+        recognition.onerror = () => setIsRecording(false);
+        recognitionRef.current = recognition;
+        recognition.start();
+        setIsRecording(true);
+    }
 
     useEffect(() => {
         if (isOpen) {
@@ -99,6 +145,10 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
         }
 
         setSaving(true);
+        if (isRecording) {
+            recognitionRef.current?.stop();
+            setIsRecording(false);
+        }
         try {
             const technicalDetails = [
                 `Cantidad: ${formData.cantidad}`,
@@ -334,9 +384,19 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
 
                     {/* Observations */}
                     <div className="space-y-2">
-                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Observaciones / Detalles Técnicos</label>
+                        <div className="flex items-center justify-between gap-3">
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Indicaciones al laboratorio</label>
+                            <button
+                                type="button"
+                                onClick={toggleDictation}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isRecording ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}
+                            >
+                                {isRecording ? <MicOff size={14} /> : <Mic size={14} />}
+                                {isRecording ? 'Detener dictado' : 'Dictar'}
+                            </button>
+                        </div>
                         <textarea
-                            placeholder="Color, materiales, especificaciones..."
+                            placeholder="Podés escribir o dictar color, materiales, forma y especificaciones..."
                             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none h-24"
                             value={formData.observaciones}
                             onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
