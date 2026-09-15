@@ -16,16 +16,16 @@ const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const MOTION_PROMPT = [
   'Use the supplied portrait as the exact first frame.',
-  'Create one continuous vertical portrait shot with no cuts.',
+  'Create one continuous 8-second vertical portrait shot designed to loop smoothly, with no cuts.',
   'The adult patient keeps the exact same identity, teeth, dental anatomy, smile design, skin, hair and background.',
-  'Only add a very subtle natural head movement, soft blinking and gentle breathing.',
-  'Keep the mouth and final designed smile clearly visible and unchanged.',
-  'Photorealistic clinical-social media footage, stable camera, no dialogue, no text, no logos.',
+  'Animate the patient as genuinely happy with the result: natural speech-like lip movement as if chatting casually, a warm smile, a brief soft laugh, subtle facial expressions, gentle blinking, breathing and small head gestures.',
+  'Keep the mouth, lips and final designed smile clearly visible and unchanged throughout the shot.',
+  'Photorealistic clinical-social media footage, stable camera, warm natural expression, no subtitles, no text, no logos.',
 ].join(' ');
 
 const NEGATIVE_PROMPT = [
   'changed teeth, changed smile, altered dental anatomy, face distortion, identity change,',
-  'camera movement, scene cut, zoom, morphing, extra teeth, open mouth, speech, text, watermark',
+  'camera movement, scene cut, zoom, morphing, extra teeth, deformed mouth, text, watermark',
 ].join(' ');
 
 type StartBody = {
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       image: { imageBytes: afterBase64, mimeType },
       config: {
         numberOfVideos: 1,
-        durationSeconds: 4,
+        durationSeconds: 8,
         aspectRatio: '9:16',
         resolution: '720p',
         personGeneration: 'allow_adult',
