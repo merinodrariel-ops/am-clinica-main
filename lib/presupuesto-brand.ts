@@ -152,6 +152,15 @@ export const AM_REFERENCE_CASES: ReferenceCase[] = [
         image: caseImage('casos/galeria/caso-patricia-carillas-diseno-sonrisa-ceramicas-dr-ariel-merino'),
         url: AM_LINKS.cases,
     },
+    {
+        slug: 'cafaro-carillas-porcelana-naturalidad-color-una-semana',
+        kicker: 'CARILLAS DE PORCELANA',
+        stat: 'CASO CAFARO',
+        headline: 'Recuperar la naturalidad y el color en una semana.',
+        detail: '21 carillas de porcelana superiores e inferiores en menos de 7 días, para recuperar volumen y color sin modificar la mordida.',
+        image: caseImage('casos/carillas-de-porcelana-recuperar-la-naturalidad-y-el-color-en-una-semana/14-lienzo-1-jpg.jpg'),
+        url: `${AM_SITE}/casos/carillas-de-porcelana-recuperar-la-naturalidad-y-el-color-en-una-semana`,
+    },
 ];
 
 export const DEFAULT_CASE_SLUGS = [
