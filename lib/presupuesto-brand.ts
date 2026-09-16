@@ -143,6 +143,15 @@ export const AM_REFERENCE_CASES: ReferenceCase[] = [
         image: caseImage('casos/gingivectomia-laser-09-antes-despues-comparativa-2/01-gingivectomia-laser-09-antes-despues-comparativa.png'),
         url: `${AM_SITE}/casos/gingivectomia-laser-sin-bisturi-sangrado-puntos`,
     },
+    {
+        slug: 'patricia-diseno-sonrisa-carillas-ceramicas',
+        kicker: 'DISEÑO DE SONRISA',
+        stat: 'CASO PATRICIA',
+        headline: 'Diseño de sonrisa con carillas cerámicas.',
+        detail: 'Caso real de Patricia, publicado por AM Estética Dental, con una transformación estética planificada y carillas cerámicas.',
+        image: caseImage('casos/galeria/caso-patricia-carillas-diseno-sonrisa-ceramicas-dr-ariel-merino'),
+        url: AM_LINKS.cases,
+    },
 ];
 
 export const DEFAULT_CASE_SLUGS = [
