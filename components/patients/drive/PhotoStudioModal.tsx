@@ -2974,7 +2974,8 @@ export default function PhotoStudioModal({
             }
         }
     }, [drawShapes, currentPoints, drawVisible, drawColor, drawMode, selectedShapeId, mousePos, imageUrl,
-        textAnnotations, editingTextId, selectedTextId, textToolActive, strokeStyle, multiSelectedIds, canvasActive]);
+        textAnnotations, editingTextId, selectedTextId, textToolActive, strokeStyle, multiSelectedIds, canvasActive,
+        imageLoadState?.status, imageLoadState?.displayUrl]);
 
     // ── Canvas layers rendering ───────────────────────────────────────────────
     useEffect(() => {
