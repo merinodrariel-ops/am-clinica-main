@@ -171,7 +171,14 @@ export async function createLaboratoryOrderAction(input: {
         const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://am-clinica-main.vercel.app').replace(/\/$/, '');
         const patientUrl = `${appBaseUrl}/patients/${encodeURIComponent(input.patientId)}?section=laboratorio`;
         const html = `<div style="font-family:Arial,sans-serif;color:#172033"><h2>Nueva orden de diseño</h2><p>Se recibió una orden para <strong>${escapeHtml(patientName)}</strong>.</p><p><strong>Tipo:</strong> ${escapeHtml(type)}<br/><strong>Laboratorio:</strong> ${escapeHtml(input.laboratoryName || 'A definir')}</p><pre style="white-space:pre-wrap;font-family:Arial;line-height:1.6;background:#f4f6fa;padding:16px;border-radius:8px">${escapeHtml(technicalDetails)}</pre><p><a href="${patientUrl}">Abrir ficha y orden en AM Clínica</a></p></div>`;
-        const result = await sendEmail({ to: emails, subject, html, workflowId, patientId: input.patientId, sourceModule: 'laboratorio', templateKey: 'laboratory_order_created', idempotencyKey: `laboratory_order_created:${order.id}` });
+        let result: { success: boolean; error?: unknown } = { success: false, error: 'No se pudo iniciar el envío de email' };
+        try {
+            result = await sendEmail({ to: emails, subject, html, workflowId, patientId: input.patientId, sourceModule: 'laboratorio', templateKey: 'laboratory_order_created', idempotencyKey: `laboratory_order_created:${order.id}` });
+        } catch (error) {
+            // The order is already persisted. Do not turn a notification failure
+            // into a false "order failed" message that invites duplicate retries.
+            console.error('[laboratorio] notification failed after order creation:', error instanceof Error ? error.message : String(error));
+        }
         for (const email of emails) {
             await supabase.from('workflow_notifications_log').insert({ workflow_id: workflowId, stage_id: stageId, event_type: 'laboratory_order_created', recipient_email: email, subject, status: result.success ? 'sent' : 'failed', error_message: result.success ? null : String(result.error || 'unknown_error'), event_key: `laboratory_order_created:${order.id}:${email}` }).then(() => undefined);
         }

@@ -197,7 +197,8 @@ export default function NuevoTrabajoForm({ isOpen, onClose, onSuccess, initialPa
             setSelectedRecipients([]);
         } catch (error) {
             console.error('Error saving lab work:', error);
-            alert('Error al guardar el trabajo');
+            const message = error instanceof Error ? error.message : 'Error al guardar el trabajo';
+            alert(`No se pudo guardar la orden de laboratorio.\n\n${message}`);
         } finally {
             setSaving(false);
         }
