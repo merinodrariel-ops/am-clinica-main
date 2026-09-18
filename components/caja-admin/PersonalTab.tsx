@@ -59,6 +59,7 @@ import {
     countObservadosPendientes,
     createPersonal,
     updatePersonal,
+    togglePersonalActivo,
     uploadPersonalDocument,
     type CreatePersonalInput,
     getPersonalValoresHoraHistoria,
@@ -154,6 +155,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     const [portalReady, setPortalReady] = useState(false);
     const [activeTab, setActiveTab] = useState<MainTab>((initialTab === 'equipo' ? 'prestadores' : initialTab) || 'prestadores');
     const [activeProviderCategory, setActiveProviderCategory] = useState<ProviderCategory | 'todos'>('todos');
+    const [providerStatusFilter, setProviderStatusFilter] = useState<'activos' | 'inactivos' | 'todos'>('activos');
+    const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
     const [observadosCount, setObservadosCount] = useState(0);
     const [personal, setPersonal] = useState<Personal[]>([]);
     const [personalAreas, setPersonalAreas] = useState<PersonalArea[]>([]);
@@ -406,6 +409,23 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             setActivatingPrestador(null);
             loadData();
         }
+    };
+
+    const handleTogglePrestadorActivo = async (prestador: Personal) => {
+        const nextActivo = !prestador.activo;
+        setTogglingActiveId(prestador.id);
+        const result = await togglePersonalActivo(prestador.id, nextActivo);
+        setTogglingActiveId(null);
+
+        if (!result.success) {
+            toast.error(result.error || 'No se pudo actualizar el estado del prestador');
+            return;
+        }
+
+        setPersonal((prev) => prev.map((item) => (
+            item.id === prestador.id ? { ...item, activo: nextActivo } : item
+        )));
+        toast.success(nextActivo ? `${prestador.nombre} reactivado` : `${prestador.nombre} desactivado`);
     };
 
     const handleSendAccess = async () => {
@@ -1052,7 +1072,7 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 prestacionesMesData,
                 configData,
             ] = await Promise.all([
-                getPersonal(),
+                getPersonal({ includeInactive: true }),
                 getPersonalAreas(),
                 getRegistroHoras({ mes: mesActual }),
                 getLiquidaciones({ mes: mesActual }),
@@ -1078,7 +1098,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
             }
 
             if (personalData.length > 0) {
-                setHorasForm(f => ({ ...f, personal_id: personalData[0].id }));
+                const firstActive = personalData.find((p) => p.activo) || personalData[0];
+                setHorasForm(f => ({ ...f, personal_id: firstActive.id }));
             }
         } finally {
             setLoading(false);
@@ -1948,7 +1969,13 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
         mensual: 0,
     });
 
-    const filteredPrestadores = prestadores.filter((p) => {
+    const statusFilteredPrestadores = prestadores.filter((p) => {
+        if (providerStatusFilter === 'activos') return p.activo !== false;
+        if (providerStatusFilter === 'inactivos') return p.activo === false;
+        return true;
+    });
+
+    const filteredPrestadores = statusFilteredPrestadores.filter((p) => {
         const hasSearch = searchTerm.trim() !== '';
 
         if (!hasSearch && activeProviderCategory !== 'todos') {
@@ -1975,6 +2002,8 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
     });
 
     const activeProviderLabel = providerCategories.find((cat) => cat.id === activeProviderCategory)?.label || 'Prestadores';
+    const activePrestadoresCount = prestadores.filter((p) => p.activo !== false).length;
+    const inactivePrestadoresCount = prestadores.filter((p) => p.activo === false).length;
 
     const hiddenUserPlaceholdersCount = personal.filter((p) => shouldHideFromPrestadores(p)).length;
 
@@ -2184,6 +2213,29 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                 {/* Search and Actions */}
                 {activeTab === 'prestadores' && (
                     <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado:</span>
+                            {([
+                                ['activos', `Activos (${activePrestadoresCount})`],
+                                ['inactivos', `Inactivos (${inactivePrestadoresCount})`],
+                                ['todos', `Todos (${prestadores.length})`],
+                            ] as const).map(([value, label]) => (
+                                <Button
+                                    key={value}
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setProviderStatusFilter(value)}
+                                    className={`h-auto rounded-lg px-3 py-1.5 text-sm transition-colors ${providerStatusFilter === value
+                                        ? value === 'inactivos'
+                                            ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                            : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                                        }`}
+                                >
+                                    {label}
+                                </Button>
+                            ))}
+                        </div>
                         <div className="flex flex-wrap gap-2">
                             {providerCategories.map((category) => {
                                 const isCategoryActive = activeProviderCategory === category.id;
@@ -3572,6 +3624,12 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                             <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                                                 {p.area || p.rol}
                                             </span>
+                                            <span className={`ml-2 inline-block px-2 py-0.5 text-xs rounded-full ${p.activo !== false
+                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                                }`}>
+                                                {p.activo !== false ? 'Activo' : 'Inactivo'}
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-1">
                                             <Button
@@ -3606,6 +3664,20 @@ export default function PersonalTab({ tcBna, initialTab, initialObservedPersonal
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             )}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => void handleTogglePrestadorActivo(p)}
+                                                disabled={togglingActiveId === p.id}
+                                                className={`h-8 w-8 p-1.5 rounded-lg transition-colors disabled:opacity-50 ${p.activo !== false
+                                                    ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-900/30'
+                                                    : 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/30'
+                                                    }`}
+                                                title={p.activo !== false ? 'Desactivar prestador' : 'Reactivar prestador'}
+                                                aria-label={`${p.activo !== false ? 'Desactivar' : 'Reactivar'} a ${p.nombre} ${p.apellido || ''}`.trim()}
+                                            >
+                                                {p.activo !== false ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+                                            </Button>
                                         </div>
                                     </div>
 
