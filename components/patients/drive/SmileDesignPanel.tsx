@@ -43,7 +43,7 @@ interface SmileDesignPanelProps {
 const IDENTITY_OPTIONS: { value: SmileIdentity; label: string; hint: string }[] = [
   { value: 'Fiel', label: 'Fiel al paciente', hint: 'Conserva tamaño, proporciones y personalidad dental.' },
   { value: 'Equilibrado', label: 'Equilibrado', hint: 'Híbrido entre identidad real y sonrisa armónica.' },
-  { value: 'Idealizado', label: 'Idealizado', hint: 'Mayor corrección, simetría y perfección estética.' },
+  { value: 'Idealizado', label: 'Idealizado', hint: 'Cierra espacios visibles y armoniza proporciones sin dientes sobredimensionados.' },
 ];
 const EXPRESSION_OPTIONS: { value: SmileExpression; label: string; hint: string }[] = [
   { value: 'Sonrisa suave', label: 'Sonrisa suave', hint: 'Afloja apenas una expresión rígida, sin exagerarla.' },

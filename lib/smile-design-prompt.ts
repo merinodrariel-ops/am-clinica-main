@@ -40,7 +40,9 @@ const IDENTITY_PROMPTS: Record<SmileSettings['identity'], string> = {
   ].join(' '),
   Idealizado: [
     'IDENTIDAD IDEALIZADA: permite una corrección más marcada de alineación, simetría y proporciones, como una rehabilitación estética.',
-    'Cierra espacios y armoniza formas, pero evita dientes sobredimensionados, bloques uniformes o apariencia de prótesis digital.',
+    'OBJETIVO OBLIGATORIO DEL IDEALIZADO: cierra por completo todos los espacios interdentales visibles en el sector anterior, especialmente el diastema de la línea media; no dejes una ranura oscura ni una separación residual en el centro.',
+    'Para cerrar los espacios, redistribuye de manera natural el ancho y la posición de las piezas adyacentes, manteniendo el número de dientes, contactos interproximales creíbles, troneras gingivales pequeñas y proporciones armónicas entre incisivos centrales, laterales y caninos.',
+    'Los dientes deben verse proporcionados y adultos: evita dientes sobredimensionados o alargados de más, bloques uniformes y cualquier apariencia de prótesis digital.',
   ].join(' '),
 };
 

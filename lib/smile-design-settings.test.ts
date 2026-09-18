@@ -84,6 +84,10 @@ test('idealized prompt allows stronger correction without oversized teeth', () =
   });
 
   assert.match(prompt, /corrección más marcada/i);
+  assert.match(prompt, /cierra por completo todos los espacios interdentales visibles/i);
+  assert.match(prompt, /diastema de la línea media/i);
+  assert.match(prompt, /contactos interproximales creíbles/i);
+  assert.match(prompt, /proporciones armónicas entre incisivos centrales, laterales y caninos/i);
   assert.match(prompt, /evita dientes sobredimensionados/i);
   assert.match(prompt, /blanco estético moderado/i);
 });
